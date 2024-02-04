@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Test.Compilation.UInt.CLMul (tests, run) where
 
@@ -34,8 +33,8 @@ tests =
 
     it "2 byte variables" $ do
       let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
             return $ x .*. y
       property $ \(x, y :: Word8) -> do
         let expected = [toInteger (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
@@ -44,7 +43,7 @@ tests =
 
     it "1 variable / 1 constant" $ do
       let program y = do
-            x <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
             return $ x .*. fromInteger y
       property $ \(x :: Word8, y :: Word8) -> do
         let expected = [toInteger (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
@@ -53,8 +52,8 @@ tests =
 
     it "2 variables / 1 constant" $ do
       let program c = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
             return $ x .*. y .*. fromInteger c
       property $ \(x, y :: Word8, c :: Word8) -> do
         let expected = [toInteger (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger c))]
@@ -63,9 +62,9 @@ tests =
 
     it "3 variables / 1 constant" $ do
       let program c = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
-            z <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
+            z <- input Public
             return $ x .*. y .*. z .*. fromInteger c
       property $ \(x, y, z :: Word8, c :: Word8) -> do
         let expected = [toInteger (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger z) `U.clMul` U.new 8 (toInteger c))]

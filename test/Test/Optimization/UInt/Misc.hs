@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Test.Optimization.UInt.Misc (tests, run) where
 
@@ -21,7 +20,7 @@ tests = describe "Misc" $ do
     --  xor 2: 1*3 = 3
     it "constant 2" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
         return $ x `aesMul` 2
 
       cs `shouldHaveSize` 27
@@ -33,7 +32,7 @@ tests = describe "Misc" $ do
     --  xor 3: 2*1 = 2
     it "constant 4" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
         return $ x `aesMul` 4
 
       cs `shouldHaveSize` 30

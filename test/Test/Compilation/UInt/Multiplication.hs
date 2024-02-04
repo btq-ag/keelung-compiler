@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Test.Compilation.UInt.Multiplication (tests, run) where
 
@@ -26,8 +25,8 @@ tests = describe "Multiplication" $ do
 
   it "2 positive variables / Byte" $ do
     let program = do
-          x <- inputUInt @8 Public
-          y <- inputUInt @8 Public
+          x <- input Public :: Comp (UInt 8)
+          y <- input Public
           return $ x * y
     property $ \(x, y :: Word8) -> do
       let expected = [toInteger (x * y)]
@@ -35,7 +34,7 @@ tests = describe "Multiplication" $ do
 
   it "1 constant + 1 variable / Byte" $ do
     let program x = do
-          y <- inputUInt @8 Public
+          y <- input Public :: Comp (UInt 8)
           return $ x * y
     property $ \(x, y :: Word8) -> do
       let expected = [toInteger (x * y)]
@@ -43,28 +42,17 @@ tests = describe "Multiplication" $ do
 
   it "1 variable + 1 constant / Byte" $ do
     let program y = do
-          x <- inputUInt @8 Public
+          x <- input Public :: Comp (UInt 8)
           return $ x * y
     property $ \(x, y :: Word8) -> do
       let expected = [toInteger (x * y)]
       forM_ [gf181, Prime 17, Binary 7] $ \field -> testCompiler field (program (fromIntegral y)) [toInteger x] [] expected
 
-  -- it "variable * constant + 0 / Byte" $ do
-  --   let program y = do
-  --         x <- inputUInt @8 Public
-  --         return $ x * fromIntegral y + 0
-  --   property $ \(x, y :: Word8) -> do
-  --     let expected = [toInteger (x * y)]
-  --     forM_ [gf181, Prime 257, Prime 17] $ \field -> do
-  --       let options = defaultOptions { optUseNewLinker = True }
-  --       testCompilerWithOpts options field (program y) [toInteger x] [] expected
-  --     -- forM_ [Binary 7] $ \field -> testCompiler field (program y 0) [toInteger x] [] expected
-
   it "with addition / Byte" $ do
     let program = do
-          x <- inputUInt @8 Public
-          y <- inputUInt @8 Public
-          z <- inputUInt @8 Public
+          x <- input Public :: Comp (UInt 8)
+          y <- input Public
+          z <- input Public
           return $ x * y + z
     property $ \(x, y, z :: Word8) -> do
       let expected = [toInteger (x * y + z)]
@@ -72,9 +60,9 @@ tests = describe "Multiplication" $ do
 
   it "with subtraction / Byte" $ do
     let program = do
-          x <- inputUInt @8 Public
-          y <- inputUInt @8 Public
-          z <- inputUInt @8 Public
+          x <- input Public :: Comp (UInt 8)
+          y <- input Public
+          z <- input Public
           return $ x * y - z
     property $ \(x, y, z :: Word8) -> do
       let expected = [toInteger (x * y - z)]

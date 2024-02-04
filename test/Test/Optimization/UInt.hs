@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Test.Optimization.UInt (tests, run) where
 
@@ -57,8 +56,8 @@ tests = describe "UInt" $ do
       -- 1 for carry bit
       -- 1 for addition
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x + y
       cs `shouldHaveSize` 26
       cs' `shouldHaveSize` 26
@@ -68,8 +67,8 @@ tests = describe "UInt" $ do
       -- 2 for carry bit
       -- 2 for addition
       (cs, cs') <- executePrime 17 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Public
+        x <- input Public :: Comp (UInt 4)
+        y <- input Public
         return $ x + y
       cs `shouldHaveSize` 16
       cs' `shouldHaveSize` 16
@@ -79,8 +78,8 @@ tests = describe "UInt" $ do
       -- 2 for carry bit
       -- 2 for addition
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @256 Public
-        y <- inputUInt @256 Public
+        x <- input Public :: Comp (UInt 256)
+        y <- input Public
         return $ x + y
       cs `shouldHaveSize` 772
       cs' `shouldHaveSize` 772
@@ -90,7 +89,7 @@ tests = describe "UInt" $ do
       -- 1 for carry bit
       -- 1 for addition
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
         return $ x + 4
       cs `shouldHaveSize` 18
       cs' `shouldHaveSize` 18
@@ -100,9 +99,9 @@ tests = describe "UInt" $ do
       -- 2 for carry bit
       -- 1 for addition
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Public
-        z <- inputUInt @4 Public
+        x <- input Public :: Comp (UInt 4)
+        y <- input Public
+        z <- input Public
         return $ x + y + z + 4
       cs `shouldHaveSize` 19
       cs' `shouldHaveSize` 19
@@ -112,9 +111,9 @@ tests = describe "UInt" $ do
       -- 2 for carry bit
       -- 1 for addition
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Public
-        z <- inputUInt @4 Public
+        x <- input Public :: Comp (UInt 4)
+        y <- input Public
+        z <- input Public
         return $ x - y + z + 4
       cs `shouldHaveSize` 19
       cs' `shouldHaveSize` 19
@@ -134,24 +133,22 @@ tests = describe "UInt" $ do
 
     it "2 variables / byte / GF181 (old linker)" $ do
       (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x * y
       cs `shouldHaveSize` 42
       cs' `shouldHaveSize` 42 -- TODO: should've been 33
-      
     it "2 variables / byte / GF181 (new linker, with UInt union find)" $ do
       (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = True}) $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x * y
       cs `shouldHaveSize` 42
       cs' `shouldHaveSize` 42 -- TODO: should've been 33
-
     it "2 variables / byte / GF181 (new linker, without UInt union find)" $ do
       (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = False}) $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x * y
       cs `shouldHaveSize` 42
       cs' `shouldHaveSize` 33
@@ -174,65 +171,64 @@ tests = describe "UInt" $ do
 
     it "2 variables / byte / Prime 257 (old linker)" $ do
       (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = False}) 257 $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 55 -- TODO: should've been 50
     it "2 variables / byte / Prime 257 (new linker, with UInt union find)" $ do
       (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = True}) 257 $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 55 -- TODO: should've been 50
     it "2 variables / byte / Prime 257 (new linker, without UInt union find)" $ do
       (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = False}) 257 $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 50
-    
+
     it "2 variables / byte / Prime 1031 (old linker)" $ do
       (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = False}) 1031 $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 55 -- TODO: should've been 50
     it "2 variables / byte / Prime 1031 (new linker, with UInt union find)" $ do
       (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = True}) 1031 $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 55 -- TODO: should've been 50
     it "2 variables / byte / Prime 1031 (new linker, without UInt union find)" $ do
       (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = False}) 1031 $ do
-        x <- inputUInt @8 Public
-        y <- inputUInt @8 Public
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 50
-    
 
     -- TODO: can be lower
     it "variable / constant (old linker)" $ do
       (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
-        x <- inputUInt @4 Public
+        x <- input Public :: Comp (UInt 4)
         return $ x * 4
       cs `shouldHaveSize` 18
       cs' `shouldHaveSize` 18 -- TODO: should've been 13
     it "variable / constant (new linker, with UInt union find)" $ do
       (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = True}) $ do
-        x <- inputUInt @4 Public
+        x <- input Public :: Comp (UInt 4)
         return $ x * 4
       cs `shouldHaveSize` 18
       cs' `shouldHaveSize` 18 -- TODO: should've been 13
     it "variable / constant (new linker, without UInt union find)" $ do
       (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True, optUseUIntUnionFind = False}) $ do
-        x <- inputUInt @4 Public
+        x <- input Public :: Comp (UInt 4)
         return $ x * 4
       cs `shouldHaveSize` 18
       cs' `shouldHaveSize` 13
@@ -269,63 +265,40 @@ tests = describe "UInt" $ do
       cs `shouldHaveSize` 5
       cs' `shouldHaveSize` 5
 
-  -- describe "Bitwise Operators" $ do
-  --   it "setBit twice" $ do
-  --     (cs, cs') <- executeGF181 $ do
-  --       x <- inputUInt @8 Public
-  --       return $ setBit (setBit x 0 true) 1 true
-  --     print cs
-  --     -- print $ linkConstraintModule cs'
-  --     cs `shouldHaveSize` 24
-  --     cs' `shouldHaveSize` 24
-
-  --     it "U8 -> U16" $ do
-  --       (cs, cs') <- executeGF181 $ do
-  --         x <- inputUInt @8 Public
-  --         y <- inputUInt @8 Public
-  --         return $ u8ToU16 x y
-  --       print cs
-  --       cs `shouldHaveSize` 528
-  --       cs' `shouldHaveSize` 528
-  -- where
-  --   u8ToU16 :: UInt 8 -> UInt 8 -> UInt 16
-  --   u8ToU16 x y =
-  --     foldl (\n index -> setBit n (index + 8) (y !!! index)) (foldl (\n index -> setBit n index (x !!! index)) 0 [0 .. 7]) [0 .. 7]
-
   describe "Comparison computation" $ do
     it "x ≤ y" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Private
+        x <- input Public :: Comp (UInt 4)
+        y <- input Private
         return $ x `lte` y
       cs `shouldHaveSize` 17
       cs' `shouldHaveSize` 16
 
     it "0 ≤ x" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
+        x <- input Public :: Comp (UInt 4)
         return $ (0 :: UInt 4) `lte` x
       cs `shouldHaveSize` 6
       cs' `shouldHaveSize` 6
 
     it "1 ≤ x" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
+        x <- input Public :: Comp (UInt 4)
         return $ (1 :: UInt 4) `lte` x
       cs `shouldHaveSize` 9
       cs' `shouldHaveSize` 8
 
     it "x ≤ 0" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        return $ x `lte` (0 :: UInt 4)
+        x <- input Public :: Comp (UInt 4)
+        return $ x `lte` 0
       cs `shouldHaveSize` 8
       cs' `shouldHaveSize` 7
 
     it "x ≤ 1" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        return $ x `lte` (1 :: UInt 4)
+        x <- input Public :: Comp (UInt 4)
+        return $ x `lte` 1
       cs `shouldHaveSize` 9
       cs' `shouldHaveSize` 7
 
@@ -337,24 +310,24 @@ tests = describe "UInt" $ do
 
     it "x < y" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Private
+        x <- input Public :: Comp (UInt 4)
+        y <- input Private
         return $ x `lt` y
       cs `shouldHaveSize` 17
       cs' `shouldHaveSize` 16
 
     it "x ≥ y" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Private
+        x <- input Public :: Comp (UInt 4)
+        y <- input Private
         return $ x `gte` y
       cs `shouldHaveSize` 17
       cs' `shouldHaveSize` 16
 
     it "x > y" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Private
+        x <- input Public :: Comp (UInt 4)
+        y <- input Private
         return $ x `gt` y
       cs `shouldHaveSize` 17
       cs' `shouldHaveSize` 16
@@ -363,39 +336,39 @@ tests = describe "UInt" $ do
     describe "between variables" $ do
       it "x ≤ y" $ do
         (cs, cs') <- executeGF181 $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Private
+          x <- input Public :: Comp (UInt 4)
+          y <- input Private
           assert $ x `lte` y
         cs `shouldHaveSize` 16
         cs' `shouldHaveSize` 15
 
     it "x < y" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Private
+        x <- input Public :: Comp (UInt 4)
+        y <- input Private
         assert $ x `lt` y
       cs `shouldHaveSize` 16
       cs' `shouldHaveSize` 15
 
     it "x ≥ y" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Private
+        x <- input Public :: Comp (UInt 4)
+        y <- input Private
         assert $ x `gte` y
       cs `shouldHaveSize` 16
       cs' `shouldHaveSize` 15
 
     it "x > y" $ do
       (cs, cs') <- executeGF181 $ do
-        x <- inputUInt @4 Public
-        y <- inputUInt @4 Private
+        x <- input Public :: Comp (UInt 4)
+        y <- input Private
         assert $ x `gt` y
       cs `shouldHaveSize` 16
       cs' `shouldHaveSize` 15
 
     describe "GTE on constants (4 bits / GF181)" $ do
       let program bound = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             assert $ x `gte` (bound :: UInt 4)
       forM_
         [ (1, 5), -- special case: the number is non-zero
@@ -421,7 +394,7 @@ tests = describe "UInt" $ do
 
     describe "GTE on constants (4 bits / Prime 2)" $ do
       let program bound = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             assert $ x `gte` (bound :: UInt 4)
       forM_
         [ (1, 7), -- special case: the number is non-zero
@@ -447,7 +420,7 @@ tests = describe "UInt" $ do
 
     describe "GTE on constants (4 bits / Prime 5)" $ do
       let program bound = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             assert $ x `gte` (bound :: UInt 4)
       forM_
         [ (1, 5), -- special case: the number is non-zero
@@ -473,7 +446,7 @@ tests = describe "UInt" $ do
 
     describe "LTE on constants (4 bits / GF181)" $ do
       let program bound = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             assert $ x `lte` (bound :: UInt 4)
       forM_
         [ (0, 5), -- special case: only 1 possible value

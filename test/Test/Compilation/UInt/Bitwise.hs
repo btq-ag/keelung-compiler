@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Test.Compilation.UInt.Bitwise (tests, run) where
 
@@ -37,7 +36,7 @@ tests = describe "Bitwise" $ do
 
     describe "variable / byte" $ do
       let program i = do
-            x <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
             return $ rotate x i
 
       it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
@@ -54,7 +53,7 @@ tests = describe "Bitwise" $ do
 
     it "misc" $ do
       let program = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             return [rotate x (-4), rotate x (-3), rotate x (-2), rotate x (-1), rotate x 0, rotate x 1, rotate x 2, rotate x 3, rotate x 4]
 
       forM_ [gf181, Prime 257, Prime 2, Binary 7] $ \field -> do
@@ -81,7 +80,7 @@ tests = describe "Bitwise" $ do
 
     describe "variable / byte" $ do
       let program i = do
-            x <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
             return $ shift x i
 
       it "GF181" $ property $ \(i :: Int, x :: Word8) -> do
@@ -98,7 +97,7 @@ tests = describe "Bitwise" $ do
 
     it "misc" $ do
       let program = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             return [x .<<. (-4), x .>>. 3, shift x (-2), shift x (-1), shift x 0, shift x 1, shift x 2, shift x 3, shift x 4]
 
       testCompiler gf181 program [0] [] [0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -108,7 +107,7 @@ tests = describe "Bitwise" $ do
 
     it "shift left" $ do
       let program n = do
-            x <- inputUInt @64 Public
+            x <- input Public :: Comp (UInt 64)
             return $ x `shiftL` n
 
       property $ \(x :: Word64, n :: Int) -> do
@@ -119,7 +118,7 @@ tests = describe "Bitwise" $ do
 
     it "shift right" $ do
       let program n = do
-            x <- inputUInt @64 Public
+            x <- input Public :: Comp (UInt 64)
             return $ x `shiftR` n
 
       property $ \(x :: Word64, n :: Int) -> do
@@ -145,25 +144,25 @@ tests = describe "Bitwise" $ do
 
     it "and 1" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Private
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
             return $ (x .&. y) !!! 0
       testCompiler gf181 program [2] [3] [0]
       testCompiler gf181 program [3] [5] [1]
 
     it "and 2" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Private
-            z <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
+            z <- input Public
             return $ (x .&. y .&. z) !!! 0
       testCompiler gf181 program [2, 4] [3] [0]
       testCompiler gf181 program [3, 7] [5] [1]
 
     it "or 1" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Private
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
             return $ (x .|. y) !!! 1
       testCompiler gf181 program [2] [3] [1]
       testCompiler gf181 program [3] [5] [1]
@@ -171,7 +170,7 @@ tests = describe "Bitwise" $ do
 
     it "or 2" $ do
       let program = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             return $ (x .|. 3) !!! 2
       testCompiler gf181 program [2] [] [0]
       testCompiler gf181 program [3] [] [0]
@@ -179,17 +178,17 @@ tests = describe "Bitwise" $ do
 
     it "xor 0" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Private
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
             let w = x .^. y .^. 0
             return [w !!! 0]
       testCompiler gf181 program [2] [3] [1]
 
     it "xor 1" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Private
-            z <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
+            z <- input Public
             w <- reuse $ x .^. y .^. z
             return [w !!! 0, w !!! 1, w !!! 2, w !!! 3]
       testCompiler gf181 program [2, 4] [3] [1, 0, 1, 0]
@@ -205,15 +204,15 @@ tests = describe "Bitwise" $ do
 
     it "rotate 1" $ do
       let program = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             return $ (x `rotate` 0) !!! 0
       testCompiler gf181 program [2] [] [0]
 
     it "rotate 2" $ do
       -- 0011 0100211003
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
+            y <- input Public
             return
               [ (x `rotate` 0) !!! 0,
                 (x `rotate` 1) !!! 1,

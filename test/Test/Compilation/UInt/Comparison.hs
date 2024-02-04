@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Test.Compilation.UInt.Comparison (tests, run) where
 
@@ -25,7 +24,7 @@ tests :: SpecWith ()
 tests = describe "Comparisons" $ do
   describe "assertLTE" $ do
     let program bound = do
-          x <- inputUInt @4 Public
+          x <- input Public :: Comp (UInt 4)
           assertLTE x bound
     let width = 4
 
@@ -128,7 +127,7 @@ tests = describe "Comparisons" $ do
 
   describe "assertLT" $ do
     let program bound = do
-          x <- inputUInt @4 Public
+          x <- input Public :: Comp (UInt 4)
           assertLT x bound
     let width = 4
     describe "bound too small" $ do
@@ -230,7 +229,7 @@ tests = describe "Comparisons" $ do
 
   describe "assertGTE" $ do
     let program bound = do
-          x <- inputUInt @4 Public
+          x <- input Public :: Comp (UInt 4)
           assertGTE x bound
     let width = 4
     describe "bound too small" $ do
@@ -332,7 +331,7 @@ tests = describe "Comparisons" $ do
 
   describe "assertGT" $ do
     let program bound = do
-          x <- inputUInt @4 Public
+          x <- input Public :: Comp (UInt 4)
           assertGT x bound
     let width = 4
     describe "bound too small" $ do
@@ -435,8 +434,8 @@ tests = describe "Comparisons" $ do
   describe "computeLTE" $ do
     it "2 variables" $ do
       let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
             return $ x `lte` y
 
       property $ \(x, y :: Word8) -> do
@@ -447,7 +446,7 @@ tests = describe "Comparisons" $ do
 
     it "variable + constant" $ do
       let program x = do
-            y <- inputUInt @8 Public
+            y <- input Public :: Comp (UInt 8)
             return $ x `lte` y
 
       property $ \(x, y :: Word8) -> do
@@ -469,8 +468,8 @@ tests = describe "Comparisons" $ do
   describe "computeLT" $ do
     it "2 variables" $ do
       let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
             return $ x `lt` y
 
       property $ \(x, y :: Word8) -> do
@@ -481,7 +480,7 @@ tests = describe "Comparisons" $ do
 
     it "variable + constant" $ do
       let program x = do
-            y <- inputUInt @8 Public
+            y <- input Public :: Comp (UInt 8)
             return $ x `lt` y
 
       property $ \(x, y :: Word8) -> do

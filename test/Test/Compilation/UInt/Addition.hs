@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Test.Compilation.UInt.Addition (tests, run) where
 
@@ -24,8 +23,8 @@ tests = describe "Addition / Subtraction" $ do
   describe "Prime field" $ do
     it "2 positive variables" $ do
       let program = do
-            x <- inputUInt @2 Public
-            y <- inputUInt @2 Public
+            x <- input Public :: Comp (UInt 2)
+            y <- input Public
             return $ x + y
       let genPair = do
             x <- chooseInteger (0, 3)
@@ -37,9 +36,9 @@ tests = describe "Addition / Subtraction" $ do
 
     it "3 positive variables" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            z <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
+            y <- input Public
+            z <- input Public
             return $ x + y + z
       -- debug (Prime 17) program
       forAll (replicateM 3 (choose (0, 15))) $ \xs -> do
@@ -48,7 +47,7 @@ tests = describe "Addition / Subtraction" $ do
 
     it "more than 4 positive variables" $ do
       let program n = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             return $ sum (replicate (fromInteger n) x)
       forAll (choose (4, 10)) $ \n -> do
         let expected = [n * n `mod` 16]
@@ -56,8 +55,8 @@ tests = describe "Addition / Subtraction" $ do
 
     it "2 positive variables / constant" $ do
       let program = do
-            x <- inputUInt @2 Public
-            y <- inputUInt @2 Public
+            x <- input Public :: Comp (UInt 2)
+            y <- input Public
             return $ x + y + 3
       let genPair = do
             x <- choose (0, 3)
@@ -69,9 +68,9 @@ tests = describe "Addition / Subtraction" $ do
 
     it "3 positive variables / constant" $ do
       let program = do
-            x <- inputUInt @2 Public
-            y <- inputUInt @2 Public
-            z <- inputUInt @2 Public
+            x <- input Public :: Comp (UInt 2)
+            y <- input Public
+            z <- input Public
             return $ x + y + z + 3
       let genPair = do
             x <- choose (0, 3)
@@ -84,7 +83,7 @@ tests = describe "Addition / Subtraction" $ do
 
     it "more than 4 positive variables / constant" $ do
       let program n = do
-            x <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
             return $ sum (replicate (fromInteger n) x) + 3
       forAll (choose (4, 10)) $ \n -> do
         let expected = [(n * n + 3) `mod` 16]
@@ -92,8 +91,8 @@ tests = describe "Addition / Subtraction" $ do
 
     it "2 mixed (positive / negative) variable" $ do
       let program = do
-            x <- inputUInt @2 Public
-            y <- inputUInt @2 Public
+            x <- input Public :: Comp (UInt 2)
+            y <- input Public
             return $ x - y
       let genPair = do
             x <- choose (0, 3)
@@ -105,8 +104,8 @@ tests = describe "Addition / Subtraction" $ do
 
     it "2 mixed (positive / negative) variable" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
+            y <- input Public
             return $ x - y
       -- debug (Prime 17) program
       -- testCompiler (Prime 17) program [3, 13] [] [6]
@@ -120,10 +119,10 @@ tests = describe "Addition / Subtraction" $ do
 
     it "3 positive / 1 negative variables" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            z <- inputUInt @4 Public
-            w <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
+            y <- input Public
+            z <- input Public
+            w <- input Public
             return $ x + y + z - w
       let genPair = do
             x <- choose (0, 15)
@@ -137,10 +136,10 @@ tests = describe "Addition / Subtraction" $ do
 
     it "3 positive / 1 negative variables (negative result)" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            z <- inputUInt @4 Public
-            w <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
+            y <- input Public
+            z <- input Public
+            w <- input Public
             return $ x + y + z - w
 
       let genPair = do
@@ -163,10 +162,10 @@ tests = describe "Addition / Subtraction" $ do
 
     it "2 positive / 2 negative variables" $ do
       let program = do
-            x <- inputUInt @10 Public
-            y <- inputUInt @10 Public
-            z <- inputUInt @10 Public
-            w <- inputUInt @10 Public
+            x <- input Public :: Comp (UInt 10)
+            y <- input Public
+            z <- input Public
+            w <- input Public
             return $ x + y - z - w
       let genPair = do
             x <- choose (0, 1023)
@@ -182,10 +181,10 @@ tests = describe "Addition / Subtraction" $ do
 
     it "1 positive / 3 negative variables" $ do
       let program = do
-            x <- inputUInt @4 Public
-            y <- inputUInt @4 Public
-            z <- inputUInt @4 Public
-            w <- inputUInt @4 Public
+            x <- input Public :: Comp (UInt 4)
+            y <- input Public
+            z <- input Public
+            w <- input Public
             return $ x - y - z - w
       let genPair = do
             x <- choose (0, 15)
@@ -199,10 +198,10 @@ tests = describe "Addition / Subtraction" $ do
 
     it "4 negative variables" $ do
       let program = do
-            x <- inputUInt @10 Public
-            y <- inputUInt @10 Public
-            z <- inputUInt @10 Public
-            w <- inputUInt @10 Public
+            x <- input Public :: Comp (UInt 10)
+            y <- input Public
+            z <- input Public
+            w <- input Public
             return $ -x - y - z - w
       let genPair = do
             x <- choose (0, 1023)
@@ -216,7 +215,7 @@ tests = describe "Addition / Subtraction" $ do
 
     it "more than 2 mixed (positive / negative / constant) / UInt 4" $ do
       let program constant signs = do
-            inputs <- replicateM (length signs) (inputUInt @4 Public)
+            inputs <- replicateM (length signs) (input Public :: Comp (UInt 4))
             return $ constant + sum (zipWith (\sign x -> if sign then x else -x) signs inputs)
       let genPair = do
             n <- choose (2, 10)
@@ -234,8 +233,8 @@ tests = describe "Addition / Subtraction" $ do
   describe "Binary field" $ do
     it "2 positive variables / Byte" $ do
       let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
             return $ x + y
       property $ \(x, y :: Word8) -> do
         let expected = [toInteger (x + y)]
@@ -243,8 +242,8 @@ tests = describe "Addition / Subtraction" $ do
 
     it "1 positive variable + 1 negative variable / Byte" $ do
       let program = do
-            x <- inputUInt @8 Public
-            y <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
             return $ x - y
       property $ \(x, y :: Word8) -> do
         let expected = [toInteger (x - y)]
@@ -252,7 +251,7 @@ tests = describe "Addition / Subtraction" $ do
 
     it "1 positive variable + 1 constant / Byte" $ do
       let program y = do
-            x <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
             return $ x + y
       property $ \(x, y :: Word8) -> do
         let expected = [toInteger (x + y)]
@@ -260,7 +259,7 @@ tests = describe "Addition / Subtraction" $ do
 
     it "1 negative variable + 1 constant / Byte" $ do
       let program y = do
-            x <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
             return $ -x + y
       property $ \(x, y :: Word8) -> do
         let expected = [toInteger (-x + y)]
@@ -268,7 +267,7 @@ tests = describe "Addition / Subtraction" $ do
 
     it "1 negative variable / Byte" $ do
       let program = do
-            x <- inputUInt @8 Public
+            x <- input Public :: Comp (UInt 8)
             return $ -x
       property $ \(x :: Word8) -> do
         let expected = [toInteger (-x)]
@@ -289,7 +288,7 @@ tests = describe "Addition / Subtraction" $ do
 
     it "mixed (positive / negative / constnat) / Byte" $ do
       let program constant signs = do
-            inputs <- replicateM (length signs) (inputUInt @8 Public)
+            inputs <- replicateM (length signs) (input Public :: Comp (UInt 8))
             return $ constant + sum (zipWith (\sign x -> if sign then x else -x) signs inputs)
       let genPair = do
             n <- choose (1, 10)
