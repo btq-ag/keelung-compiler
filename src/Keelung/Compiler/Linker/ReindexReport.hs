@@ -30,7 +30,7 @@ import Keelung.Syntax.Counters (Counters)
 import Keelung.Syntax.Counters qualified as Counters
 
 test :: (Integral n, GaloisField n) => ConstraintModule n -> Maybe Error
-test cm = checkReport (cmCounters cm) $ generateReindexReport (constructEnv cm) [] cm
+test cm = checkReport (envNewCounters (constructEnv cm)) $ generateReindexReport (constructEnv cm) [] cm
 
 --------------------------------------------------------------------------------
 
@@ -107,7 +107,7 @@ class GenerateReindexReport a where
 instance GenerateReindexReport Limb where
   generateReindexReport env tags limb =
     ReindexReport $
-      IntMap.fromDistinctAscList
+      IntMap.fromList
         [ ( reindexRefU
               env
               (Limb.lmbRef limb)
@@ -119,9 +119,8 @@ instance GenerateReindexReport Limb where
 
 instance GenerateReindexReport Slice where
   generateReindexReport env tags slice =
-    -- precondition of `fromDistinctAscList` is that the keys are in ascending order
     ReindexReport $
-      IntMap.fromDistinctAscList
+      IntMap.fromList
         [ ( reindexRefU
               env
               (Slice.sliceRefU slice)

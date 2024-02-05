@@ -89,7 +89,7 @@ limbShouldBeKept :: Env -> Limb -> Bool
 limbShouldBeKept env limb =
   if envUseNewLinker env
     then case lmbRef limb of
-      RefUX width var -> case IntMap.lookup width (envRefBsInEnvUB env) of
+      RefUX width var -> case IntMap.lookup width (envOccurUB env) of
         Nothing -> False
         Just table -> IntervalTable.member (width * var + lmbOffset limb, width * var + lmbOffset limb + lmbWidth limb) table
       _ -> True -- it's a pinned UInt variable
@@ -100,22 +100,21 @@ refUShouldBeKept :: Env -> RefU -> Bool
 refUShouldBeKept env ref = case ref of
   RefUX width var ->
     -- it's a UInt intermediate variable that occurs in the circuit
-    ( case IntMap.lookup width (envRefUsInEnvU env) of
-        Nothing -> False
-        Just xs -> IntSet.member var xs
-    )
+    case IntMap.lookup width (envOccurU env) of
+      Nothing -> False
+      Just xs -> IntSet.member var xs
   _ -> True -- it's a pinned UInt variable
 
 shouldBeKept :: Env -> Ref -> Bool
 shouldBeKept env (F ref) = case ref of
   RefFX var ->
     -- it's a Field intermediate variable that occurs in the circuit
-    var `IntSet.member` envRefFsInEnvF env
+    var `IntSet.member` envOccurF env
   _ -> True -- it's a pinned Field variable
 shouldBeKept env (B ref) = case ref of
   RefBX var ->
     --  it's a Boolean intermediate variable that occurs in the circuit
-    var `IntSet.member` envRefBsInEnvB env
+    var `IntSet.member` envOccurB env
   RefUBit var i ->
     if envUseNewLinker env
       then refUBitShouldBeKept var i
@@ -126,11 +125,9 @@ shouldBeKept env (B ref) = case ref of
     refUBitShouldBeKept :: RefU -> Int -> Bool
     refUBitShouldBeKept refU i = case refU of
       RefUX width var ->
-        if envUseNewLinker env
-          then case IntMap.lookup width (envRefBsInEnvUB env) of
-            Nothing -> False
-            Just table -> IntervalTable.member (width * var + i, width * var + i + 1) table
-          else refUShouldBeKept env refU
+        case IntMap.lookup width (envOccurUB env) of
+          Nothing -> False
+          Just table -> IntervalTable.member (width * var + i, width * var + i + 1) table
       _ -> True -- it's a pinned UInt variable
 
 -------------------------------------------------------------------------------
@@ -375,10 +372,10 @@ toConstraints cm env =
 data Env = Env
   { envOldCounters :: !Counters,
     envNewCounters :: !Counters,
-    envRefFsInEnvF :: !IntSet,
-    envRefBsInEnvB :: !IntSet,
-    envRefUsInEnvU :: !(IntMap IntSet),
-    envRefBsInEnvUB :: !(IntMap IntervalTable),
+    envOccurF :: !IntSet,
+    envOccurB :: !IntSet,
+    envOccurU :: !(IntMap IntSet),
+    envOccurUB :: !(IntMap IntervalTable),
     envIndexTableF :: !IntervalTable,
     envIndexTableB :: !IntervalTable,
     envIndexTableUBWithOffsets :: !(IntMap (Int, IntervalTable)),
@@ -396,24 +393,23 @@ data Env = Env
 -- | Smart constructor for 'Env'
 constructEnv :: ConstraintModule n -> Env
 constructEnv cm =
-  let tablesUB = OccurUB.toIntervalTables (cmOccurrenceUB cm)
-   in Env
-        { envOldCounters = cmCounters cm,
-          envNewCounters = updateCounters cm,
-          envRefFsInEnvF = OccurF.occuredSet (cmOccurrenceF cm),
-          envRefBsInEnvB = OccurB.occuredSet (cmOccurrenceB cm),
-          envRefUsInEnvU = OccurU.occuredSet (cmOccurrenceU cm),
-          envRefBsInEnvUB = tablesUB,
-          envIndexTableF = OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm),
-          envIndexTableB = OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm),
-          envIndexTableUBWithOffsets = OccurUB.toIntervalTablesWithOffsets (cmOccurrenceUB cm),
-          envIndexTable =
-            OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
-              <> OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
-              <> OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm),
-          envPinnedSize = getCount (cmCounters cm) Output + getCount (cmCounters cm) PublicInput + getCount (cmCounters cm) PrivateInput,
-          envFieldInfo = optFieldInfo (cmOptions cm),
-          envFieldWidth = FieldInfo.fieldWidth (optFieldInfo (cmOptions cm)),
-          envUseNewLinker = optUseNewLinker (cmOptions cm),
-          envUseUIntUnionFind = optUseUIntUnionFind (cmOptions cm)
-        }
+  Env
+    { envOldCounters = cmCounters cm,
+      envNewCounters = updateCounters cm,
+      envOccurF = OccurF.occuredSet (cmOccurrenceF cm),
+      envOccurB = OccurB.occuredSet (cmOccurrenceB cm),
+      envOccurU = OccurU.occuredSet (cmOccurrenceU cm),
+      envOccurUB = OccurUB.toIntervalTables (cmOccurrenceUB cm),
+      envIndexTableF = OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm),
+      envIndexTableB = OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm),
+      envIndexTableUBWithOffsets = OccurUB.toIntervalTablesWithOffsets (cmOccurrenceUB cm),
+      envIndexTable =
+        OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
+          <> OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
+          <> OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm),
+      envPinnedSize = getCount (cmCounters cm) Output + getCount (cmCounters cm) PublicInput + getCount (cmCounters cm) PrivateInput,
+      envFieldInfo = optFieldInfo (cmOptions cm),
+      envFieldWidth = FieldInfo.fieldWidth (optFieldInfo (cmOptions cm)),
+      envUseNewLinker = optUseNewLinker (cmOptions cm),
+      envUseUIntUnionFind = optUseUIntUnionFind (cmOptions cm)
+    }

@@ -19,10 +19,23 @@ tests = describe "Compilation Experiment" $ do
   let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True}
 
   describe "DivMod" $ do
-    it "constant dividend / constant divisor" $ do
-      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
-      let dividend = 255
-      let divisor = 11
-      let expected = [dividend `div` divisor, dividend `mod` divisor]
-      debugWithOpts options (Binary 7) (program dividend divisor)
-      testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+    -- it "constant dividend / constant divisor" $ do
+    --   let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 4)
+    --   let dividend = 12
+    --   let divisor = 5
+    --   let expected = [dividend `div` divisor, dividend `mod` divisor]
+    --   debugWithOpts options (Binary 7) (program dividend divisor)
+    --   testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+
+    it "1 negative variable + 1 constant / Byte" $ do
+      let program y = do
+            x <- input Public :: Comp (UInt 4)
+            return $ -x + y
+      debugWithOpts options (Binary 7) (program 3)
+      testCompilerWithOpts options (Binary 7) (program 3) [0] [] [3]
+
+      -- let program y = do
+      --       x <- input Public :: Comp (UInt 4)
+      --       return $ -x + y
+      -- debugWithOpts options (Binary 7) (program 3)
+      -- testCompilerWithOpts options (Binary 7) (program 3) [0] [] [3]
