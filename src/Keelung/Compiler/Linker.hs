@@ -261,8 +261,7 @@ linkPolyL env poly =
   let constant = PolyL.polyConstant poly
       limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb env)) (PolyL.polyLimbs poly))
       varPolynomial = IntMap.fromList (map (first (reindexRef env)) (Map.toList (PolyL.polyRefs poly)))
-   in -- traceShow (fmap N poly, fmap N limbPolynomial)
-      Poly.buildWithIntMap constant (IntMap.unionWith (+) limbPolynomial varPolynomial)
+   in Poly.buildWithIntMap constant (IntMap.unionWith (+) limbPolynomial varPolynomial)
 
 linkPolyLUnsafe :: (Integral n, GaloisField n) => Env -> PolyL n -> Poly n
 linkPolyLUnsafe env xs = case linkPolyL env xs of

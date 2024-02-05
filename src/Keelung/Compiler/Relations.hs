@@ -90,7 +90,15 @@ new :: Options -> Relations n
 new = Relations Ref.new LimbRelations.new UInt.new SliceRelations.new
 
 assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
-assignR var val = updateRelationsR $ Ref.assignF var val
+assignR var val relations =
+  if optUseNewLinker (relationsOptions relations)
+    then case var of
+      B (RefUBit refU i) ->
+        if val == 0 || val == 1
+          then assignS (Slice.Slice refU i (i + 1)) (toInteger val) relations
+          else throwError $ InvalidBooleanValue val
+      _ -> updateRelationsR (Ref.assignR var val) relations
+    else updateRelationsR (Ref.assignR var val) relations
 
 assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignB ref val = assignR (B ref) (if val then 1 else 0)

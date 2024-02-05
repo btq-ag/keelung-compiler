@@ -6,7 +6,7 @@
 module Keelung.Compiler.Relations.Reference
   ( RefRelations,
     new,
-    assignF,
+    assignR,
     relateB,
     relateR,
     relationBetween,
@@ -53,8 +53,9 @@ mapError = EquivClass.mapError (uncurry ConflictingValuesF)
 new :: RefRelations n
 new = EquivClass.new "References Relations"
 
-assignF :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
-assignF var val xs = mapError $ EquivClass.assign var val xs
+-- | Note: `RefUBit` should not be allowed here
+assignR :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
+assignR var val xs = mapError $ EquivClass.assign var val xs
 
 relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
 relateB refA (polarity, refB) xs = mapError $ EquivClass.relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB) xs
@@ -63,7 +64,7 @@ relateB refA (polarity, refB) xs = mapError $ EquivClass.relate (B refA) (if pol
 relateR :: (GaloisField n, Integral n) => Options -> UIntRelations -> SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
 relateR options relationsU relationsS x slope y intercept xs =
   case (x, y, slope, intercept) of
-    (_, _, 0, value) -> assignF x value xs
+    (_, _, 0, value) -> assignR x value xs
     (refA, refB, _, _) ->
       composeLookup
         xs
@@ -204,7 +205,7 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     relateF refA slope refB intercept xs
   (Root, Value n) ->
     -- rootA = slope * n + intercept
-    assignF refA (slope * n + intercept) xs
+    assignR refA (slope * n + intercept) xs
   (Root, ChildOf slopeB rootB interceptB) ->
     -- rootA = slope * refB + intercept && refB = slopeB * rootB + interceptB
     -- =>
@@ -216,7 +217,7 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     -- n = slope * rootB + intercept
     -- =>
     -- rootB = (n - intercept) / slope
-    assignF refB ((n - intercept) / slope) xs
+    assignR refB ((n - intercept) / slope) xs
   (Value n, Value m) ->
     -- n = slope * m + intercept
     -- =>
@@ -236,7 +237,7 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     -- slopeB * rootB = (n - intercept) / slope - interceptB
     -- =>
     -- rootB = ((n - intercept) / slope - interceptB) / slopeB
-    assignF rootB (((n - intercept) / slope - interceptB) / slopeB) xs
+    assignR rootB (((n - intercept) / slope - interceptB) / slopeB) xs
   (ChildOf slopeA rootA interceptA, Root) ->
     -- refA = slopeA * rootA + interceptA = slope * rootB + intercept
     -- =>
@@ -246,7 +247,7 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     -- refA = slopeA * rootA + interceptA = slope * n + intercept
     -- =>
     -- rootA = (slope * n + intercept - interceptA) / slopeA
-    assignF rootA ((slope * n + intercept - interceptA) / slopeA) xs
+    assignR rootA ((slope * n + intercept - interceptA) / slopeA) xs
   (ChildOf slopeA rootA interceptA, ChildOf slopeB rootB interceptB) ->
     -- refA = slopeA * rootA + interceptA = slope * (slopeB * rootB + interceptB) + intercept
     -- =>

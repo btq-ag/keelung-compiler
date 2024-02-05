@@ -21,8 +21,8 @@ tests = describe "Compilation Experiment" $ do
   describe "DivMod" $ do
     it "constant dividend / constant divisor" $ do
       let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
-      let dividend = 124
-      let divisor = 36
+      let dividend = 255
+      let divisor = 11
       let expected = [dividend `div` divisor, dividend `mod` divisor]
-      -- debugWithOpts options (Prime 17) (program dividend divisor)
-      testCompilerWithOpts options (Prime 17) (program dividend divisor) [] [] expected
+      -- debugWithOpts options (Binary 7) (program dividend divisor)
+      testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected

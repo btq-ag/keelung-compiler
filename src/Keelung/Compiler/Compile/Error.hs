@@ -16,6 +16,7 @@ data Error n
   = ConflictingValuesB Bool Bool
   | ConflictingValuesF n n
   | ConflictingValuesU Integer Integer
+  | InvalidBooleanValue n
   | AssertComparisonError Integer Ordering Integer
   | AssertLTEBoundTooSmallError Integer
   | AssertLTEBoundTooLargeError Integer Width
@@ -35,6 +36,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (ConflictingValuesB b1 b2) = "Cannot unify conflicting Boolean values: " <> show b1 <> " and " <> show b2
   show (ConflictingValuesF f1 f2) = "Cannot unify conflicting Field elements: " <> show (N f1) <> " and " <> show (N f2)
   show (ConflictingValuesU u1 u2) = "Cannot unify conflicting UInt values: " <> show u1 <> " and " <> show u2
+  show (InvalidBooleanValue n) = "Expected value to be Boolean but got: " <> show n
   show (AssertComparisonError x op y) = "Assertion on comparison doesn't hold: " <> show x <> " " <> op' <> " " <> show y
     where
       op' = case op of
