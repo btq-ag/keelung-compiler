@@ -313,28 +313,29 @@ reindexSlice env slice sign =
     ]
 
 reindexRefF :: Env -> RefF -> Var
-reindexRefF env (RefFO x) = x + getOffset (envOldCounters env) (Output, ReadField)
-reindexRefF env (RefFI x) = x + getOffset (envOldCounters env) (PublicInput, ReadField)
-reindexRefF env (RefFP x) = x + getOffset (envOldCounters env) (PrivateInput, ReadField)
-reindexRefF env (RefFX x) = IntervalTable.reindex (envIndexTableF env) x + getOffset (envOldCounters env) (Intermediate, ReadField)
+reindexRefF env (RefFO x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Output, ReadField)
+reindexRefF env (RefFI x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PublicInput, ReadField)
+reindexRefF env (RefFP x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PrivateInput, ReadField)
+reindexRefF env (RefFX x) = IntervalTable.reindex (envIndexTableF env) x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Intermediate, ReadField)
 
 reindexRefB :: Env -> RefB -> Var
-reindexRefB env (RefBO x) = x + getOffset (envOldCounters env) (Output, ReadBool)
-reindexRefB env (RefBI x) = x + getOffset (envOldCounters env) (PublicInput, ReadBool)
-reindexRefB env (RefBP x) = x + getOffset (envOldCounters env) (PrivateInput, ReadBool)
-reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (envOldCounters env) (Intermediate, ReadBool)
+reindexRefB env (RefBO x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Output, ReadBool)
+reindexRefB env (RefBI x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PublicInput, ReadBool)
+reindexRefB env (RefBP x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PrivateInput, ReadBool)
+reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Intermediate, ReadBool)
 reindexRefB env (RefUBit x i) = reindexRefU env x i
 
 reindexRefU :: Env -> RefU -> Int -> Var
-reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envOldCounters env) (Output, ReadAllUInts)
-reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envOldCounters env) (PublicInput, ReadAllUInts)
-reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envOldCounters env) (PrivateInput, ReadAllUInts)
+reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Output, ReadAllUInts)
+reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PublicInput, ReadAllUInts)
+reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PrivateInput, ReadAllUInts)
 reindexRefU env (RefUX w x) i =
   let result =
         if envUseNewLinker env
           then case IntMap.lookup w (envIndexTableUBWithOffsets env) of
             Nothing -> error "[ panic ] reindexRefU: impossible"
-            Just (offset, table) -> IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
+            Just (offset, table) ->
+              IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
           else
             let offset = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x
              in IntervalTable.reindex (envIndexTable env) (offset - envPinnedSize env) + envPinnedSize env + i `mod` w

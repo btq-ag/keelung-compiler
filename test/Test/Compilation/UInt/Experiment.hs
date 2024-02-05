@@ -24,5 +24,5 @@ tests = describe "Compilation Experiment" $ do
       let dividend = 255
       let divisor = 11
       let expected = [dividend `div` divisor, dividend `mod` divisor]
-      -- debugWithOpts options (Binary 7) (program dividend divisor)
+      debugWithOpts options (Binary 7) (program dividend divisor)
       testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
