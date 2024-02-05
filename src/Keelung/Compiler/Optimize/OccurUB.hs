@@ -45,11 +45,6 @@ instance Show OccurUB where
                         show width
                           <> ": "
                           <> show intervalSet
-                          -- showList'
-                          --   ( map
-                          --       (\(var, intervals) -> show (RefUX width var) <> ": " <> show intervals)
-                          --       (IntMap.toList varMap)
-                          --   )
                     )
                     (IntMap.toList xs)
                 )

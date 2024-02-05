@@ -175,29 +175,6 @@ reduceAddL polynomial = do
     Just poly -> learnFromAddL poly
   return substituted
 
--- changed <- learnFromAddL polynomial
--- if changed
---   then return Nothing
---   else do
---     relations <- gets cmRelations
---     case substPolyL relations polynomial of
---       Nothing -> return (Just polynomial) -- nothing changed
---       Just (Left constant, changes) -> do
---         when (constant /= 0) $
---           error "[ panic ] Additive reduced to some constant other than 0"
---         -- the polynomial has been reduced to nothing
---         markChanged AdditiveLimbConstraintChanged
---         -- remove all variables in the polynomial from the occurrence list
---         applyChanges changes
---         return Nothing
---       Just (Right reducePolynomial, changes) -> do
---         -- the polynomial has been reduced to something
---         markChanged AdditiveLimbConstraintChanged
---         -- remove variables that has been reduced in the polynomial from the occurrence list
---         applyChanges changes
---         -- keep reducing the reduced polynomial
---         reduceAddL reducePolynomial
-
 ------------------------------------------------------------------------------
 
 type MulL n = (PolyL n, PolyL n, Either n (PolyL n))
@@ -258,7 +235,7 @@ reduceMulLCPC a bs c = do
   case PolyL.multiplyBy (-a) bs of
     Left constant ->
       if constant == c
-        then modify' $ removeOccurrencesTuple (PolyL.varsSet bs)
+        then modify' $ removeOccurrence bs
         else throwError $ Compile.ConflictingValuesF constant c
     Right xs -> addAddL $ PolyL.addConstant c xs
 
@@ -274,12 +251,12 @@ reduceMulLCPP a polyB polyC = do
         then do
           -- a * bs = 0
           -- cm = 0
-          modify' $ removeOccurrencesTuple (PolyL.varsSet polyB)
+          modify' $ removeOccurrence polyB
           addAddL polyC
         else do
           -- a * bs = constant = cm
           -- => cm - constant = 0
-          modify' $ removeOccurrencesTuple (PolyL.varsSet polyB)
+          modify' $ removeOccurrence polyB
           addAddL (PolyL.addConstant (-constant) polyC)
     Right polyBa -> addAddL (polyC <> polyBa)
 
@@ -531,8 +508,7 @@ data Changes = Changes
   deriving (Eq, Show)
 
 applyChanges :: (GaloisField n, Integral n) => Changes -> RoundM n ()
-applyChanges changes = do
-  modify' $ removeOccurrences (removedLimbs changes) . addOccurrences (addedLimbs changes) . removeOccurrences (removedRefs changes) . addOccurrences (addedRefs changes)
+applyChanges changes = modify' $ removeOccurrences (removedLimbs changes) . addOccurrences (addedLimbs changes) . removeOccurrences (removedRefs changes) . addOccurrences (addedRefs changes)
 
 -- | Mark a limb as added
 addLimb :: Limb -> Maybe Changes -> Maybe Changes
@@ -560,11 +536,18 @@ removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Changes)
 substPolyL relations poly = do
+  -- let useNewLinker = Options.optUseNewLinker (Relations.relationsOptions relations)
   let constant = PolyL.polyConstant poly
       initState = (Left constant, Nothing)
-      -- afterSubstRefU = foldl (substRefU (Relations.exportUIntRelations relations)) initState (PolyL.polyLimbs poly)
       afterSubstLimb =
-        foldl (substLimb (Relations.relationsL relations)) initState (PolyL.polyLimbs poly)
+        foldl
+          -- ( if useNewLinker
+          --     then _substSlice (Relations.relationsS relations)
+          --     else substLimb (Relations.relationsL relations)
+          -- )
+          (substLimb (Relations.relationsL relations))
+          initState
+          (PolyL.polyLimbs poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstLimb (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed

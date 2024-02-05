@@ -16,7 +16,8 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
   -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = False}
-  let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True}
+  -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True}
+  let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True, optOptimize = False}
 
   describe "DivMod" $ do
     -- it "constant dividend / constant divisor" $ do
