@@ -8,6 +8,8 @@ module Keelung.Compiler.ConstraintModule
     sizeOfConstraintModule,
     prettyVariables,
     UpdateOccurrences (..),
+    addOccurrences,
+    removeOccurrences,
     addOccurrencesTuple,
     removeOccurrencesTuple,
     Hint (..),
@@ -177,32 +179,6 @@ prettyVariables counters =
             <> showUInts
             <> "\n"
 
--- -------------------------------------------------------------------------------
-
--- -- | Variables that needed to be constrained to be Boolean
--- --    1. Boolean output variables
--- --    2. UInt BinReps output variables
--- --    3. Boolean private input variables
--- --    4. UInt BinReps private input variables
--- --    5. Boolean public input variables
--- --    6. UInt BinReps public input variables
--- --    7. Boolean intermediate variables
--- --    8. UInt BinReps public intermediate variables
--- booleanConstraintCategories :: [(Category, ReadType)]
--- booleanConstraintCategories =
---   [ (Output, ReadBool),
---     (Output, ReadAllUInts),
---     (PublicInput, ReadBool),
---     (PublicInput, ReadAllUInts),
---     (PrivateInput, ReadBool),
---     (PrivateInput, ReadAllUInts),
---     (Intermediate, ReadBool),
---     (Intermediate, ReadAllUInts)
---   ]
-
--- getBooleanConstraintCount :: ConstraintModule n -> Int
--- getBooleanConstraintCount cm = sum (map (getCount (cmCounters cm)) booleanConstraintCategories) + sum (fmap IntervalTable.size (OccurUB.toIntervalTables (cmOccurrenceUB cm)))
-
 -------------------------------------------------------------------------------
 
 -- | TODO: revisit this
@@ -215,9 +191,18 @@ sizeOfConstraintModule cm =
     + length (cmDivMods cm)
     + length (cmModInvs cm)
 
+-- | Update the occurrences of a reference
 class UpdateOccurrences ref where
-  addOccurrences :: Set ref -> ConstraintModule n -> ConstraintModule n
-  removeOccurrences :: Set ref -> ConstraintModule n -> ConstraintModule n
+  addOccurrence :: ref -> ConstraintModule n -> ConstraintModule n
+  removeOccurrence :: ref -> ConstraintModule n -> ConstraintModule n
+
+-- | `addOccurrence` on a set of references
+addOccurrences :: (UpdateOccurrences ref) => Set ref -> ConstraintModule n -> ConstraintModule n
+addOccurrences xs cm = foldl (flip addOccurrence) cm xs
+
+-- | `removeOccurrence` on a set of references
+removeOccurrences :: (UpdateOccurrences ref) => Set ref -> ConstraintModule n -> ConstraintModule n
+removeOccurrences xs cm = foldl (flip removeOccurrence) cm xs
 
 addOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Limb, Set Ref) -> ConstraintModule n -> ConstraintModule n
 addOccurrencesTuple (refUs, limbs, refs) = addOccurrences refUs . addOccurrences limbs . addOccurrences refs
@@ -230,161 +215,101 @@ newtype Hint = Hint (Either RefU U)
 
 -- | For hints
 instance UpdateOccurrences Hint where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                Hint (Left (RefUX width var)) ->
-                  cm
-                    { cmOccurrenceUB = OccurUB.increase width var (0, width) (cmOccurrenceUB cm)
-                    }
-                _ -> cm
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                Hint (Left (RefUX width var)) ->
-                  cm
-                    { cmOccurrenceUB = OccurUB.decrease width var (0, width) (cmOccurrenceUB cm)
-                    }
-                _ -> cm
-          )
-      )
+  addOccurrence ref cm =
+    case ref of
+      Hint (Left (RefUX width var)) ->
+        cm
+          { cmOccurrenceUB = OccurUB.increase width var (0, width) (cmOccurrenceUB cm)
+          }
+      _ -> cm
+  removeOccurrence ref cm =
+    case ref of
+      Hint (Left (RefUX width var)) ->
+        cm
+          { cmOccurrenceUB = OccurUB.decrease width var (0, width) (cmOccurrenceUB cm)
+          }
+      _ -> cm
 
 instance UpdateOccurrences Ref where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                F refF -> addOccurrences (Set.singleton refF) cm
-                B refB -> addOccurrences (Set.singleton refB) cm
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                F refF -> removeOccurrences (Set.singleton refF) cm
-                B refB -> removeOccurrences (Set.singleton refB) cm
-          )
-      )
+  addOccurrence ref cm =
+    case ref of
+      F refF -> addOccurrences (Set.singleton refF) cm
+      B refB -> addOccurrences (Set.singleton refB) cm
+  removeOccurrence ref cm =
+    case ref of
+      F refF -> removeOccurrences (Set.singleton refF) cm
+      B refB -> removeOccurrences (Set.singleton refB) cm
 
 instance UpdateOccurrences RefF where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefFX var ->
-                  cm
-                    { cmOccurrenceF = OccurF.increase var (cmOccurrenceF cm)
-                    }
-                _ -> cm
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefFX var ->
-                  cm
-                    { cmOccurrenceF = OccurF.decrease var (cmOccurrenceF cm)
-                    }
-                _ -> cm
-          )
-      )
+  addOccurrence ref cm =
+    case ref of
+      RefFX var ->
+        cm
+          { cmOccurrenceF = OccurF.increase var (cmOccurrenceF cm)
+          }
+      _ -> cm
+  removeOccurrence ref cm =
+    case ref of
+      RefFX var ->
+        cm
+          { cmOccurrenceF = OccurF.decrease var (cmOccurrenceF cm)
+          }
+      _ -> cm
 
 instance UpdateOccurrences RefB where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefUBit (RefUX width var) i ->
-                  cm
-                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm),
-                      cmOccurrenceUB = OccurUB.increase width var (i, i + 1) (cmOccurrenceUB cm)
-                    }
-                RefBX var ->
-                  cm
-                    { cmOccurrenceB = OccurB.increase var (cmOccurrenceB cm)
-                    }
-                _ -> cm
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefUBit (RefUX width var) i ->
-                  cm
-                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm),
-                      cmOccurrenceUB = OccurUB.decrease width var (i, i + 1) (cmOccurrenceUB cm)
-                    }
-                RefBX var ->
-                  cm
-                    { cmOccurrenceB = OccurB.decrease var (cmOccurrenceB cm)
-                    }
-                _ -> cm
-          )
-      )
+  addOccurrence ref cm =
+    case ref of
+      RefUBit (RefUX width var) i ->
+        cm
+          { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm),
+            cmOccurrenceUB = OccurUB.increase width var (i, i + 1) (cmOccurrenceUB cm)
+          }
+      RefBX var ->
+        cm
+          { cmOccurrenceB = OccurB.increase var (cmOccurrenceB cm)
+          }
+      _ -> cm
+  removeOccurrence ref cm =
+    case ref of
+      RefUBit (RefUX width var) i ->
+        cm
+          { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm),
+            cmOccurrenceUB = OccurUB.decrease width var (i, i + 1) (cmOccurrenceUB cm)
+          }
+      RefBX var ->
+        cm
+          { cmOccurrenceB = OccurB.decrease var (cmOccurrenceB cm)
+          }
+      _ -> cm
 
 instance UpdateOccurrences RefU where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
-                    }
-                _ -> cm
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cm ref ->
-              case ref of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
-                    }
-                _ -> cm
-          )
-      )
+  addOccurrence ref cm =
+    case ref of
+      RefUX width var ->
+        cm
+          { cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cm)
+          }
+      _ -> cm
+  removeOccurrence ref cm =
+    case ref of
+      RefUX width var ->
+        cm
+          { cmOccurrenceU = OccurU.decrease width var (cmOccurrenceU cm)
+          }
+      _ -> cm
 
 instance UpdateOccurrences Limb where
-  addOccurrences =
-    flip
-      ( foldl
-          ( \cm limb ->
-              case lmbRef limb of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceUB = OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
-                    }
-                _ -> cm
-          )
-      )
-  removeOccurrences =
-    flip
-      ( foldl
-          ( \cm limb ->
-              case lmbRef limb of
-                RefUX width var ->
-                  cm
-                    { cmOccurrenceUB = OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
-                    }
-                _ -> cm
-          )
-      )
+  addOccurrence limb cm =
+    case lmbRef limb of
+      RefUX width var ->
+        cm
+          { cmOccurrenceUB = OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+          }
+      _ -> cm
+  removeOccurrence limb cm =
+    case lmbRef limb of
+      RefUX width var ->
+        cm
+          { cmOccurrenceUB = OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceUB cm)
+          }
+      _ -> cm

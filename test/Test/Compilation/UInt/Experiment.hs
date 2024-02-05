@@ -29,8 +29,8 @@ tests = describe "Compilation Experiment" $ do
 
     it "1 negative variable + 1 constant / Byte" $ do
       let program y = do
-            x <- input Public :: Comp (UInt 4)
-            return $ -x + y
+            x <- input Public :: Comp (UInt 2)
+            return $ y - x
       debugWithOpts options (Binary 7) (program 3)
       testCompilerWithOpts options (Binary 7) (program 3) [0] [] [3]
 
