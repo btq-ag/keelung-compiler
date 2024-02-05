@@ -165,8 +165,8 @@ toConstraints refUShouldBeKept = fold step mempty
       SliceLookup.Parent _ _ -> mempty
       SliceLookup.Empty _ -> mempty
 
-toConstraintsWithNewLinker :: OccurUB -> (RefU -> Bool) -> SliceRelations -> Seq (Constraint n)
-toConstraintsWithNewLinker occurrence refUShouldBeKept = fold step mempty
+toConstraintsWithNewLinker :: OccurUB -> (Slice -> Bool) -> SliceRelations -> Seq (Constraint n)
+toConstraintsWithNewLinker occurrence sliceShouldBeKept = fold step mempty
   where
     step :: Seq (Constraint n) -> Slice -> Segment -> Seq (Constraint n)
     step acc slice segment = acc <> convert slice segment
@@ -185,7 +185,7 @@ toConstraintsWithNewLinker occurrence refUShouldBeKept = fold step mempty
               -- pinned reference, all bits needs to be exported
               Seq.singleton (CSliceVal slice (toInteger val))
         SliceLookup.ChildOf root ->
-          if refUShouldBeKept (sliceRefU slice) && refUShouldBeKept (sliceRefU root)
+          if sliceShouldBeKept slice  && sliceShouldBeKept root
             then Seq.singleton (CSliceEq slice root)
             else mempty
         SliceLookup.Parent _ _ -> mempty

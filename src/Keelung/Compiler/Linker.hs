@@ -95,6 +95,17 @@ limbShouldBeKept env limb =
       _ -> True -- it's a pinned UInt variable
     else refUShouldBeKept env (lmbRef limb)
 
+-- | Predicate on whether a Slice should be exported as constraints
+sliceShouldBeKept :: Env -> Slice -> Bool
+sliceShouldBeKept env slice =
+  if envUseNewLinker env
+    then case sliceRefU slice of
+      RefUX width var -> case IntMap.lookup width (envOccurUB env) of
+        Nothing -> False
+        Just table -> IntervalTable.member (width * var + sliceStart slice, width * var + sliceEnd slice) table
+      _ -> True -- it's a pinned UInt variable
+    else refUShouldBeKept env (sliceRefU slice)
+
 -- | Predicate on whether a RefU should be exported as constraints
 refUShouldBeKept :: Env -> RefU -> Bool
 refUShouldBeKept env ref = case ref of
@@ -348,7 +359,7 @@ toConstraints cm env =
       -- constraints extracted from relations between Slices (only when optUseUIntUnionFind = True)
       sliceConstraints =
         if optUseNewLinker (cmOptions cm)
-          then SliceRelations.toConstraintsWithNewLinker (cmOccurrenceUB cm) (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
+          then SliceRelations.toConstraintsWithNewLinker (cmOccurrenceUB cm) (sliceShouldBeKept env) (Relations.relationsS (cmRelations cm))
           else SliceRelations.toConstraints (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
       -- constraints extracted from relations between UInts & Limbs (only when optUseUIntUnionFind = False)
       limbAndUIntConstraints =
