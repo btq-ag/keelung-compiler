@@ -10,8 +10,6 @@ module Keelung.Compiler.ConstraintModule
     UpdateOccurrences (..),
     addOccurrences,
     removeOccurrences,
-    addOccurrencesTuple,
-    removeOccurrencesTuple,
     Hint (..),
   )
 where
@@ -204,11 +202,17 @@ addOccurrences xs cm = foldl (flip addOccurrence) cm xs
 removeOccurrences :: (UpdateOccurrences ref) => Set ref -> ConstraintModule n -> ConstraintModule n
 removeOccurrences xs cm = foldl (flip removeOccurrence) cm xs
 
-addOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Limb, Set Ref) -> ConstraintModule n -> ConstraintModule n
-addOccurrencesTuple (refUs, limbs, refs) = addOccurrences refUs . addOccurrences limbs . addOccurrences refs
-
-removeOccurrencesTuple :: (GaloisField n, Integral n) => (Set RefU, Set Limb, Set Ref) -> ConstraintModule n -> ConstraintModule n
-removeOccurrencesTuple (refUs, limbs, refs) = removeOccurrences refUs . removeOccurrences limbs . removeOccurrences refs
+instance UpdateOccurrences (PolyL n) where
+  addOccurrence poly cm =
+    let (refUs, limbs, refs) = PolyL.limbsAndRefs poly
+     in if optUseNewLinker (cmOptions cm)
+          then (addOccurrences limbs . addOccurrences refs) cm
+          else (addOccurrences refUs . addOccurrences limbs . addOccurrences refs) cm
+  removeOccurrence poly cm =
+    let (refUs, limbs, refs) = PolyL.limbsAndRefs poly
+     in if optUseNewLinker (cmOptions cm)
+          then (removeOccurrences limbs . removeOccurrences refs) cm
+          else (removeOccurrences refUs . removeOccurrences limbs . removeOccurrences refs) cm
 
 newtype Hint = Hint (Either RefU U)
   deriving (Show, Eq, Ord)

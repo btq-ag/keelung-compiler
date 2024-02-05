@@ -6,7 +6,7 @@
 -- | Polynomial made of Limbs
 module Keelung.Data.PolyL
   ( PolyL (polyConstant, polyLimbs, polyRefs),
-    varsSet,
+    limbsAndRefs,
     fromLimbs,
     fromLimb,
     fromRefs,
@@ -156,8 +156,8 @@ viewAsRefMap (PolyL constant limbs vars) = (constant, vars <> Map.fromList (toLi
     limbToTerms (limb, n) = [(B (RefUBit (lmbRef limb) i), n) | i <- [0 .. lmbWidth limb - 1]]
 
 -- | Return a set of all Refs in the PolyL
-varsSet :: PolyL n -> (Set RefU, Set Limb, Set Ref)
-varsSet (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (toList ls)), Set.fromList (map fst (toList ls)), Map.keysSet vars)
+limbsAndRefs :: PolyL n -> (Set RefU, Set Limb, Set Ref)
+limbsAndRefs (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (toList ls)), Set.fromList (map fst (toList ls)), Map.keysSet vars)
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int

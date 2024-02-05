@@ -20,7 +20,7 @@ instance Show IntervalSet where
   show (IntervalSet xs) =
     showList'
       $ map
-        ( \(start, (end, _)) ->
+        ( \(start, (end, _count)) ->
             if end - start == 1
               then show start
               else show start <> " ~ " <> show (end - 1)
