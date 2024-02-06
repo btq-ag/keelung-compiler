@@ -169,10 +169,13 @@ reduceAddL polynomial = do
         else -- keep substituting the substituted polynomial
           reduceAddL substitutedPolynomial
 
-  -- learn from the substituted polynomial
-  _ <- case substituted of
-    Nothing -> learnFromAddL polynomial
-    Just poly -> learnFromAddL poly
+  -- learn from the substituted polynomial (when optUseNewLinker is False)
+  useNewLinker <- gets (Options.optUseNewLinker . cmOptions)
+  unless useNewLinker $ do
+    _ <- case substituted of
+      Nothing -> learnFromAddL polynomial
+      Just poly -> learnFromAddL poly
+    return ()
   return substituted
 
 ------------------------------------------------------------------------------

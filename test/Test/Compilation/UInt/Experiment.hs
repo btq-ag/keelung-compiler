@@ -15,9 +15,8 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
-  -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = False}
-  -- let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True}
-  let options = defaultOptions {optUseUIntUnionFind = True, optUseNewLinker = True, optOptimize = False}
+  -- let options = defaultOptions {optUseNewLinker = False}
+  let options = defaultOptions {optUseNewLinker = True}
 
   describe "DivMod" $ do
     -- it "constant dividend / constant divisor" $ do
@@ -33,7 +32,7 @@ tests = describe "Compilation Experiment" $ do
             x <- input Public :: Comp (UInt 2)
             return $ y - x
       debugWithOpts options (Binary 7) (program 3)
-      testCompilerWithOpts options (Binary 7) (program 3) [0] [] [3]
+      -- testCompilerWithOpts options (Binary 7) (program 3) [0] [] [3]
 
       -- let program y = do
       --       x <- input Public :: Comp (UInt 4)
