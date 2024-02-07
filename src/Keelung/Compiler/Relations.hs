@@ -31,27 +31,23 @@ import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Limb qualified as LimbRelations
 import Keelung.Compiler.Relations.Reference qualified as Ref
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
-import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Limb (Limb)
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
-import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Prelude hiding (lookup)
 
 data Relations n = Relations
   { relationsR :: Ref.RefRelations n,
     relationsL :: LimbRelations.LimbRelations,
-    relationsU :: UInt.UIntRelations,
     relationsS :: SliceRelations.SliceRelations,
     relationsOptions :: Options
   }
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
-  show (Relations f _ _ s _) =
+  show (Relations f _ s _) =
     (if EquivClass.size f == 0 then "" else show f)
       <> (if SliceRelations.size s == 0 then "" else show s)
 
@@ -74,7 +70,7 @@ updateRelationsL f xs = do
 --------------------------------------------------------------------------------
 
 new :: Options -> Relations n
-new = Relations Ref.new LimbRelations.new UInt.new SliceRelations.new
+new = Relations Ref.new LimbRelations.new SliceRelations.new
 
 assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignR var val relations =
@@ -92,13 +88,7 @@ assignB ref val = assignR (B ref) (if val then 1 else 0)
 
 -- | Lookup the RefU of the Limb first before assigning value to it
 assignL :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
-assignL var val relations = case UInt.lookupRefU (relationsU relations) (Limb.lmbRef var) of
-  Left rootVar -> updateRelationsL (LimbRelations.assign (var {Limb.lmbRef = rootVar}) val) relations
-  Right rootVal ->
-    -- the parent of this limb turned out to be a constant
-    if toInteger rootVal == val
-      then return relations -- do nothing
-      else throwError $ ConflictingValuesU (toInteger rootVal) val
+assignL var val = updateRelationsL (LimbRelations.assign var val)
 
 assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignS slice int relations = do
@@ -112,25 +102,7 @@ relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
 
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateL limb1 limb2 relations =
-  let result1 = lookupLimb limb1 relations
-      result2 = lookupLimb limb2 relations
-   in case (result1, result2) of
-        (Left limb1', Left limb2') -> case EquivClass.relationBetween (UInt.Ref (Limb.lmbRef limb1)) (UInt.Ref (Limb.lmbRef limb2)) (relationsU relations) of
-          Nothing ->
-            -- no relations between the RefUs of the Limbs, so we relate the Limbs instead
-            updateRelationsL (LimbRelations.relate limb1' limb2') relations
-          Just UInt.Equal ->
-            -- the RefUs of the Limbs are equal, so we do nothing (no need to relate the Limbs)
-            return relations
-        (Left limb1', Right val2') -> updateRelationsL (LimbRelations.assign limb1' (toInteger val2')) relations
-        (Right val1', Left limb2') -> updateRelationsL (LimbRelations.assign limb2' (toInteger val1')) relations
-        (Right val1', Right val2') -> if val1' == val2' then return relations else throwError $ ConflictingValuesU (toInteger val1') (toInteger val2')
-
-lookupLimb :: (GaloisField n, Integral n) => Limb -> Relations n -> Either Limb U
-lookupLimb limb relations = case UInt.lookupRefU (relationsU relations) (Limb.lmbRef limb) of
-  Left rootVar -> Left (limb {Limb.lmbRef = rootVar}) -- replace the RefU of the Limb with the root of that RefU
-  Right rootVal -> Right (U.slice rootVal (Limb.lmbOffset limb) (Limb.lmbWidth limb)) -- the parent of this limb turned out to be a constant
+relateL limb1 limb2 = updateRelationsL (LimbRelations.relate limb1 limb2)
 
 -- var = slope * var2 + intercept
 relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
@@ -148,7 +120,7 @@ relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> M
 relationBetween var1 var2 = Ref.relationBetween var1 var2 . relationsR
 
 size :: Relations n -> Int
-size (Relations f l u s _) = EquivClass.size f + LimbRelations.size l + UInt.size u + SliceRelations.size s
+size (Relations f l s _) = EquivClass.size f + LimbRelations.size l + SliceRelations.size s
 
 --------------------------------------------------------------------------------
 
