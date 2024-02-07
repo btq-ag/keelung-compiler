@@ -9,7 +9,6 @@ module Keelung.Compiler.Relations
     assignR,
     assignB,
     assignL,
-    assignU,
     assignS,
     relateB,
     relateL,
@@ -72,14 +71,6 @@ updateRelationsL f xs = do
   relations <- f (relationsL xs)
   return $ xs {relationsL = relations}
 
-updateRelationsU ::
-  (UInt.UIntRelations -> EquivClass.M (Error n) UInt.UIntRelations) ->
-  Relations n ->
-  EquivClass.M (Error n) (Relations n)
-updateRelationsU f xs = do
-  relations <- f (relationsU xs)
-  return $ xs {relationsU = relations}
-
 --------------------------------------------------------------------------------
 
 new :: Options -> Relations n
@@ -108,9 +99,6 @@ assignL var val relations = case UInt.lookupRefU (relationsU relations) (Limb.lm
     if toInteger rootVal == val
       then return relations -- do nothing
       else throwError $ ConflictingValuesU (toInteger rootVal) val
-
-assignU :: (GaloisField n, Integral n) => RefU -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
-assignU var val = updateRelationsU $ UInt.assignRefU var val
 
 assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignS slice int relations = do

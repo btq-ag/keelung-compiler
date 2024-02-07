@@ -11,7 +11,6 @@ module Keelung.Compiler.Relations.UInt
     assignRefU,
     lookupRefU,
     size,
-    isValid,
   )
 where
 
@@ -104,6 +103,3 @@ mapError = EquivClass.mapError (uncurry ConflictingValuesU)
 
 size :: UIntRelations -> Int
 size = Map.size . EquivClass.toMap
-
-isValid :: UIntRelations -> Bool
-isValid = EquivClass.isValid

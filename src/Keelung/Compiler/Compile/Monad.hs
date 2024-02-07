@@ -178,8 +178,6 @@ addC = mapM_ addOne
       execRelations $ Relations.assignR x c
     addOne (CLimbVal x c) = do
       execRelations $ Relations.assignL x c
-    addOne (CRefUVal x c) = do
-      execRelations $ Relations.assignU x c
     addOne (CSliceVal x c) = do
       execRelations $ Relations.assignS x c
     addOne (CRefEq x y) = do

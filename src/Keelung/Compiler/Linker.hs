@@ -14,7 +14,6 @@ module Keelung.Compiler.Linker
 where
 
 import Data.Bifunctor (Bifunctor (bimap, first))
-import Data.Bits qualified
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
@@ -40,7 +39,6 @@ import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.IntervalTable (IntervalTable)
 import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Limb (Limb (..))
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Polynomial (Poly)
@@ -191,17 +189,17 @@ linkConstraint env (CLimbVal x n) =
    in case Poly.buildWithIntMap negatedConstant (reindexLimb env x 1) of
         Left _ -> error "CLimbVal: impossible"
         Right xs -> Seq.fromList [Linked.CAdd xs]
-linkConstraint env (CRefUVal x n) =
-  case FieldInfo.fieldTypeData (envFieldInfo env) of
-    Binary _ ->
-      let cRefFVals = Seq.fromList [CRefFVal (B (RefUBit x i)) (if Data.Bits.testBit n i then 1 else 0) | i <- [0 .. widthOf x - 1]]
-       in cRefFVals >>= linkConstraint env
-    Prime _ -> do
-      -- split the Integer into smaller chunks of size `fieldWidth`
-      let number = U.new (widthOf x) n
-          chunks = map toInteger (U.chunks (envFieldWidth env) number)
-          cLimbVals = Seq.fromList $ zipWith CLimbVal (Limb.refUToLimbs (envFieldWidth env) x) chunks
-       in cLimbVals >>= linkConstraint env
+-- linkConstraint env (CRefUVal x n) =
+--   case FieldInfo.fieldTypeData (envFieldInfo env) of
+--     Binary _ ->
+--       let cRefFVals = Seq.fromList [CRefFVal (B (RefUBit x i)) (if Data.Bits.testBit n i then 1 else 0) | i <- [0 .. widthOf x - 1]]
+--        in cRefFVals >>= linkConstraint env
+--     Prime _ -> do
+--       -- split the Integer into smaller chunks of size `fieldWidth`
+--       let number = U.new (widthOf x) n
+--           chunks = map toInteger (U.chunks (envFieldWidth env) number)
+--           cLimbVals = Seq.fromList $ zipWith CLimbVal (Limb.refUToLimbs (envFieldWidth env) x) chunks
+--        in cLimbVals >>= linkConstraint env
 linkConstraint env (CSliceVal x n) =
   let constant = case FieldInfo.fieldTypeData (envFieldInfo env) of
         Binary _ -> fromInteger (if n < 0 then -n else n)
