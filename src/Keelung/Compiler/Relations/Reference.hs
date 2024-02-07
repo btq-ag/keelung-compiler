@@ -29,12 +29,9 @@ import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung (N (N))
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Options
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
-import Keelung.Compiler.Relations.UInt (UIntRelations)
-import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Constraint
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -61,8 +58,8 @@ relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB
 relateB refA (polarity, refB) xs = mapError $ EquivClass.relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB) xs
 
 -- var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => Options -> UIntRelations -> SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
-relateR options relationsU relationsS x slope y intercept xs =
+relateR :: (GaloisField n, Integral n) => SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
+relateR relationsS x slope y intercept xs =
   case (x, y, slope, intercept) of
     (_, _, 0, value) -> assignR x value xs
     (refA, refB, _, _) ->
@@ -72,8 +69,8 @@ relateR options relationsU relationsS x slope y intercept xs =
         refB
         slope
         intercept
-        (lookup options relationsU relationsS refA xs)
-        (lookup options relationsU relationsS refB xs)
+        (lookup relationsS refA xs)
+        (lookup relationsS refB xs)
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> RefRelations n -> Maybe (n, n)
 relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
@@ -110,38 +107,25 @@ data Lookup n = Root | Value n | ChildOf n Ref n
       Show
     )
 
-lookup :: (GaloisField n) => Options -> UIntRelations -> SliceRelations -> Ref -> RefRelations n -> Lookup n
-lookup options relationsU relationsS (B (RefUBit refU index)) relationsR =
-  if optUseUIntUnionFind options
-    then
-      let -- look in the SliceRelations first
-          lookupSliceRelations =
-            let SliceLookup _ segments = SliceRelations.lookup (Slice.fromRefU refU) relationsS
-             in case IntMap.lookupLE index segments of
-                  Nothing -> lookupRefRelations
-                  Just (start, segment) -> case segment of
-                    SliceLookup.Constant value -> Value (if Data.Bits.testBit value (index - start) then 1 else 0)
-                    SliceLookup.ChildOf parent -> ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (index - start + Slice.sliceStart parent))) 0
-                    SliceLookup.Parent _ _ -> lookupRefRelations
-                    SliceLookup.Empty _ -> lookupRefRelations
-          -- look in the RefRelations later if we cannot find any result in the SliceRelations
-          lookupRefRelations = case EquivClass.lookup (B (RefUBit refU index)) relationsR of
-            EquivClass.IsConstant value -> Value value
-            EquivClass.IsRoot _ -> Root
-            EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
-       in lookupSliceRelations
-    else case EquivClass.lookup (UInt.Ref refU) relationsU of
-      EquivClass.IsConstant value -> Value (if Data.Bits.testBit value index then 1 else 0)
-      EquivClass.IsRoot toChildren ->
-        if Map.null toChildren
-          then -- cannot find any result in the UIntRelations, so we look in the RefRelations instead
-          case EquivClass.lookup (B (RefUBit refU index)) relationsR of
-            EquivClass.IsConstant value -> Value value
-            EquivClass.IsRoot _ -> Root
-            EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
-          else Root
-      EquivClass.IsChildOf (UInt.Ref parent) UInt.Equal -> ChildOf 1 (B (RefUBit parent index)) 0
-lookup _ _ _ var relations =
+lookup :: (GaloisField n) => SliceRelations -> Ref -> RefRelations n -> Lookup n
+lookup relationsS (B (RefUBit refU index)) relationsR =
+  let -- look in the SliceRelations first
+      lookupSliceRelations =
+        let SliceLookup _ segments = SliceRelations.lookup (Slice.fromRefU refU) relationsS
+         in case IntMap.lookupLE index segments of
+              Nothing -> lookupRefRelations
+              Just (start, segment) -> case segment of
+                SliceLookup.Constant value -> Value (if Data.Bits.testBit value (index - start) then 1 else 0)
+                SliceLookup.ChildOf parent -> ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (index - start + Slice.sliceStart parent))) 0
+                SliceLookup.Parent _ _ -> lookupRefRelations
+                SliceLookup.Empty _ -> lookupRefRelations
+      -- look in the RefRelations later if we cannot find any result in the SliceRelations
+      lookupRefRelations = case EquivClass.lookup (B (RefUBit refU index)) relationsR of
+        EquivClass.IsConstant value -> Value value
+        EquivClass.IsRoot _ -> Root
+        EquivClass.IsChildOf parent (LinRel a b) -> ChildOf a parent b
+   in lookupSliceRelations
+lookup _ var relations =
   case EquivClass.lookup var relations of
     EquivClass.IsConstant value -> Value value
     EquivClass.IsRoot _ -> Root

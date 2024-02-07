@@ -16,14 +16,12 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
-import Keelung.Compiler.Options qualified as Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
-import Keelung.Compiler.Relations.UInt qualified as UInt
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
@@ -261,31 +259,15 @@ type DivMod = (Either RefU U, Either RefU U, Either RefU U, Either RefU U)
 -- | Subsitute variables in polynomials of DivMod with their corresponding values or roots
 reduceDivMod :: (GaloisField n, Integral n) => DivMod -> RoundM n (Maybe DivMod)
 reduceDivMod (a, b, q, r) = do
-  optUseUIntUnionFind <- gets (Options.optUseUIntUnionFind . cmOptions)
-  if optUseUIntUnionFind
-    then do
-      relationsS <- gets (Relations.relationsS . cmRelations)
-      return $
-        Just
-          ( lookupRefU relationsS a,
-            lookupRefU relationsS b,
-            lookupRefU relationsS q,
-            lookupRefU relationsS r
-          )
-    else do
-      relationsU <- gets (Relations.relationsU . cmRelations)
-      return $
-        Just
-          ( a `bind` UInt.lookupRefU relationsU,
-            b `bind` UInt.lookupRefU relationsU,
-            q `bind` UInt.lookupRefU relationsU,
-            r `bind` UInt.lookupRefU relationsU
-          )
+  relationsS <- gets (Relations.relationsS . cmRelations)
+  return $
+    Just
+      ( lookupRefU relationsS a,
+        lookupRefU relationsS b,
+        lookupRefU relationsS q,
+        lookupRefU relationsS r
+      )
   where
-    bind :: Either RefU U -> (RefU -> Either RefU U) -> Either RefU U
-    bind (Right val) _ = Right val
-    bind (Left var) f = f var
-
     lookupRefU :: SliceRelations -> Either RefU U -> Either RefU U
     lookupRefU _ (Right val) = Right val
     lookupRefU relations (Left var) =
@@ -397,9 +379,7 @@ assignL var value = do
     lift $
       lift $
         EquivClass.runM $
-          if Options.optUseUIntUnionFind (cmOptions cm)
-            then Relations.assignS (Slice.fromLimb var) value (cmRelations cm)
-            else Relations.assignL var value (cmRelations cm)
+          Relations.assignS (Slice.fromLimb var) value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -426,9 +406,7 @@ relateL var1 var2 = do
     lift $
       lift $
         EquivClass.runM $
-          if Options.optUseUIntUnionFind (cmOptions cm)
-            then Relations.relateS (Slice.fromLimb var1) (Slice.fromLimb var2) (cmRelations cm)
-            else Relations.relateL var1 var2 (cmRelations cm)
+          Relations.relateS (Slice.fromLimb var1) (Slice.fromLimb var2) (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do

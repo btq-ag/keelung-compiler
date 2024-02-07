@@ -32,10 +32,8 @@ import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Options
 import Keelung.Compiler.Relations qualified as Relations
-import Keelung.Compiler.Relations.Limb qualified as LimbRelations
 import Keelung.Compiler.Relations.Reference qualified as RefRelations
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
-import Keelung.Compiler.Relations.UInt qualified as UIntRelations
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.FieldInfo qualified as FieldInfo
@@ -84,17 +82,6 @@ linkConstraintModule cm =
 
 -------------------------------------------------------------------------------
 
--- | Predicate on whether a Limb should be exported as constraints
-limbShouldBeKept :: Env -> Limb -> Bool
-limbShouldBeKept env limb =
-  if envUseNewLinker env
-    then case lmbRef limb of
-      RefUX width var -> case IntMap.lookup width (envOccurUB env) of
-        Nothing -> False
-        Just table -> IntervalTable.member (width * var + lmbOffset limb, width * var + lmbOffset limb + lmbWidth limb) table
-      _ -> True -- it's a pinned UInt variable
-    else refUShouldBeKept env (lmbRef limb)
-
 -- | Predicate on whether a Slice should be exported as constraints
 sliceShouldBeKept :: Env -> Slice -> Bool
 sliceShouldBeKept env slice =
@@ -104,7 +91,7 @@ sliceShouldBeKept env slice =
         Nothing -> False
         Just table -> IntervalTable.member (width * var + sliceStart slice, width * var + sliceEnd slice) table
       _ -> True -- it's a pinned UInt variable
-    else refUShouldBeKept env (sliceRefU slice)
+    else error "[ panic ] sliceShouldBeKept: UseNewLinker not enabled"
 
 -- | Predicate on whether a RefU should be exported as constraints
 refUShouldBeKept :: Env -> RefU -> Bool
@@ -361,19 +348,12 @@ toConstraints cm env =
         if optUseNewLinker (cmOptions cm)
           then SliceRelations.toConstraintsWithNewLinker (cmOccurrenceUB cm) (sliceShouldBeKept env) (Relations.relationsS (cmRelations cm))
           else SliceRelations.toConstraints (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
-      -- constraints extracted from relations between UInts & Limbs (only when optUseUIntUnionFind = False)
-      limbAndUIntConstraints =
-        LimbRelations.toConstraints (limbShouldBeKept env) (Relations.relationsL (cmRelations cm))
-          <> UIntRelations.toConstraints (refUShouldBeKept env) (Relations.relationsU (cmRelations cm))
       -- constraints extracted from addative constraints
       fromAddativeConstraints = fmap CAddL (cmAddL cm)
       -- constraints extracted from multiplicative constraints
       fromMultiplicativeConstraints = fmap (\(a, b, c) -> CMulL a b c) (cmMulL cm)
    in refConstraints
-        <> ( if optUseUIntUnionFind (cmOptions cm)
-               then sliceConstraints
-               else limbAndUIntConstraints
-           )
+        <> sliceConstraints
         <> fromAddativeConstraints
         <> fromMultiplicativeConstraints
 
@@ -396,8 +376,7 @@ data Env = Env
     envFieldInfo :: !FieldInfo,
     envFieldWidth :: !Width,
     -- other options
-    envUseNewLinker :: !Bool,
-    envUseUIntUnionFind :: !Bool
+    envUseNewLinker :: !Bool
   }
   deriving (Show)
 
@@ -421,6 +400,5 @@ constructEnv cm =
       envPinnedSize = getCount (cmCounters cm) Output + getCount (cmCounters cm) PublicInput + getCount (cmCounters cm) PrivateInput,
       envFieldInfo = optFieldInfo (cmOptions cm),
       envFieldWidth = FieldInfo.fieldWidth (optFieldInfo (cmOptions cm)),
-      envUseNewLinker = optUseNewLinker (cmOptions cm),
-      envUseUIntUnionFind = optUseUIntUnionFind (cmOptions cm)
+      envUseNewLinker = optUseNewLinker (cmOptions cm)
     }

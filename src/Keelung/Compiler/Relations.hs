@@ -53,12 +53,9 @@ data Relations n = Relations
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
-  show (Relations f l u s options) =
+  show (Relations f _ _ s _) =
     (if EquivClass.size f == 0 then "" else show f)
-      <> ( if optUseUIntUnionFind options
-             then (if SliceRelations.size s == 0 then "" else show s)
-             else (if EquivClass.size l == 0 then "" else show l) <> (if EquivClass.size u == 0 then "" else show u)
-         )
+      <> (if SliceRelations.size s == 0 then "" else show s)
 
 updateRelationsR ::
   (Ref.RefRelations n -> EquivClass.M (Error n) (Ref.RefRelations n)) ->
@@ -153,7 +150,7 @@ relateU var1 var2 = updateRelationsU $ UInt.relateRefU var1 var2
 
 -- var = slope * var2 + intercept
 relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateR x slope y intercept xs = updateRelationsR (Ref.relateR (relationsOptions xs) (relationsU xs) (relationsS xs) x slope y intercept) xs
+relateR x slope y intercept xs = updateRelationsR (Ref.relateR (relationsS xs) x slope y intercept) xs
 
 relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateS slice1 slice2 relations = do
@@ -167,9 +164,9 @@ relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> M
 relationBetween var1 var2 = Ref.relationBetween var1 var2 . relationsR
 
 size :: Relations n -> Int
-size (Relations f l u s options) = EquivClass.size f + LimbRelations.size l + UInt.size u + (if optUseUIntUnionFind options then SliceRelations.size s else 0)
+size (Relations f l u s _) = EquivClass.size f + LimbRelations.size l + UInt.size u + SliceRelations.size s
 
 --------------------------------------------------------------------------------
 
 lookup :: (GaloisField n) => Ref -> Relations n -> Ref.Lookup n
-lookup var xs = Ref.lookup (relationsOptions xs) (relationsU xs) (relationsS xs) var (relationsR xs)
+lookup var xs = Ref.lookup (relationsS xs) var (relationsR xs)

@@ -24,8 +24,6 @@ data Options = Options
     optOptimize :: Bool,
     -- | Whether to use the new linker
     optUseNewLinker :: Bool,
-    -- | Whether to enable UnionFind on UInts
-    optUseUIntUnionFind :: Bool,
     -- | Whether to disable testing on unoptimized program
     optDisableTestingOnO0 :: Bool
   }
@@ -39,7 +37,6 @@ defaultOptions =
       optConstProp = True,
       optOptimize = True,
       optUseNewLinker = False,
-      optUseUIntUnionFind = True,
       optDisableTestingOnO0 = False
     }
 
