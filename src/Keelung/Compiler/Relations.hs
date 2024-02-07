@@ -13,7 +13,6 @@ module Keelung.Compiler.Relations
     assignS,
     relateB,
     relateL,
-    relateU,
     relateR,
     relateS,
     relationBetween,
@@ -144,9 +143,6 @@ lookupLimb :: (GaloisField n, Integral n) => Limb -> Relations n -> Either Limb 
 lookupLimb limb relations = case UInt.lookupRefU (relationsU relations) (Limb.lmbRef limb) of
   Left rootVar -> Left (limb {Limb.lmbRef = rootVar}) -- replace the RefU of the Limb with the root of that RefU
   Right rootVal -> Right (U.slice rootVal (Limb.lmbOffset limb) (Limb.lmbWidth limb)) -- the parent of this limb turned out to be a constant
-
-relateU :: (GaloisField n, Integral n) => RefU -> RefU -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateU var1 var2 = updateRelationsU $ UInt.relateRefU var1 var2
 
 -- var = slope * var2 + intercept
 relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)

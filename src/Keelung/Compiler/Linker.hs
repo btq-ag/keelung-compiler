@@ -159,10 +159,6 @@ linkConstraint env (CLimbEq x y) =
           case Poly.buildWithIntMap 0 pairs of
             Left _ -> error "CLimbEq: two variables are the same"
             Right xs -> Seq.fromList [Linked.CAdd xs]
-linkConstraint env (CRefUEq x y) =
-  -- split `x` and `y` into smaller limbs and pair them up with `CLimbEq`
-  let cVarEqLs = Seq.fromList $ zipWith CLimbEq (Limb.refUToLimbs (envFieldWidth env) x) (Limb.refUToLimbs (envFieldWidth env) y)
-   in cVarEqLs >>= linkConstraint env
 linkConstraint env (CSliceEq x y) =
   let widthX = Slice.sliceEnd x - Slice.sliceStart x
       widthY = Slice.sliceEnd y - Slice.sliceStart y

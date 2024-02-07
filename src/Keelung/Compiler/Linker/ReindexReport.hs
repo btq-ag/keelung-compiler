@@ -160,7 +160,6 @@ instance GenerateReindexReport (Constraint n) where
   generateReindexReport env tags (CRefEq x y) = generateReindexReport env ("CRefEq L" : tags) x <> generateReindexReport env ("CRefEq R" : tags) y
   generateReindexReport env tags (CRefBNEq x y) = generateReindexReport env ("CRefBNEq L" : tags) x <> generateReindexReport env ("CRefBNEq R" : tags) y
   generateReindexReport env tags (CLimbEq x y) = generateReindexReport env ("CLimbEq L" : tags) x <> generateReindexReport env ("CLimbEq R" : tags) y
-  generateReindexReport env tags (CRefUEq x y) = generateReindexReport env ("CRefUEq L" : tags) x <> generateReindexReport env ("CRefUEq R" : tags) y
   generateReindexReport env tags (CSliceEq x y) = generateReindexReport env ("CSliceEq L" : tags) x <> generateReindexReport env ("CSliceEq R" : tags) y
   generateReindexReport env tags (CRefFVal x _) = generateReindexReport env ("CRefFVal" : tags) x
   generateReindexReport env tags (CLimbVal x _) = generateReindexReport env ("CLimbVal" : tags) x

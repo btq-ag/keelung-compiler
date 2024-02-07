@@ -188,8 +188,6 @@ addC = mapM_ addOne
       execRelations $ Relations.relateR x 1 y 0
     addOne (CLimbEq x y) = do
       execRelations $ Relations.relateL x y
-    addOne (CRefUEq x y) = do
-      execRelations $ Relations.relateU x y
     addOne (CSliceEq x y) = do
       execRelations $ Relations.relateS x y
     addOne (CRefBNEq x y) = do

@@ -9,25 +9,19 @@ module Keelung.Compiler.Relations.UInt
     Relation (..),
     new,
     assignRefU,
-    relateRefU,
     lookupRefU,
-    toConstraints,
     size,
     isValid,
   )
 where
 
 import Control.DeepSeq (NFData)
-import Data.Foldable (Foldable (toList))
 import Data.Map.Strict qualified as Map
-import Data.Sequence (Seq)
-import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung (HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Util (Seniority (..))
-import Keelung.Data.Constraint
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
@@ -57,7 +51,8 @@ data Relation
   = Equal -- a = b
   deriving
     ( -- | ShiftLeft Int -- a = b << n
-      Show, Eq,
+      Show,
+      Eq,
       Generic,
       NFData
     )
@@ -97,33 +92,11 @@ new = EquivClass.new "UInt Relations"
 assignRefU :: RefU -> Integer -> UIntRelations -> EquivClass.M (Error n) UIntRelations
 assignRefU var val xs = mapError $ EquivClass.assign (Ref var) val xs
 
--- | Relate two RefUs of the same width
-relateRefU :: RefU -> RefU -> UIntRelations -> EquivClass.M (Error n) UIntRelations
-relateRefU var1 var2 xs =
-  if widthOf var1 /= widthOf var2
-    then pure xs
-    else mapError $ EquivClass.relate (Ref var1) Equal (Ref var2) xs
-
 lookupRefU :: UIntRelations -> RefU -> Either RefU U
 lookupRefU xs var = case EquivClass.lookup (Ref var) xs of
   EquivClass.IsConstant constant -> Right (U.new (widthOf var) constant)
   EquivClass.IsRoot _ -> Left var
   EquivClass.IsChildOf (Ref parent) Equal -> Left parent
-
--- | Convert the relations to specialized constraints
-toConstraints :: (RefU -> Bool) -> UIntRelations -> Seq (Constraint n)
-toConstraints refUShouldBeKept = Seq.fromList . toList . Map.mapMaybeWithKey convert . EquivClass.toMap
-  where
-    convert :: Element -> EquivClass.VarStatus Element Integer Relation -> Maybe (Constraint n)
-    convert (Ref var) status
-      | refUShouldBeKept var = case status of
-          EquivClass.IsConstant val -> Just $ CRefUVal var val
-          EquivClass.IsRoot _ -> Nothing
-          EquivClass.IsChildOf (Ref parent) Equal ->
-            if refUShouldBeKept parent
-              then Just $ CRefUEq var parent
-              else Nothing
-      | otherwise = Nothing
 
 -- | Helper function for lifting errors
 mapError :: EquivClass.M (Integer, Integer) a -> EquivClass.M (Error n) a

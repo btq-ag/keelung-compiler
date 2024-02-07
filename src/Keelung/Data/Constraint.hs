@@ -45,7 +45,6 @@ data Constraint n
   | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n)) -- multiplicative constraint
   | CRefEq Ref Ref -- Ref equality
   | CLimbEq Limb Limb -- Limb equality
-  | CRefUEq RefU RefU -- RefU equality
   | CSliceEq Slice Slice -- Slice equality
   | CRefBNEq RefB RefB -- RefB negation
   | CRefFVal Ref n -- x = val
@@ -68,7 +67,6 @@ instance Functor Constraint where
   fmap f (CAddL x) = CAddL (fmap f x)
   fmap _ (CRefEq x y) = CRefEq x y
   fmap _ (CLimbEq x y) = CLimbEq x y
-  fmap _ (CRefUEq x y) = CRefUEq x y
   fmap _ (CSliceEq x y) = CSliceEq x y
   fmap _ (CRefBNEq x y) = CRefBNEq x y
   fmap f (CRefFVal x y) = CRefFVal x (f y)
@@ -82,7 +80,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (CAddL xs) = "AL " <> show xs <> " = 0"
   show (CRefEq x y) = "EQ " <> show x <> " = " <> show y
   show (CLimbEq x y) = "EL " <> show x <> " = " <> show y
-  show (CRefUEq x y) = "EU " <> show x <> " = " <> show y
   show (CSliceEq x y) = "ES " <> show x <> " = " <> show y
   show (CRefBNEq x y) = "NB " <> show x <> " = ¬ " <> show y
   show (CRefFVal x n) = "VF " <> show x <> " = " <> show n
