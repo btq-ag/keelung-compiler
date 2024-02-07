@@ -111,12 +111,14 @@ lookup :: (GaloisField n) => SliceRelations -> Ref -> RefRelations n -> Lookup n
 lookup relationsS (B (RefUBit refU index)) relationsR =
   let -- look in the SliceRelations first
       lookupSliceRelations =
-        let SliceLookup _ segments = SliceRelations.lookup (Slice.fromRefU refU) relationsS
-         in case IntMap.lookupLE index segments of
+        -- TODO: specialized `SliceRelations.lookup` to `SliceRelations.lookupBit`
+        let sliceOfRefUBit = Slice.Slice refU index (index + 1)
+            SliceLookup _ segments = SliceRelations.lookup sliceOfRefUBit relationsS
+         in case IntMap.lookupMax segments of
               Nothing -> lookupRefRelations
-              Just (start, segment) -> case segment of
-                SliceLookup.Constant value -> Value (if Data.Bits.testBit value (index - start) then 1 else 0)
-                SliceLookup.ChildOf parent -> ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (index - start + Slice.sliceStart parent))) 0
+              Just (_, segment) -> case segment of
+                SliceLookup.Constant value -> Value (if Data.Bits.testBit value 0 then 1 else 0)
+                SliceLookup.ChildOf parent -> ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (Slice.sliceStart parent))) 0
                 SliceLookup.Parent _ _ -> lookupRefRelations
                 SliceLookup.Empty _ -> lookupRefRelations
       -- look in the RefRelations later if we cannot find any result in the SliceRelations

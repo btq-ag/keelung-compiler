@@ -507,19 +507,18 @@ removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Changes)
 substPolyL relations poly = do
-  -- let useNewLinker = Options.optUseNewLinker (Relations.relationsOptions relations)
   let constant = PolyL.polyConstant poly
       initState = (Left constant, Nothing)
-      afterSubstLimb =
+      afterSubstSlice =
         foldl
-          -- ( if useNewLinker
+          -- ( if Options.optUseNewLinker (Relations.relationsOptions relations)
           --     then _substSlice (Relations.relationsS relations)
-          --     else substLimb (Relations.relationsL relations)
+          --     else substLimb
           -- )
           substLimb
           initState
           (PolyL.polyLimbs poly)
-      afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstLimb (PolyL.polyRefs poly)
+      afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstSlice (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed
     (result, Just changes) -> Just (result, changes)
@@ -533,16 +532,6 @@ substLimb ::
 substLimb (accPoly, changes) (limb, multiplier) = case accPoly of
   Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
   Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-
--- EquivClass.IsChildOf root () ->
---   if root == limb
---     then case accPoly of -- nothing changed. TODO: see if this is necessary
---       Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
---       Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
---     else case accPoly of
---       -- replace `limb` with `root`
---       Left c -> (PolyL.fromLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
---       Right accPoly' -> (Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), (addLimb root . removeLimb limb) changes)
 
 --- | Substitutes a Limb in a PolyL with SliceRelations.
 _substSlice ::

@@ -185,7 +185,7 @@ toConstraintsWithNewLinker occurrence sliceShouldBeKept = fold step mempty
               -- pinned reference, all bits needs to be exported
               Seq.singleton (CSliceVal slice (toInteger val))
         SliceLookup.ChildOf root ->
-          if sliceShouldBeKept slice  && sliceShouldBeKept root
+          if sliceShouldBeKept slice && sliceShouldBeKept root
             then Seq.singleton (CSliceEq slice root)
             else mempty
         SliceLookup.Parent _ _ -> mempty

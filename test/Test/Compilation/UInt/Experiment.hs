@@ -26,3 +26,12 @@ tests = describe "Compilation Experiment" $ do
       let expected = [dividend `div` divisor, dividend `mod` divisor]
       debugWithOpts options (Binary 7) (program dividend divisor)
       testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+
+    -- it "before reuse" $ do
+    --   let program = do
+    --         a <- input Public :: Comp (UInt 5)
+    --         b <- input Public
+    --         (q, _) <- performDivMod a b
+    --         reuse q
+    --   -- forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+    --   testCompilerWithOpts options gf181 program [10, 4] [] [2]
