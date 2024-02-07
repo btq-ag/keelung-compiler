@@ -120,7 +120,7 @@ lookup options relationsU relationsS (B (RefUBit refU index)) relationsR =
              in case IntMap.lookupLE index segments of
                   Nothing -> lookupRefRelations
                   Just (start, segment) -> case segment of
-                    SliceLookup.Constant value -> Value (if Data.Bits.testBit value index then 1 else 0)
+                    SliceLookup.Constant value -> Value (if Data.Bits.testBit value (index - start) then 1 else 0)
                     SliceLookup.ChildOf parent -> ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (index - start + Slice.sliceStart parent))) 0
                     SliceLookup.Parent _ _ -> lookupRefRelations
                     SliceLookup.Empty _ -> lookupRefRelations
