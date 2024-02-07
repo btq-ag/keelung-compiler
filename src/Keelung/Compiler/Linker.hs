@@ -139,24 +139,6 @@ linkConstraint env (CRefBNEq x y) =
   case Poly.buildEither 1 [(reindexRefB env x, -1), (reindexRefB env y, -1)] of
     Left _ -> error "CRefBNEq: two variables are the same"
     Right xs -> Seq.fromList [Linked.CAdd xs]
-linkConstraint env (CLimbEq x y) =
-  if lmbWidth x /= lmbWidth y
-    then error "[ panic ] CLimbEq: Limbs are of different width"
-    else do
-      case FieldInfo.fieldTypeData (envFieldInfo env) of
-        Binary _ -> do
-          i <- Seq.fromList [0 .. lmbWidth x - 1]
-          let pair = [(reindexRefU env (lmbRef x) (lmbOffset x + i), 1), (reindexRefU env (lmbRef y) (lmbOffset y + i), -1)]
-          case Poly.buildEither 0 pair of
-            Left _ -> error "CLimbEq: two variables are the same"
-            Right xs -> Seq.fromList [Linked.CAdd xs]
-        Prime _ -> do
-          let pairsX = reindexLimb env x 1
-          let pairsY = reindexLimb env y (-1)
-          let pairs = IntMap.unionWith (+) pairsX pairsY
-          case Poly.buildWithIntMap 0 pairs of
-            Left _ -> error "CLimbEq: two variables are the same"
-            Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CSliceEq x y) =
   let widthX = Slice.sliceEnd x - Slice.sliceStart x
       widthY = Slice.sliceEnd y - Slice.sliceStart y
@@ -181,25 +163,6 @@ linkConstraint env (CSliceEq x y) =
 linkConstraint env (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef env x, 1)] of
   Left _ -> error "CRefFVal: impossible"
   Right xs -> Seq.fromList [Linked.CAdd xs]
-linkConstraint env (CLimbVal x n) =
-  -- "ArithException: arithmetic underflow" will be thrown if `n` is negative in Binary fields
-  let negatedConstant = case FieldInfo.fieldTypeData (envFieldInfo env) of
-        Prime _ -> fromInteger (-n)
-        Binary _ -> fromInteger n
-   in case Poly.buildWithIntMap negatedConstant (reindexLimb env x 1) of
-        Left _ -> error "CLimbVal: impossible"
-        Right xs -> Seq.fromList [Linked.CAdd xs]
--- linkConstraint env (CRefUVal x n) =
---   case FieldInfo.fieldTypeData (envFieldInfo env) of
---     Binary _ ->
---       let cRefFVals = Seq.fromList [CRefFVal (B (RefUBit x i)) (if Data.Bits.testBit n i then 1 else 0) | i <- [0 .. widthOf x - 1]]
---        in cRefFVals >>= linkConstraint env
---     Prime _ -> do
---       -- split the Integer into smaller chunks of size `fieldWidth`
---       let number = U.new (widthOf x) n
---           chunks = map toInteger (U.chunks (envFieldWidth env) number)
---           cLimbVals = Seq.fromList $ zipWith CLimbVal (Limb.refUToLimbs (envFieldWidth env) x) chunks
---        in cLimbVals >>= linkConstraint env
 linkConstraint env (CSliceVal x n) =
   let constant = case FieldInfo.fieldTypeData (envFieldInfo env) of
         Binary _ -> fromInteger (if n < 0 then -n else n)

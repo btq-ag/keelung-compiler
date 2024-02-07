@@ -8,10 +8,9 @@ module Keelung.Compiler.Relations
     new,
     assignR,
     assignB,
-    assignL,
     assignS,
     relateB,
-    relateL,
+    -- relateL,
     relateR,
     relateS,
     relationBetween,
@@ -28,10 +27,8 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Options
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Limb qualified as LimbRelations
 import Keelung.Compiler.Relations.Reference qualified as Ref
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
-import Keelung.Data.Limb (Limb)
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
@@ -40,16 +37,15 @@ import Prelude hiding (lookup)
 
 data Relations n = Relations
   { relationsR :: Ref.RefRelations n,
-    relationsL :: LimbRelations.LimbRelations,
     relationsS :: SliceRelations.SliceRelations,
     relationsOptions :: Options
   }
   deriving (Eq, Generic, NFData)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
-  show (Relations f _ s _) =
-    (if EquivClass.size f == 0 then "" else show f)
-      <> (if SliceRelations.size s == 0 then "" else show s)
+  show (Relations refs slices _) =
+    (if EquivClass.size refs == 0 then "" else show refs)
+      <> (if SliceRelations.size slices == 0 then "" else show slices)
 
 updateRelationsR ::
   (Ref.RefRelations n -> EquivClass.M (Error n) (Ref.RefRelations n)) ->
@@ -59,18 +55,10 @@ updateRelationsR f xs = do
   relations <- f (relationsR xs)
   return $ xs {relationsR = relations}
 
-updateRelationsL ::
-  (LimbRelations.LimbRelations -> EquivClass.M (Error n) LimbRelations.LimbRelations) ->
-  Relations n ->
-  EquivClass.M (Error n) (Relations n)
-updateRelationsL f xs = do
-  relations <- f (relationsL xs)
-  return $ xs {relationsL = relations}
-
 --------------------------------------------------------------------------------
 
 new :: Options -> Relations n
-new = Relations Ref.new LimbRelations.new SliceRelations.new
+new = Relations Ref.new SliceRelations.new
 
 assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignR var val relations =
@@ -86,10 +74,6 @@ assignR var val relations =
 assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignB ref val = assignR (B ref) (if val then 1 else 0)
 
--- | Lookup the RefU of the Limb first before assigning value to it
-assignL :: (GaloisField n, Integral n) => Limb -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
-assignL var val = updateRelationsL (LimbRelations.assign var val)
-
 assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
 assignS slice int relations = do
   EquivClass.markChanged
@@ -101,8 +85,8 @@ assignS slice int relations = do
 relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
 
-relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
-relateL limb1 limb2 = updateRelationsL (LimbRelations.relate limb1 limb2)
+-- relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
+-- relateL limb1 limb2 = updateRelationsL (LimbRelations.relate limb1 limb2)
 
 -- var = slope * var2 + intercept
 relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
@@ -120,7 +104,7 @@ relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> M
 relationBetween var1 var2 = Ref.relationBetween var1 var2 . relationsR
 
 size :: Relations n -> Int
-size (Relations f l s _) = EquivClass.size f + LimbRelations.size l + SliceRelations.size s
+size (Relations refs slices _) = EquivClass.size refs + SliceRelations.size slices
 
 --------------------------------------------------------------------------------
 

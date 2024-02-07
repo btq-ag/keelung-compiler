@@ -19,7 +19,6 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
-import Keelung.Compiler.Relations.Limb qualified as Limb
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.Limb (Limb)
@@ -517,7 +516,7 @@ substPolyL relations poly = do
           --     then _substSlice (Relations.relationsS relations)
           --     else substLimb (Relations.relationsL relations)
           -- )
-          (substLimb (Relations.relationsL relations))
+          substLimb
           initState
           (PolyL.polyLimbs poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstLimb (PolyL.polyRefs poly)
@@ -528,26 +527,22 @@ substPolyL relations poly = do
 -- | Substitutes a Limb in a PolyL.
 substLimb ::
   (Integral n, GaloisField n) =>
-  Limb.LimbRelations ->
   (Either n (PolyL n), Maybe Changes) ->
   (Limb, n) ->
   (Either n (PolyL n), Maybe Changes)
-substLimb relations (accPoly, changes) (limb, multiplier) = case EquivClass.lookup limb relations of
-  EquivClass.IsConstant constant -> case accPoly of
-    Left c -> (Left (fromInteger constant * multiplier + c), removeLimb limb changes)
-    Right xs -> (Right $ PolyL.addConstant (fromInteger constant * multiplier) xs, removeLimb limb changes)
-  EquivClass.IsRoot _ -> case accPoly of
-    Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-    Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-  EquivClass.IsChildOf root () ->
-    if root == limb
-      then case accPoly of -- nothing changed. TODO: see if this is necessary
-        Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-        Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-      else case accPoly of
-        -- replace `limb` with `root`
-        Left c -> (PolyL.fromLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
-        Right accPoly' -> (Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), (addLimb root . removeLimb limb) changes)
+substLimb (accPoly, changes) (limb, multiplier) = case accPoly of
+  Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+  Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+
+-- EquivClass.IsChildOf root () ->
+--   if root == limb
+--     then case accPoly of -- nothing changed. TODO: see if this is necessary
+--       Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+--       Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+--     else case accPoly of
+--       -- replace `limb` with `root`
+--       Left c -> (PolyL.fromLimbs c [(root, multiplier)], (addLimb root . removeLimb limb) changes)
+--       Right accPoly' -> (Right (PolyL.insertLimbs 0 [(root, multiplier)] accPoly'), (addLimb root . removeLimb limb) changes)
 
 --- | Substitutes a Limb in a PolyL with SliceRelations.
 _substSlice ::

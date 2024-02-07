@@ -176,16 +176,12 @@ addC = mapM_ addOne
       modify' (\cs -> addOccurrence xs $ cs {cmAddL = xs Seq.<| cmAddL cs})
     addOne (CRefFVal x c) = do
       execRelations $ Relations.assignR x c
-    addOne (CLimbVal x c) = do
-      execRelations $ Relations.assignL x c
     addOne (CSliceVal x c) = do
       execRelations $ Relations.assignS x c
     addOne (CRefEq x y) = do
       countBitTestAsOccurU x
       countBitTestAsOccurU y
       execRelations $ Relations.relateR x 1 y 0
-    addOne (CLimbEq x y) = do
-      execRelations $ Relations.relateL x y
     addOne (CSliceEq x y) = do
       execRelations $ Relations.relateS x y
     addOne (CRefBNEq x y) = do
