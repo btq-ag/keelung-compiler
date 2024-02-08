@@ -30,6 +30,14 @@ tests = describe "SliceRelations" $ do
         let actual = SliceRelations.lookup slice relations'
         actual `shouldBe` expected
 
+  describe "SliceRelations.lookup" $ do
+    it "the length of input `Slice` should match the length of the output `SliceLookup" $ do
+      let relations = SliceRelations.new
+      property $ \(commands, slice) -> do
+        let relations' = foldr execCommand relations (commands :: [Command])
+        let result = SliceRelations.lookup slice relations'
+        widthOf slice `shouldBe` widthOf result
+
   describe "SliceRelations.relate" $ do
     it "should result in valid SliceRelations, when the related slices are non-overlapping" $ do
       let relations = SliceRelations.new

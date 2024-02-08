@@ -29,6 +29,7 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (SliceLookup (..))
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
+import qualified Keelung.Compiler.Options as Options
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
@@ -511,17 +512,17 @@ substPolyL relations poly = do
       initState = (Left constant, Nothing)
       afterSubstSlice =
         foldl
-          -- ( if Options.optUseNewLinker (Relations.relationsOptions relations)
-          --     then _substSlice (Relations.relationsS relations)
-          --     else substLimb
-          -- )
-          substLimb
+          ( if Options.optUseNewLinker (Relations.relationsOptions relations)
+              then _substSlice (Relations.relationsS relations)
+              else substLimb
+          )
           initState
           (PolyL.polyLimbs poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstSlice (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed
     (result, Just changes) -> Just (result, changes)
+    -- (result, Just changes) -> trace (show (fmap N poly) <> "  =>   " <> show (fmap (fmap N) result)) $   Just (result, changes)
 
 -- | Substitutes a Limb in a PolyL.
 substLimb ::
@@ -543,28 +544,29 @@ _substSlice ::
 _substSlice relations initState (limb, multiplier) =
   let SliceLookup _ segments = SliceRelations.lookup (Slice.fromLimb limb) relations
    in IntMap.foldl' step initState segments
+  --  in trace ("lookup     " <> show (Slice.fromLimb limb)  <> "  -->  " <> show  segments) IntMap.foldl' step initState segments
   where
-    step (accPoly, changes) segment = case segment of
-      SliceLookup.Constant constant -> case accPoly of
-        Left c -> (Left (fromIntegral constant * multiplier + c), removeLimb limb changes)
-        Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral multiplier) xs, removeLimb limb changes)
-      SliceLookup.ChildOf root ->
-        let rootLimb = Slice.toLimb root
-         in if rootLimb == limb
-              then case accPoly of -- nothing changed. TODO: see if this is necessary
-                Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-                Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-              else case accPoly of
-                -- replace `limb` with `root`
-                Left c -> (PolyL.fromLimbs c [(rootLimb, multiplier)], (addLimb rootLimb . removeLimb limb) changes)
-                Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] accPoly'), (addLimb rootLimb . removeLimb limb) changes)
-      SliceLookup.Parent _ _ -> case accPoly of
-        Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-        Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-      SliceLookup.Empty _ -> case accPoly of
-        Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-        Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-
+    step (accPoly, changes) segment = 
+      case segment of
+            SliceLookup.Constant constant -> case accPoly of
+              Left c -> (Left (fromIntegral constant * multiplier + c), removeLimb limb changes)
+              Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral multiplier) xs, removeLimb limb changes)
+            SliceLookup.ChildOf root ->
+              let rootLimb = Slice.toLimb root
+              in if rootLimb == limb
+                    then case accPoly of -- nothing changed. TODO: see if this is necessary
+                      Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+                      Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+                    else case accPoly of
+                      -- replace `limb` with `root`
+                      Left c -> (PolyL.fromLimbs c [(rootLimb, multiplier)], (addLimb rootLimb . removeLimb limb) changes)
+                      Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] accPoly'), (addLimb rootLimb . removeLimb limb) changes)
+            SliceLookup.Parent _ _ -> case accPoly of
+              Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+              Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+            SliceLookup.Empty _ -> case accPoly of
+              Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+              Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
 -- | Substitutes a Ref in a PolyL.
 substRef ::
   (Integral n, GaloisField n) =>

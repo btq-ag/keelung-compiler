@@ -1,5 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Replace case with fromMaybe" #-}
 
 module Keelung.Compiler.Relations.Slice
   ( SliceRelations,
@@ -137,12 +140,12 @@ lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
 
     lookupMapping :: Mapping -> SliceLookup
     lookupMapping (Mapping xs) =
-      let width = widthOf ref
-       in SliceLookup.splice (start, end) $ case IntMap.lookup width xs of
-            Nothing -> SliceLookup.fromRefU ref
+      let whenNotFound = SliceLookup (Slice ref start end) (IntMap.singleton start (SliceLookup.Empty (end - start)))
+       in case IntMap.lookup (widthOf ref) xs of
+            Nothing -> whenNotFound
             Just varMap -> case IntMap.lookup (refUVar ref) varMap of
-              Nothing -> SliceLookup.fromRefU ref
-              Just lookups -> lookups
+              Nothing -> whenNotFound
+              Just lookups -> SliceLookup.splice (start, end) lookups
 
 -- | Convert relations to specialized constraints
 toConstraints :: (RefU -> Bool) -> SliceRelations -> Seq (Constraint n)

@@ -12,6 +12,7 @@ where
 
 import Data.IntMap qualified as IntMap
 import Data.Map.Strict qualified as Map
+import Data.Set qualified as Set
 import Keelung (widthOf)
 import Keelung.Data.Reference (RefU (..))
 import Keelung.Data.Slice (Slice (..))
@@ -22,7 +23,6 @@ import Keelung.Data.U qualified as U
 import Keelung.Syntax (Width)
 import Test.Hspec
 import Test.QuickCheck
-import qualified Data.Set as Set
 
 --------------------------------------------------------------------------------
 
@@ -60,6 +60,18 @@ tests = describe "SliceLookup" $ do
       forAll genParam $ \(sliceLookup, index) -> do
         let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
         widthOf sliceLookup1 + widthOf sliceLookup2 `shouldBe` widthOf sliceLookup
+
+  describe "splice" $ do
+    it "should result in a SliceLookup of the same width as of the interval" $ do
+      let genParam = do
+            sliceLookup <- arbitrary
+            let slice = lookupSlice sliceLookup
+            start <- chooseInt (sliceStart slice, (sliceEnd slice - 1) `max` sliceStart slice)
+            end <- chooseInt (start, (sliceEnd slice - 1) `max` sliceStart slice)
+            pure (sliceLookup, (start, end))
+      forAll genParam $ \(sliceLookup, (start, end)) -> do
+        let result = SliceLookup.splice (start, end) sliceLookup
+        widthOf result `shouldBe` end - start
 
   describe "normalize" $ do
     it "should be the coequalizer of `merge . split` and `id`" $ do

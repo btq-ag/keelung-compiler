@@ -96,12 +96,9 @@ sameKindOfSegment (Empty _) (Empty _) = True
 sameKindOfSegment (Parent {}) (Parent {}) = False
 sameKindOfSegment _ _ = False
 
--- | Check if a `Segment` is empty
+-- | Check if the width of a `Segment` is 0
 nullSegment :: Segment -> Bool
-nullSegment (Constant val) = widthOf val == 0
-nullSegment (ChildOf slice) = Slice.null slice
-nullSegment (Parent len _) = len == 0
-nullSegment (Empty len) = len == 0
+nullSegment = (== 0) . widthOf
 
 -- | Check if a `Segment` is valid
 validSegment :: Segment -> Bool
@@ -120,7 +117,7 @@ data SliceLookup = SliceLookup
 instance NFData SliceLookup
 
 instance Show SliceLookup where
-  show (SliceLookup slice segments) = show (sliceRefU slice) <> ": " <> show (IntMap.elems segments)
+  show (SliceLookup slice segments) = show (sliceRefU slice) <> " " <> show (sliceStart slice) <> " ... " <> show (sliceEnd slice) <> ": " <> show (IntMap.elems segments)
 
 instance HasWidth SliceLookup where
   widthOf (SliceLookup slice _) = widthOf slice
@@ -161,7 +158,7 @@ fromSegment (Slice ref start end) segment =
                     else [(0, segment)]
 
 -- | Split a `Segment` into two at a given index (relative to the starting offset of the Segement)
---   Maybe result in invalid empty segments!
+--   May result in invalid empty segments!
 unsafeSplitSegment :: Int -> Segment -> (Segment, Segment)
 unsafeSplitSegment index segment = case segment of
   Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val - index)))
@@ -173,7 +170,7 @@ unsafeSplitSegment index segment = case segment of
      in (Parent index children1, Parent (len - index) children2)
   Empty len -> (Empty index, Empty (len - index))
 
--- | Split a `SliceLookup` into two at a given index
+-- | Split a `SliceLookup` into two at a given absolute index
 split :: Int -> SliceLookup -> (SliceLookup, SliceLookup)
 split index (SliceLookup (Slice ref start end) xs) = case IntMap.splitLookup index xs of
   (before, Just segment, after) -> (SliceLookup (Slice ref start index) before, SliceLookup (Slice ref index end) (IntMap.insert index segment after))
@@ -182,10 +179,27 @@ split index (SliceLookup (Slice ref start end) xs) = case IntMap.splitLookup ind
     Just (index', segment) ->
       let (segment1, segment2) = unsafeSplitSegment (index - index') segment
        in case (nullSegment segment1, nullSegment segment2) of
-            (True, True) -> (SliceLookup (Slice ref start index) before, SliceLookup (Slice ref index end) after)
-            (True, False) -> (SliceLookup (Slice ref start index') before, SliceLookup (Slice ref index' end) (IntMap.insert index segment2 after))
-            (False, True) -> (SliceLookup (Slice ref start index) before, SliceLookup (Slice ref index end) (IntMap.insert index' segment1 after))
-            (False, False) -> (SliceLookup (Slice ref start index) (IntMap.insert index' segment1 before), SliceLookup (Slice ref index end) (IntMap.insert index segment2 after))
+            (True, True) ->
+              -- xs = before <index> after
+              ( SliceLookup (Slice ref start index) before,
+                SliceLookup (Slice ref index end) after
+              )
+            (True, False) ->
+              -- index = index'
+              -- xs = before <index> segment2 <> after
+              ( SliceLookup (Slice ref start index) before,
+                SliceLookup (Slice ref index end) (IntMap.insert index segment2 after)
+              )
+            (False, True) ->
+              -- xs = before <index'> segment1 <index> after
+              ( SliceLookup (Slice ref start index) (IntMap.insert index' segment1 before),
+                SliceLookup (Slice ref index end) after
+              )
+            (False, False) ->
+              -- xs = before <index'> segment1 <index> segment2 <> after
+              ( SliceLookup (Slice ref start index) (IntMap.insert index' segment1 before),
+                SliceLookup (Slice ref index end) (IntMap.insert index segment2 after)
+              )
 
 -- | Given an interval, get a slice of SliceLookup
 splice :: (Int, Int) -> SliceLookup -> SliceLookup
