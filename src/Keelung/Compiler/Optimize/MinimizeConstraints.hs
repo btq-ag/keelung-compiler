@@ -14,14 +14,17 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Keelung (widthOf)
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
+import Keelung.Compiler.Options qualified as Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.Limb (Limb)
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -29,7 +32,6 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (SliceLookup (..))
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
-import qualified Keelung.Compiler.Options as Options
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
@@ -159,7 +161,6 @@ reduceAddL polynomial = do
       markChanged AdditiveLimbConstraintChanged
       -- remove variables that has been reduced in the polynomial from the occurrence list
       applyChanges changes
-
       -- learn from the substituted Polynomial
       reduced <- learnFromAddL substitutedPolynomial
       if reduced
@@ -215,42 +216,39 @@ reduceMulL_ polyA polyB polyC = case (polyA, polyB, polyC) of
 --      =>
 --    cm - a * b = 0
 reduceMulLCCP :: (GaloisField n, Integral n) => n -> n -> PolyL n -> RoundM n ()
-reduceMulLCCP a b cm = do
-  addAddL $ PolyL.addConstant (-a * b) cm
+reduceMulLCCP a b cm = addAddL $ PolyL.addConstant (-a * b) cm
 
 -- | Trying to reduce a multiplicative limb constaint of (Constant / Polynomial / Constant)
 --    a * bs = c
 --      =>
 --    c - a * bs = 0
 reduceMulLCPC :: (GaloisField n, Integral n) => n -> PolyL n -> n -> RoundM n ()
-reduceMulLCPC a bs c = do
-  case PolyL.multiplyBy (-a) bs of
-    Left constant ->
-      if constant == c
-        then modify' $ removeOccurrence bs
-        else throwError $ Compile.ConflictingValuesF constant c
-    Right xs -> addAddL $ PolyL.addConstant c xs
+reduceMulLCPC a bs c = case PolyL.multiplyBy (-a) bs of
+  Left constant ->
+    if constant == c
+      then modify' $ removeOccurrence bs
+      else throwError $ Compile.ConflictingValuesF constant c
+  Right xs -> addAddL $ PolyL.addConstant c xs
 
 -- | Trying to reduce a multiplicative limb constaint of (Constant / Polynomial / Polynomial)
 --    a * bs = cm
 --      =>
 --    cm - a * bs = 0
 reduceMulLCPP :: (GaloisField n, Integral n) => n -> PolyL n -> PolyL n -> RoundM n ()
-reduceMulLCPP a polyB polyC = do
-  case PolyL.multiplyBy (-a) polyB of
-    Left constant ->
-      if constant == 0
-        then do
-          -- a * bs = 0
-          -- cm = 0
-          modify' $ removeOccurrence polyB
-          addAddL polyC
-        else do
-          -- a * bs = constant = cm
-          -- => cm - constant = 0
-          modify' $ removeOccurrence polyB
-          addAddL (PolyL.addConstant (-constant) polyC)
-    Right polyBa -> addAddL (polyC <> polyBa)
+reduceMulLCPP a polyB polyC = case PolyL.multiplyBy (-a) polyB of
+  Left constant ->
+    if constant == 0
+      then do
+        -- a * bs = 0
+        -- cm = 0
+        modify' $ removeOccurrence polyB
+        addAddL polyC
+      else do
+        -- a * bs = constant = cm
+        -- => cm - constant = 0
+        modify' $ removeOccurrence polyB
+        addAddL (PolyL.addConstant (-constant) polyC)
+  Right polyBa -> addAddL (polyC <> polyBa)
 
 ------------------------------------------------------------------------------
 
@@ -522,7 +520,6 @@ substPolyL relations poly = do
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed
     (result, Just changes) -> Just (result, changes)
-    -- (result, Just changes) -> trace (show (fmap N poly) <> "  =>   " <> show (fmap (fmap N) result)) $   Just (result, changes)
 
 -- | Substitutes a Limb in a PolyL.
 substLimb ::
@@ -543,30 +540,30 @@ _substSlice ::
   (Either n (PolyL n), Maybe Changes)
 _substSlice relations initState (limb, multiplier) =
   let SliceLookup _ segments = SliceRelations.lookup (Slice.fromLimb limb) relations
-   in IntMap.foldl' step initState segments
-  --  in trace ("lookup     " <> show (Slice.fromLimb limb)  <> "  -->  " <> show  segments) IntMap.foldl' step initState segments
+      segmentsWithSlices = map (\(index, segment) -> (Slice.Slice (Limb.lmbRef limb) index (index + widthOf segment), segment)) (IntMap.toList segments)
+   in foldl step initState segmentsWithSlices
   where
-    step (accPoly, changes) segment = 
-      case segment of
-            SliceLookup.Constant constant -> case accPoly of
-              Left c -> (Left (fromIntegral constant * multiplier + c), removeLimb limb changes)
-              Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral multiplier) xs, removeLimb limb changes)
-            SliceLookup.ChildOf root ->
-              let rootLimb = Slice.toLimb root
-              in if rootLimb == limb
-                    then case accPoly of -- nothing changed. TODO: see if this is necessary
-                      Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-                      Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-                    else case accPoly of
-                      -- replace `limb` with `root`
-                      Left c -> (PolyL.fromLimbs c [(rootLimb, multiplier)], (addLimb rootLimb . removeLimb limb) changes)
-                      Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] accPoly'), (addLimb rootLimb . removeLimb limb) changes)
-            SliceLookup.Parent _ _ -> case accPoly of
-              Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-              Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
-            SliceLookup.Empty _ -> case accPoly of
-              Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-              Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+    step (accPoly, changes) (slice, segment) = case segment of
+      SliceLookup.Constant constant -> case accPoly of
+        Left c -> (Left (fromIntegral constant * multiplier + c), removeLimb (Slice.toLimb slice) changes)
+        Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral multiplier) xs, removeLimb (Slice.toLimb slice) changes)
+      SliceLookup.ChildOf root ->
+        let rootLimb = Slice.toLimb root
+         in if rootLimb == limb
+              then case accPoly of -- nothing changed. TODO: see if this is necessary
+                Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+                Right xs -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] xs), changes)
+              else case accPoly of
+                -- replace `limb` with `root`
+                Left c -> (PolyL.fromLimbs c [(rootLimb, multiplier)], (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
+                Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] accPoly'), (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
+      SliceLookup.Parent _ _ -> case accPoly of
+        Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, multiplier)], changes)
+        Right xs -> (Right (PolyL.insertLimbs 0 [(Slice.toLimb slice, multiplier)] xs), changes)
+      SliceLookup.Empty _ -> case accPoly of
+        Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, multiplier)], changes)
+        Right xs -> (Right (PolyL.insertLimbs 0 [(Slice.toLimb slice, multiplier)] xs), changes)
+
 -- | Substitutes a Ref in a PolyL.
 substRef ::
   (Integral n, GaloisField n) =>

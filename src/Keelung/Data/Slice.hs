@@ -70,7 +70,7 @@ fromLimb limb = Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset l
 
 -- | Convert a "Slice" to a "Limb"
 toLimb :: Slice -> Limb
-toLimb (Slice ref start end) = Limb.new ref start (end - start) (Left True)
+toLimb (Slice ref start end) = Limb.new ref (end - start) start (Left True)
 
 --------------------------------------------------------------------------------
 
