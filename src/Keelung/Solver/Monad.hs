@@ -135,7 +135,7 @@ instance Functor Constraint where
 data Error n
   = VarUnassignedError IntSet
   | R1CInconsistentError (R1C n)
-  | ConflictingValues
+  | ConflictingValues String
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
   | ModInvError Limbs Integer
@@ -152,9 +152,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       ++ showList' (map (\var -> "$" <> show var) $ IntSet.toList unboundVariables)
   show (R1CInconsistentError r1c) =
     "equation doesn't hold: `" <> show (fmap N r1c) <> "`"
-  -- " <> show (N a) <> " * " <> show (N b) <> " ≠ " <> show (N c) <> "`"
-  show ConflictingValues = "Cannot unify conflicting values in constraint"
-  -- show (ConflictingValues expected actual) = "Cannot unify conflicting values: " <> show (N expected) <> " and " <> show (N actual)
+  show (ConflictingValues msg) = "Cannot unify conflicting values in constraint: " <> msg
   show (BooleanConstraintError var val) =
     "expected the value of $" <> show var <> " to be either 0 or 1, but got `" <> show (N val) <> "`"
   show (StuckError context constraints) =

@@ -78,13 +78,13 @@ fromOrdinaryConstraints (R1CS _ ordinaryConstraints counters eqZeros divMods clD
        in concatMap generateRange (IntMap.toList (getBooleanConstraintRanges counters))
 
     differentiate :: (GaloisField n, Integral n) => R1C n -> Either (Error n) [Constraint n]
-    differentiate (R1C (Left a) (Left b) (Left c)) = if a * b == c then Right [] else Left ConflictingValues
+    differentiate (R1C (Left a) (Left b) (Left c)) = if a * b == c then Right [] else Left (ConflictingValues "multplicative R1C with all constants")
     differentiate (R1C (Left a) (Left b) (Right c)) = Right [AddConstraint $ Poly.addConstant (-a * b) c]
     differentiate (R1C (Left a) (Right b) (Left c)) = case Poly.multiplyBy a b of
       Left constant ->
         if constant == c
           then Right []
-          else Left ConflictingValues
+          else Left (ConflictingValues "multplicative R1C with constant on the left")
       Right poly -> Right [AddConstraint $ Poly.addConstant (-c) poly]
     differentiate (R1C (Left a) (Right b) (Right c)) = case Poly.multiplyBy (-a) b of
       Left constant -> Right [AddConstraint $ Poly.addConstant constant c]
@@ -92,7 +92,7 @@ fromOrdinaryConstraints (R1CS _ ordinaryConstraints counters eqZeros divMods clD
         Left constant ->
           if constant == 0
             then Right []
-            else Left ConflictingValues
+            else Left (ConflictingValues "multplicative R1C with constant on the right")
         Right poly' -> Right [AddConstraint poly']
     differentiate (R1C (Right a) (Left b) (Left c)) = differentiate (R1C (Left b) (Right a) (Left c))
     differentiate (R1C (Right a) (Left b) (Right c)) = differentiate (R1C (Left b) (Right a) (Right c))
@@ -292,7 +292,7 @@ eliminateIfHold :: (GaloisField n, Integral n) => n -> n -> M n (Result a)
 eliminateIfHold expected actual =
   if expected == actual
     then return Eliminated
-    else throwError ConflictingValues
+    else throwError (ConflictingValues "at eliminateIfHold")
 
 -- | Trying to reduce a DivMod constraint if any of these set of variables are known:
 --    1. dividend & divisor
@@ -321,9 +321,9 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
-            throwError ConflictingValues
+            throwError $ ConflictingValues "quotient value mismatch"
           when (expectedRemainderVal /= actualRemainderVal) $
-            throwError ConflictingValues
+            throwError $ ConflictingValues "remainder value mismatch"
           return Eliminated
         (Just divisorVal, Just actualQuotientVal, Nothing) -> do
           when (toInteger divisorVal == 0) $
@@ -331,7 +331,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
-            throwError ConflictingValues
+            throwError $ ConflictingValues "quotient value mismatch with remainder unknown"
           bindLimbs "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
@@ -340,7 +340,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
-            throwError ConflictingValues
+            throwError $ ConflictingValues "remainder value mismatch with quotient unknown"
           bindLimbs "quotient" quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
@@ -355,7 +355,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           let expectedDivisorVal = if isCarryLess then dividendVal `U.clDiv` actualQuotientVal else dividendVal `div` actualQuotientVal
               expectedRemainderVal = if isCarryLess then dividendVal `U.clMod` expectedDivisorVal else dividendVal `mod` expectedDivisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
-            throwError ConflictingValues
+            throwError $ ConflictingValues "remainder value mismatch with divisor unknown"
           bindLimbs "divisor" divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do

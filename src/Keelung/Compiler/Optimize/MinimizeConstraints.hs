@@ -14,6 +14,7 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
+-- import Debug.Trace
 import Keelung (widthOf)
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
@@ -180,24 +181,25 @@ reduceMulL (polyA, polyB, polyC) = do
     Left constantC -> return (Left constantC)
     Right polyC' -> substitutePolyL MultiplicativeLimbConstraintChanged polyC'
   reduceMulL_ polyAResult polyBResult polyCResult
-  where
-    substitutePolyL :: (GaloisField n, Integral n) => WhatChanged -> PolyL n -> RoundM n (Either n (PolyL n))
-    substitutePolyL typeOfChange polynomial = do
-      relations <- gets cmRelations
-      case substPolyL relations polynomial of
-        Nothing -> return (Right polynomial) -- nothing changed
-        Just (Left constant, changes) -> do
-          -- the polynomial has been reduced to nothing
-          markChanged typeOfChange
-          -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list
-          applyChanges changes
-          return (Left constant)
-        Just (Right reducePolynomial, changes) -> do
-          -- the polynomial has been reduced to something
-          markChanged typeOfChange
-          -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list and add the new ones
-          applyChanges changes
-          return (Right reducePolynomial)
+
+-- | Substitutes Refs & Limbs in a polynomial and returns the reduced polynomial if it is reduced
+substitutePolyL :: (GaloisField n, Integral n) => WhatChanged -> PolyL n -> RoundM n (Either n (PolyL n))
+substitutePolyL typeOfChange polynomial = do
+  relations <- gets cmRelations
+  case substPolyL relations polynomial of
+    Nothing -> return (Right polynomial) -- nothing changed
+    Just (Left constant, changes) -> do
+      -- the polynomial has been reduced to nothing
+      markChanged typeOfChange
+      -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list
+      applyChanges changes
+      return (Left constant)
+    Just (Right reducePolynomial, changes) -> do
+      -- the polynomial has been reduced to something
+      markChanged typeOfChange
+      -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list and add the new ones
+      applyChanges changes
+      return (Right reducePolynomial)
 
 -- | Trying to reduce a multiplicative limb constaint, returns the reduced constraint if it is reduced
 reduceMulL_ :: (GaloisField n, Integral n) => Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> RoundM n (Maybe (MulL n))
@@ -257,7 +259,9 @@ type DivMod = (Either RefU U, Either RefU U, Either RefU U, Either RefU U)
 -- | Subsitute variables in polynomials of DivMod with their corresponding values or roots
 reduceDivMod :: (GaloisField n, Integral n) => DivMod -> RoundM n (Maybe DivMod)
 reduceDivMod (a, b, q, r) = do
+  -- traceM $ "reduceDivMod " <> show (a, b, q, r)
   relationsS <- gets (Relations.relationsS . cmRelations)
+  -- traceShowM relationsS
   return $
     Just
       ( lookupRefU relationsS a,

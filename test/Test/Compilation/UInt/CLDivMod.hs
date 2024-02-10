@@ -54,7 +54,7 @@ tests =
         []
         []
         (InterpreterError (Interpreter.DivModQuotientError True 7 3 2 3))
-        (SolverError Solver.ConflictingValues :: Error (Prime 17))
+        (SolverError (Solver.ConflictingValues "quotient value mismatch"):: Error (Prime 17))
 
     it "assertCLDivMod (with wrong remainder constant)" $ do
       let program = assertCLDivMod 7 (3 :: UInt 4) 2 0
@@ -64,7 +64,7 @@ tests =
         []
         []
         (InterpreterError (Interpreter.DivModRemainderError True 7 3 1 0))
-        (SolverError Solver.ConflictingValues :: Error (Prime 17))
+        (SolverError (Solver.ConflictingValues "remainder value mismatch"):: Error (Prime 17))
 
     it "performCLDivMod (single statements)" $ do
       let program = do

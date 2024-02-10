@@ -38,7 +38,7 @@ tests = describe "UInt" $ do
         return $ c .&. 5
       cs `shouldHaveSize` 32
       -- TODO: should be 24
-      cs' `shouldHaveSize` 32
+      cs' `shouldHaveSize` 26
 
   describe "Addition / Subtraction" $ do
     it "2 variables / 8 bit / GF181" $ do
@@ -134,7 +134,7 @@ tests = describe "UInt" $ do
         y <- input Public
         return $ x * y
       cs `shouldHaveSize` 42
-      cs' `shouldHaveSize` 42 -- TODO: should've been 33
+      cs' `shouldHaveSize` 33
 
     -- 8 * 3 for input / output
     -- 4 * 5 for intermediate limbs
@@ -165,7 +165,7 @@ tests = describe "UInt" $ do
         y <- input Public
         return $ x * y
       cs `shouldHaveSize` 55
-      cs' `shouldHaveSize` 55 -- TODO: should've been 50
+      cs' `shouldHaveSize` 50
     it "2 variables / byte / Prime 1031 (old linker)" $ do
       (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = False}) 1031 $ do
         x <- input Public :: Comp (UInt 8)
@@ -173,13 +173,14 @@ tests = describe "UInt" $ do
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 55 -- TODO: should've been 50
+
     it "2 variables / byte / Prime 1031 (new linker)" $ do
       (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True}) 1031 $ do
         x <- input Public :: Comp (UInt 8)
         y <- input Public
         return $ x * y
       cs `shouldHaveSize` 55
-      cs' `shouldHaveSize` 55 -- TODO: should've been 50
+      cs' `shouldHaveSize` 50
 
     -- TODO: can be lower
     it "variable / constant (old linker)" $ do
@@ -193,7 +194,7 @@ tests = describe "UInt" $ do
         x <- input Public :: Comp (UInt 4)
         return $ x * 4
       cs `shouldHaveSize` 18
-      cs' `shouldHaveSize` 18 -- TODO: should've been 13
+      cs' `shouldHaveSize` 13
 
     -- TODO: should've been just 4
     it "constant / constant" $ do

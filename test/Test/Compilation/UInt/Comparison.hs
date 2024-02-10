@@ -97,7 +97,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertLTEError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error GF181)
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error GF181)
       it "Prime 2" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
@@ -110,7 +110,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertLTEError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error (Prime 2))
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error (Prime 2))
       it "Binary 7" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
@@ -123,7 +123,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertLTEError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error (Binary 7))
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error (Binary 7))
 
   describe "assertLT" $ do
     let program bound = do
@@ -199,7 +199,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertLTError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error GF181)
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error GF181)
       it "Prime 2" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
@@ -212,7 +212,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertLTError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error (Prime 2))
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error (Prime 2))
       it "Binary 7" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
@@ -225,7 +225,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertLTError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error (Binary 7))
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error (Binary 7))
 
   describe "assertGTE" $ do
     let program bound = do
@@ -301,7 +301,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertGTEError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error GF181)
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error GF181)
       it "Prime 2" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
@@ -314,7 +314,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertGTEError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error (Prime 2))
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error (Prime 2))
       it "Binary 7" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
@@ -327,7 +327,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertGTEError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error (Binary 7))
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error (Binary 7))
 
   describe "assertGT" $ do
     let program bound = do
@@ -403,7 +403,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertGTError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error GF181)
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error GF181)
       it "Prime 2" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
@@ -416,7 +416,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertGTError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error (Prime 2))
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error (Prime 2))
       it "Binary 7" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
@@ -429,7 +429,7 @@ tests = describe "Comparisons" $ do
                   [fromInteger x]
                   []
                   (InterpreterError (Interpreter.AssertGTError (fromInteger x) bound))
-                  (SolverError Solver.ConflictingValues :: Error (Binary 7))
+                  (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error (Binary 7))
 
   describe "computeLTE" $ do
     it "2 variables" $ do

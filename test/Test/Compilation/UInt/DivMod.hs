@@ -210,21 +210,21 @@ tests =
             []
             []
             (InterpreterError (Interpreter.DivModQuotientError False 7 3 2 3))
-            (SolverError Solver.ConflictingValues :: Error GF181)
+            (SolverError (Solver.ConflictingValues "quotient value mismatch") :: Error GF181)
           throwBoth
             (Prime 17)
             program
             []
             []
             (InterpreterError (Interpreter.DivModQuotientError False 7 3 2 3))
-            (SolverError Solver.ConflictingValues :: Error (Prime 17))
+            (SolverError (Solver.ConflictingValues "quotient value mismatch") :: Error (Prime 17))
           throwBoth
             (Binary 7)
             program
             []
             []
             (InterpreterError (Interpreter.DivModQuotientError False 7 3 2 3))
-            (SolverError Solver.ConflictingValues :: Error (Binary 7))
+            (SolverError (Solver.ConflictingValues "quotient value mismatch") :: Error (Binary 7))
 
         it "with wrong remainder constant" $ do
           let program = assertDivMod 7 (3 :: UInt 4) 2 0
@@ -234,21 +234,21 @@ tests =
             []
             []
             (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
-            (SolverError Solver.ConflictingValues :: Error GF181)
+            (SolverError (Solver.ConflictingValues "remainder value mismatch") :: Error GF181)
           throwBoth
             (Prime 17)
             program
             []
             []
             (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
-            (SolverError Solver.ConflictingValues :: Error (Prime 17))
+            (SolverError (Solver.ConflictingValues "remainder value mismatch") :: Error (Prime 17))
           throwBoth
             (Binary 7)
             program
             []
             []
             (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
-            (SolverError Solver.ConflictingValues :: Error (Binary 7))
+            (SolverError (Solver.ConflictingValues "remainder value mismatch") :: Error (Binary 7))
 
         it "assertDivMod (divisor & remainder unknown & quotient = 0)" $ do
           let program = do

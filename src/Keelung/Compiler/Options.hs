@@ -36,7 +36,7 @@ defaultOptions =
     { optFieldInfo = gf181Info,
       optConstProp = True,
       optOptimize = True,
-      optUseNewLinker = True,
+      optUseNewLinker = False,
       optDisableTestingOnO0 = False
     }
 

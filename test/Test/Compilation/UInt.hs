@@ -165,7 +165,7 @@ tests = do
           [3]
           []
           (InterpreterError $ Interpreter.AssertionError "¬ ($UI₄0 = 3)")
-          (SolverError Solver.ConflictingValues :: Error GF181)
+          (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Error GF181)
 
       it "neq 4" $ do
         let program = do
