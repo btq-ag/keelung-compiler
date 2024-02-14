@@ -17,6 +17,7 @@ tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
   -- let options = defaultOptions {optUseNewLinker = False}
   let options = defaultOptions {optUseNewLinker = True}
+  -- let options = defaultOptions {optUseNewLinker = True, optOptimize = False}
 
   describe "DivMod" $ do
     it "constant dividend / constant divisor" $ do

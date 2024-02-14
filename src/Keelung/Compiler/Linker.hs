@@ -82,24 +82,25 @@ linkConstraintModule cm =
 
 -- | Predicate on whether a Slice should be exported as constraints
 sliceShouldBeKept :: Env -> Slice -> Bool
-sliceShouldBeKept env slice =
-  if envUseNewLinker env
-    then case sliceRefU slice of
-      RefUX width var -> case IntMap.lookup width (envOccurUB env) of
-        Nothing -> False
-        Just table -> IntervalTable.member (width * var + sliceStart slice, width * var + sliceEnd slice) table
-      _ -> True -- it's a pinned UInt variable
-    else error "[ panic ] sliceShouldBeKept: UseNewLinker not enabled"
+sliceShouldBeKept env slice = case envOccurU env of
+  Left _ -> error "[ panic ] sliceShouldBeKept: UseNewLinker not enabled"
+  Right tables -> case sliceRefU slice of
+    RefUX width var -> case IntMap.lookup width tables of
+      Nothing -> False
+      Just table -> IntervalTable.member (width * var + sliceStart slice, width * var + sliceEnd slice) table
+    _ -> True -- it's a pinned UInt variable
 
 -- | Predicate on whether a RefU should be exported as constraints
 refUShouldBeKept :: Env -> RefU -> Bool
-refUShouldBeKept env ref = case ref of
-  RefUX width var ->
-    -- it's a UInt intermediate variable that occurs in the circuit
-    case IntMap.lookup width (envOccurU env) of
-      Nothing -> False
-      Just xs -> IntSet.member var xs
-  _ -> True -- it's a pinned UInt variable
+refUShouldBeKept env ref = case envOccurU env of
+  Left table -> case ref of
+    RefUX width var ->
+      -- it's a UInt intermediate variable that occurs in the circuit
+      case IntMap.lookup width table of
+        Nothing -> False
+        Just xs -> IntSet.member var xs
+    _ -> True -- it's a pinned UInt variable
+  Right _ -> error "[ panic ] refUShouldBeKept: UseNewLinker enabled"
 
 shouldBeKept :: Env -> Ref -> Bool
 shouldBeKept env (F ref) = case ref of
@@ -111,17 +112,15 @@ shouldBeKept env (B ref) = case ref of
   RefBX var ->
     --  it's a Boolean intermediate variable that occurs in the circuit
     var `IntSet.member` envOccurB env
-  RefUBit var i ->
-    if envUseNewLinker env
-      then refUBitShouldBeKept var i
-      else --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
-        refUShouldBeKept env var
+  RefUBit var i -> case envOccurU env of
+    Left _ -> refUShouldBeKept env var --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
+    Right tables -> refUBitShouldBeKept tables var i
   _ -> True -- it's a pinned Field variable
   where
-    refUBitShouldBeKept :: RefU -> Int -> Bool
-    refUBitShouldBeKept refU i = case refU of
+    refUBitShouldBeKept :: IntMap IntervalTable -> RefU -> Int -> Bool
+    refUBitShouldBeKept tables refU i = case refU of
       RefUX width var ->
-        case IntMap.lookup width (envOccurUB env) of
+        case IntMap.lookup width tables of
           Nothing -> False
           Just table -> IntervalTable.member (width * var + i, width * var + i + 1) table
       _ -> True -- it's a pinned UInt variable
@@ -265,33 +264,31 @@ reindexSlice env slice sign =
     ]
 
 reindexRefF :: Env -> RefF -> Var
-reindexRefF env (RefFO x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Output, ReadField)
-reindexRefF env (RefFI x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PublicInput, ReadField)
-reindexRefF env (RefFP x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PrivateInput, ReadField)
-reindexRefF env (RefFX x) = IntervalTable.reindex (envIndexTableF env) x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Intermediate, ReadField)
+reindexRefF env (RefFO x) = x + getOffset (envNewCounters env) (Output, ReadField)
+reindexRefF env (RefFI x) = x + getOffset (envNewCounters env) (PublicInput, ReadField)
+reindexRefF env (RefFP x) = x + getOffset (envNewCounters env) (PrivateInput, ReadField)
+reindexRefF env (RefFX x) = IntervalTable.reindex (envIndexTableF env) x + getOffset (envNewCounters env) (Intermediate, ReadField)
 
 reindexRefB :: Env -> RefB -> Var
-reindexRefB env (RefBO x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Output, ReadBool)
-reindexRefB env (RefBI x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PublicInput, ReadBool)
-reindexRefB env (RefBP x) = x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PrivateInput, ReadBool)
-reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Intermediate, ReadBool)
+reindexRefB env (RefBO x) = x + getOffset (envNewCounters env) (Output, ReadBool)
+reindexRefB env (RefBI x) = x + getOffset (envNewCounters env) (PublicInput, ReadBool)
+reindexRefB env (RefBP x) = x + getOffset (envNewCounters env) (PrivateInput, ReadBool)
+reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (envNewCounters env) (Intermediate, ReadBool)
 reindexRefB env (RefUBit x i) = reindexRefU env x i
 
 reindexRefU :: Env -> RefU -> Int -> Var
-reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (Output, ReadAllUInts)
-reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PublicInput, ReadAllUInts)
-reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (if envUseNewLinker env then envNewCounters env else envOldCounters env) (PrivateInput, ReadAllUInts)
-reindexRefU env (RefUX w x) i =
-  let result =
-        if envUseNewLinker env
-          then case IntMap.lookup w (envIndexTableUBWithOffsets env) of
-            Nothing -> error "[ panic ] reindexRefU: impossible"
-            Just (offset, table) ->
-              IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
-          else
-            let offset = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x
-             in IntervalTable.reindex (envIndexTable env) (offset - envPinnedSize env) + envPinnedSize env + i `mod` w
-   in result
+reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envNewCounters env) (Output, ReadAllUInts)
+reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envNewCounters env) (PublicInput, ReadAllUInts)
+reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envNewCounters env) (PrivateInput, ReadAllUInts)
+reindexRefU env (RefUX w x) i = case envIndexTableU env of
+  Left table ->
+    let offset = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x
+     in IntervalTable.reindex table (offset - envPinnedSize env) + envPinnedSize env + i `mod` w
+  Right tables ->
+    case IntMap.lookup w tables of
+      Nothing -> error "[ panic ] reindexRefU: impossible"
+      Just (offset, table) ->
+        IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
 
 -------------------------------------------------------------------------------
 
@@ -322,18 +319,14 @@ data Env = Env
     envNewCounters :: !Counters,
     envOccurF :: !IntSet,
     envOccurB :: !IntSet,
-    envOccurU :: !(IntMap IntSet),
-    envOccurUB :: !(IntMap IntervalTable),
+    envOccurU :: !(Either (IntMap IntSet) (IntMap IntervalTable)),
     envIndexTableF :: !IntervalTable,
     envIndexTableB :: !IntervalTable,
-    envIndexTableUBWithOffsets :: !(IntMap (Int, IntervalTable)),
-    envIndexTable :: !IntervalTable,
+    envIndexTableU :: !(Either IntervalTable (IntMap (Int, IntervalTable))),
     envPinnedSize :: !Int,
     -- field related
     envFieldInfo :: !FieldInfo,
-    envFieldWidth :: !Width,
-    -- other options
-    envUseNewLinker :: !Bool
+    envFieldWidth :: !Width
   }
   deriving (Show)
 
@@ -345,17 +338,21 @@ constructEnv cm =
       envNewCounters = updateCounters cm,
       envOccurF = OccurF.occuredSet (cmOccurrenceF cm),
       envOccurB = OccurB.occuredSet (cmOccurrenceB cm),
-      envOccurU = OccurU.occuredSet (cmOccurrenceU cm),
-      envOccurUB = OccurUB.toIntervalTables (cmOccurrenceUB cm),
+      envOccurU =
+        if optUseNewLinker (cmOptions cm)
+          then Right (OccurUB.toIntervalTables (cmOccurrenceUB cm))
+          else Left (OccurU.occuredSet (cmOccurrenceU cm)),
       envIndexTableF = OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm),
       envIndexTableB = OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm),
-      envIndexTableUBWithOffsets = OccurUB.toIntervalTablesWithOffsets (cmOccurrenceUB cm),
-      envIndexTable =
-        OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
-          <> OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
-          <> OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm),
+      envIndexTableU =
+        if optUseNewLinker (cmOptions cm)
+          then Right $ OccurUB.toIntervalTablesWithOffsets (cmOccurrenceUB cm)
+          else
+            Left $
+              OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
+                <> OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
+                <> OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm),
       envPinnedSize = getCount (cmCounters cm) Output + getCount (cmCounters cm) PublicInput + getCount (cmCounters cm) PrivateInput,
       envFieldInfo = optFieldInfo (cmOptions cm),
-      envFieldWidth = FieldInfo.fieldWidth (optFieldInfo (cmOptions cm)),
-      envUseNewLinker = optUseNewLinker (cmOptions cm)
+      envFieldWidth = FieldInfo.fieldWidth (optFieldInfo (cmOptions cm))
     }
