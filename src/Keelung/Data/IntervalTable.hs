@@ -1,4 +1,11 @@
-module Keelung.Data.IntervalTable (IntervalTable (IntervalTable), empty, member, size, fromOccurrenceMap, reindex, merge) where
+module Keelung.Data.IntervalTable
+  ( IntervalTable (IntervalTable),
+    member,
+    size,
+    fromOccurrenceMap,
+    reindex,
+  )
+where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap

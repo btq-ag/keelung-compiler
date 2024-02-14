@@ -8,6 +8,7 @@ module Keelung.Compiler.Optimize.OccurU
     toList,
     toIntMap,
     toIntervalTable,
+    toIntervalTables,
     increase,
     decrease,
     occuredSet,
@@ -76,9 +77,11 @@ toIntMap (OccurU xs) = xs
 
 -- | O(lg n). To an IntervalTable
 toIntervalTable :: Counters -> OccurU -> IntervalTable
-toIntervalTable counters (OccurU xs) =
-  let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
-   in bitsPart
+toIntervalTable counters (OccurU xs) = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
+
+-- | O(n). To an IntMap of widths to IntervalTable
+toIntervalTables :: Counters -> OccurU -> IntMap IntervalTable
+toIntervalTables counters (OccurU xs) = IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadUInt width), x)) xs
 
 -- | O(1). Bump the count of a RefF
 increase :: Width -> Var -> OccurU -> OccurU

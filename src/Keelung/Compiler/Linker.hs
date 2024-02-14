@@ -56,7 +56,7 @@ linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> Con
 linkConstraintModule cm =
   ConstraintSystem
     { csOptions = cmOptions cm,
-      csCounters = updateCounters cm,
+      csCounters = envNewCounters env,
       csConstraints = constraints >>= linkConstraint env,
       csEqZeros = eqZeros,
       csDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
@@ -185,24 +185,24 @@ linkConstraint env (CMulL as bs cs) =
         )
     ]
 
-updateCounters :: ConstraintModule n -> Counters
-updateCounters cm =
-  if optUseNewLinker (cmOptions cm)
-    then updateCountersNew (OccurF.occuredSet (cmOccurrenceF cm)) (OccurB.occuredSet (cmOccurrenceB cm)) (OccurUB.toIntervalTables (cmOccurrenceUB cm)) (cmCounters cm)
-    else updateCountersOld (OccurF.occuredSet (cmOccurrenceF cm)) (OccurB.occuredSet (cmOccurrenceB cm)) (OccurU.occuredSet (cmOccurrenceU cm)) (cmCounters cm)
+updateCounters :: IntervalTable -> IntervalTable -> Either IntervalTable (IntMap (Int, IntervalTable)) -> ConstraintModule n -> Counters
+updateCounters tableF tableB tableU cm =
+  case tableU of
+    Left _ -> updateCountersOld (OccurU.toIntervalTables (cmCounters cm) (cmOccurrenceU cm)) (cmCounters cm)
+    Right _ -> updateCountersNew (OccurUB.toIntervalTables (cmOccurrenceUB cm)) (cmCounters cm)
   where
-    updateCountersOld :: IntSet -> IntSet -> IntMap IntSet -> Counters -> Counters
-    updateCountersOld refFsInEnvF refBsInEnvB refUsInEnvU counters =
-      let newFXCount = (WriteField, IntSet.size refFsInEnvF)
-          newBXCount = (WriteBool, IntSet.size refBsInEnvB)
-          newUXCounts = IntMap.mapWithKey (\width set -> (WriteUInt width, IntSet.size set)) refUsInEnvU
+    updateCountersOld :: IntMap IntervalTable -> Counters -> Counters
+    updateCountersOld tables counters =
+      let newFXCount = (WriteField, IntervalTable.size tableF)
+          newBXCount = (WriteBool, IntervalTable.size tableB)
+          newUXCounts = IntMap.mapWithKey (\width set -> (WriteUInt width, IntervalTable.size set)) tables
           actions = newFXCount : newBXCount : IntMap.elems newUXCounts
        in foldr (\(selector, count) -> setCount (Intermediate, selector) count) counters actions
 
-    updateCountersNew :: IntSet -> IntSet -> IntMap IntervalTable -> Counters -> Counters
-    updateCountersNew refFsInEnvF refBsInEnvB refBsInEnvUB =
-      setCount (Intermediate, WriteField) (IntSet.size refFsInEnvF)
-        . setCount (Intermediate, WriteBool) (IntSet.size refBsInEnvB)
+    updateCountersNew :: IntMap IntervalTable -> Counters -> Counters
+    updateCountersNew refBsInEnvUB =
+      setCount (Intermediate, WriteField) (IntervalTable.size tableF)
+        . setCount (Intermediate, WriteBool) (IntervalTable.size tableB)
         . setCountOfIntermediateUIntBits (fmap IntervalTable.size refBsInEnvUB)
 
 --------------------------------------------------------------------------------
@@ -283,7 +283,9 @@ reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envNewCounters en
 reindexRefU env (RefUX w x) i = case envIndexTableU env of
   Left table ->
     let offset = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x
-     in IntervalTable.reindex table (offset - envPinnedSize env) + envPinnedSize env + i `mod` w
+        -- pinned variables are placed before intermediate variables
+        pinnedVarSize = getOffset (envNewCounters env) (Intermediate, ReadField)
+     in IntervalTable.reindex table (offset - pinnedVarSize) + i `mod` w + pinnedVarSize
   Right tables ->
     case IntMap.lookup w tables of
       Nothing -> error "[ panic ] reindexRefU: impossible"
@@ -323,7 +325,6 @@ data Env = Env
     envIndexTableF :: !IntervalTable,
     envIndexTableB :: !IntervalTable,
     envIndexTableU :: !(Either IntervalTable (IntMap (Int, IntervalTable))),
-    envPinnedSize :: !Int,
     -- field related
     envFieldInfo :: !FieldInfo,
     envFieldWidth :: !Width
@@ -333,26 +334,28 @@ data Env = Env
 -- | Smart constructor for 'Env'
 constructEnv :: ConstraintModule n -> Env
 constructEnv cm =
-  Env
-    { envOldCounters = cmCounters cm,
-      envNewCounters = updateCounters cm,
-      envOccurF = OccurF.occuredSet (cmOccurrenceF cm),
-      envOccurB = OccurB.occuredSet (cmOccurrenceB cm),
-      envOccurU =
-        if optUseNewLinker (cmOptions cm)
-          then Right (OccurUB.toIntervalTables (cmOccurrenceUB cm))
-          else Left (OccurU.occuredSet (cmOccurrenceU cm)),
-      envIndexTableF = OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm),
-      envIndexTableB = OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm),
-      envIndexTableU =
+  let indexTableF = OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
+      indexTableB = OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
+      indexTableU =
         if optUseNewLinker (cmOptions cm)
           then Right $ OccurUB.toIntervalTablesWithOffsets (cmOccurrenceUB cm)
           else
             Left $
               OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
                 <> OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
-                <> OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm),
-      envPinnedSize = getCount (cmCounters cm) Output + getCount (cmCounters cm) PublicInput + getCount (cmCounters cm) PrivateInput,
-      envFieldInfo = optFieldInfo (cmOptions cm),
-      envFieldWidth = FieldInfo.fieldWidth (optFieldInfo (cmOptions cm))
-    }
+                <> OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm)
+   in Env
+        { envOldCounters = cmCounters cm,
+          envNewCounters = updateCounters indexTableF indexTableB indexTableU cm,
+          envOccurF = OccurF.occuredSet (cmOccurrenceF cm),
+          envOccurB = OccurB.occuredSet (cmOccurrenceB cm),
+          envOccurU =
+            if optUseNewLinker (cmOptions cm)
+              then Right (OccurUB.toIntervalTables (cmOccurrenceUB cm))
+              else Left (OccurU.occuredSet (cmOccurrenceU cm)),
+          envIndexTableF = indexTableF,
+          envIndexTableB = indexTableB,
+          envIndexTableU = indexTableU,
+          envFieldInfo = optFieldInfo (cmOptions cm),
+          envFieldWidth = FieldInfo.fieldWidth (optFieldInfo (cmOptions cm))
+        }
