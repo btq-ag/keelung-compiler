@@ -185,11 +185,11 @@ linkConstraint env (CMulL as bs cs) =
         )
     ]
 
-updateCounters :: IntervalTable -> IntervalTable -> Either IntervalTable (IntMap (Int, IntervalTable)) -> ConstraintModule n -> Counters
+updateCounters :: IntervalTable -> IntervalTable -> Either (IntervalTable, IntMap IntervalTable) (IntMap (Int, IntervalTable)) -> ConstraintModule n -> Counters
 updateCounters tableF tableB tableU cm =
   case tableU of
-    Left _ -> updateCountersOld (OccurU.toIntervalTables (cmCounters cm) (cmOccurrenceU cm)) (cmCounters cm)
-    Right _ -> updateCountersNew (OccurUB.toIntervalTables (cmOccurrenceUB cm)) (cmCounters cm)
+    Left (_, tables) -> updateCountersOld tables (cmCounters cm)
+    Right tables -> updateCountersNew tables (cmCounters cm)
   where
     updateCountersOld :: IntMap IntervalTable -> Counters -> Counters
     updateCountersOld tables counters =
@@ -199,11 +199,11 @@ updateCounters tableF tableB tableU cm =
           actions = newFXCount : newBXCount : IntMap.elems newUXCounts
        in foldr (\(selector, count) -> setCount (Intermediate, selector) count) counters actions
 
-    updateCountersNew :: IntMap IntervalTable -> Counters -> Counters
-    updateCountersNew refBsInEnvUB =
+    updateCountersNew :: IntMap (Int, IntervalTable) -> Counters -> Counters
+    updateCountersNew tables =
       setCount (Intermediate, WriteField) (IntervalTable.size tableF)
         . setCount (Intermediate, WriteBool) (IntervalTable.size tableB)
-        . setCountOfIntermediateUIntBits (fmap IntervalTable.size refBsInEnvUB)
+        . setCountOfIntermediateUIntBits (fmap (IntervalTable.size . snd) tables)
 
 --------------------------------------------------------------------------------
 
@@ -281,7 +281,7 @@ reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envCounters env) 
 reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envCounters env) (PublicInput, ReadAllUInts)
 reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envCounters env) (PrivateInput, ReadAllUInts)
 reindexRefU env (RefUX w x) i = case envIndexTableU env of
-  Left table ->
+  Left (table, _) ->
     let offset = getOffset (envCounters env) (Intermediate, ReadAllUInts)
         varBeforeReindexing = getOffset (envCounters env) (Intermediate, ReadUInt w) + w * x - offset
      in IntervalTable.reindex table varBeforeReindexing + offset + i `mod` w
@@ -317,12 +317,14 @@ toConstraints cm env =
 -- | Allow us to determine which relations should be extracted from the pool
 data Env = Env
   { envCounters :: !Counters,
+    -- for determining which relations should be extracted as constraints
     envOccurF :: !IntSet,
     envOccurB :: !IntSet,
     envOccurU :: !(Either (IntMap IntSet) (IntMap IntervalTable)),
+    -- for variable reindexing
     envIndexTableF :: !IntervalTable,
     envIndexTableB :: !IntervalTable,
-    envIndexTableU :: !(Either IntervalTable (IntMap (Int, IntervalTable))),
+    envIndexTableU :: !(Either (IntervalTable, IntMap IntervalTable) (IntMap (Int, IntervalTable))),
     -- field related
     envFieldInfo :: !FieldInfo,
     envFieldWidth :: !Width
@@ -337,7 +339,7 @@ constructEnv cm =
       indexTableU =
         if optUseNewLinker (cmOptions cm)
           then Right $ OccurUB.toIntervalTablesWithOffsets (cmOccurrenceUB cm)
-          else Left $ OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm)
+          else Left (OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm), OccurU.toIntervalTables (cmCounters cm) (cmOccurrenceU cm))
    in Env
         { envCounters = updateCounters indexTableF indexTableB indexTableU cm,
           envOccurF = OccurF.occuredSet (cmOccurrenceF cm),
