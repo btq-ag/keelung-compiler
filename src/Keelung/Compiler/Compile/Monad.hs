@@ -43,7 +43,20 @@ runM options compilers counters program =
   runExcept
     ( execStateT
         (runReaderT program compilers)
-        (ConstraintModule options (tempSetFlag counters (optUseNewLinker options)) OccurF.new (OccurB.new False) OccurU.new OccurUB.new (Relations.new options) mempty mempty mempty mempty mempty mempty)
+        ( ConstraintModule
+            options
+            (tempSetFlag counters (optUseNewLinker options))
+            OccurF.new
+            (OccurB.new False)
+            (if optUseNewLinker options then Right OccurUB.new else Left OccurU.new)
+            (Relations.new options)
+            mempty
+            mempty
+            mempty
+            mempty
+            mempty
+            mempty
+        )
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -164,11 +177,10 @@ addC = mapM_ addOne
 
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
     countBitTestAsOccurU (B (RefUBit (RefUX width var) i)) = do
-      useNewLinker <- gets (optUseNewLinker . cmOptions)
-      if useNewLinker
-        then modify' (\cs -> cs {cmOccurrenceUB = OccurUB.increase width var (i, i + 1) (cmOccurrenceUB cs)})
-        else -- then return ()
-          modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
+      result <- gets cmOccurrenceU
+      case result of 
+        Left occurU -> modify' (\cs -> cs {cmOccurrenceU = Left $ OccurU.increase width var occurU})
+        Right occurUB -> modify' (\cs -> cs {cmOccurrenceU = Right $ OccurUB.increase width var (i, i + 1) occurUB})
     countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()

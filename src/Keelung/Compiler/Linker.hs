@@ -299,10 +299,9 @@ toConstraints cm env =
   let -- constraints extracted from relations between Refs
       refConstraints = RefRelations.toConstraints (shouldBeKept env) (Relations.relationsR (cmRelations cm))
       -- constraints extracted from relations between Slices (only when optUseUIntUnionFind = True)
-      sliceConstraints =
-        if optUseNewLinker (cmOptions cm)
-          then SliceRelations.toConstraintsWithNewLinker (cmOccurrenceUB cm) (sliceShouldBeKept env) (Relations.relationsS (cmRelations cm))
-          else SliceRelations.toConstraints (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
+      sliceConstraints = case cmOccurrenceU cm of
+        Left _ -> SliceRelations.toConstraints (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
+        Right occurUB -> SliceRelations.toConstraintsWithNewLinker occurUB (sliceShouldBeKept env) (Relations.relationsS (cmRelations cm))
       -- constraints extracted from addative constraints
       fromAddativeConstraints = fmap CAddL (cmAddL cm)
       -- constraints extracted from multiplicative constraints
@@ -336,18 +335,16 @@ constructEnv :: ConstraintModule n -> Env
 constructEnv cm =
   let indexTableF = OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
       indexTableB = OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
-      indexTableU =
-        if optUseNewLinker (cmOptions cm)
-          then Right $ OccurUB.toIntervalTablesWithOffsets (cmOccurrenceUB cm)
-          else Left (OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm), OccurU.toIntervalTables (cmCounters cm) (cmOccurrenceU cm))
+      indexTableU = case cmOccurrenceU cm of
+        Left occurU -> Left (OccurU.toIntervalTable (cmCounters cm) occurU, OccurU.toIntervalTables (cmCounters cm) occurU)
+        Right occurUB -> Right (OccurUB.toIntervalTablesWithOffsets occurUB)
    in Env
         { envCounters = updateCounters indexTableF indexTableB indexTableU cm,
           envOccurF = OccurF.occuredSet (cmOccurrenceF cm),
           envOccurB = OccurB.occuredSet (cmOccurrenceB cm),
-          envOccurU =
-            if optUseNewLinker (cmOptions cm)
-              then Right (OccurUB.toIntervalTables (cmOccurrenceUB cm))
-              else Left (OccurU.occuredSet (cmOccurrenceU cm)),
+          envOccurU = case cmOccurrenceU cm of
+            Left occurU -> Left (OccurU.occuredSet occurU)
+            Right occurUB -> Right (OccurUB.toIntervalTables occurUB),
           envIndexTableF = indexTableF,
           envIndexTableB = indexTableB,
           envIndexTableU = indexTableU,
