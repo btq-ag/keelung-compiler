@@ -14,7 +14,6 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
--- import Debug.Trace
 import Keelung (widthOf)
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
@@ -259,9 +258,7 @@ type DivMod = (Either RefU U, Either RefU U, Either RefU U, Either RefU U)
 -- | Subsitute variables in polynomials of DivMod with their corresponding values or roots
 reduceDivMod :: (GaloisField n, Integral n) => DivMod -> RoundM n (Maybe DivMod)
 reduceDivMod (a, b, q, r) = do
-  -- traceM $ "reduceDivMod " <> show (a, b, q, r)
   relationsS <- gets (Relations.relationsS . cmRelations)
-  -- traceShowM relationsS
   return $
     Just
       ( lookupRefU relationsS a,

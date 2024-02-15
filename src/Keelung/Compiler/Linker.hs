@@ -276,16 +276,36 @@ reindexRefB env (RefBP x) = x + getOffset (envNewCounters env) (PrivateInput, Re
 reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (envNewCounters env) (Intermediate, ReadBool)
 reindexRefB env (RefUBit x i) = reindexRefU env x i
 
+new :: Bool
+new = False
+
 reindexRefU :: Env -> RefU -> Int -> Var
 reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envNewCounters env) (Output, ReadAllUInts)
 reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envNewCounters env) (PublicInput, ReadAllUInts)
 reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envNewCounters env) (PrivateInput, ReadAllUInts)
 reindexRefU env (RefUX w x) i = case envIndexTableU env of
   Left table ->
-    let offset = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x
-        -- pinned variables are placed before intermediate variables
-        pinnedVarSize = getOffset (envNewCounters env) (Intermediate, ReadField)
-     in IntervalTable.reindex table (offset - pinnedVarSize) + i `mod` w + pinnedVarSize
+    let offset = getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
+        varBeforeReindexing = getOffset (envNewCounters env) (Intermediate, ReadUInt w) + w * x + i `mod` w - offset
+
+        offset' = getOffset (envNewCounters env) (Intermediate, ReadField)
+        varBeforeReindexing' = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x + i `mod` w
+     in -- trace ("ref:  " <> show (RefUBit (RefUX w x) i))
+        --     $ trace ("old:  " <> show offset' <> " + " <> show (IntervalTable.reindex table (varBeforeReindexing' - offset')) <> " (" <> show varBeforeReindexing')
+        --     $ trace
+        --       ( "new:  "
+        --           <> show offset
+        --           <> " + "
+        --           <> show (IntervalTable.reindex table varBeforeReindexing)
+        --           <> " ("
+        --           <> show varBeforeReindexing
+        --           <> " "
+        --           <> show (getOffset (envNewCounters env) (Intermediate, ReadUInt w))
+        --       )
+        --     $
+        if new
+          then IntervalTable.reindex table varBeforeReindexing + offset
+          else IntervalTable.reindex table (varBeforeReindexing' - offset') + offset'
   Right tables ->
     case IntMap.lookup w tables of
       Nothing -> error "[ panic ] reindexRefU: impossible"
@@ -341,9 +361,12 @@ constructEnv cm =
           then Right $ OccurUB.toIntervalTablesWithOffsets (cmOccurrenceUB cm)
           else
             Left $
-              OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
-                <> OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
-                <> OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm)
+              if new
+                then OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm)
+                else
+                  OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
+                    <> OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
+                    <> OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm)
    in Env
         { envOldCounters = cmCounters cm,
           envNewCounters = updateCounters indexTableF indexTableB indexTableU cm,

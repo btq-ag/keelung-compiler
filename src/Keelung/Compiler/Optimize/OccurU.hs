@@ -23,7 +23,6 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Util
 import Keelung.Data.IntervalTable (IntervalTable)
 import Keelung.Data.IntervalTable qualified as IntervalTable
-import Keelung.Data.Reference (RefU (RefUX))
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
 import Prelude hiding (null)
@@ -44,12 +43,11 @@ instance Show OccurU where
             ( showList'
                 ( map
                     ( \(width, occurs) ->
-                        "UInt "
-                          <> show width
+                        show width
                           <> ": "
                           <> showList'
                             ( map
-                                (\(var, n) -> show (RefUX width var) <> ": " <> show n)
+                                (\(var, _) -> show var)
                                 ( filter
                                     (\(_, n) -> n > 0) -- only show variables that are used
                                     (IntMap.toList occurs)
