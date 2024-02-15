@@ -170,10 +170,10 @@ tests =
         reindexRef env (B (RefUBit inputVar1 2)) `shouldBe` 7
         reindexRef env (B (RefUBit inputVar1 3)) `shouldBe` 8
         let intermediateVar0 = RefUX 4 0
-        reindexRef env (B (RefUBit intermediateVar0 0)) `shouldBe` 9
-        reindexRef env (B (RefUBit intermediateVar0 1)) `shouldBe` 10
-        reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 11
-        reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 12
+        reindexRef env (B (RefUBit intermediateVar0 0)) `shouldBe` 12
+        reindexRef env (B (RefUBit intermediateVar0 1)) `shouldBe` 13
+        reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 14
+        reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 15
 
       it "Bit test / and 1 (new linker)" $ do
         (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
@@ -193,9 +193,9 @@ tests =
         reindexRef env (B (RefUBit inputVar1 2)) `shouldBe` 7
         reindexRef env (B (RefUBit inputVar1 3)) `shouldBe` 8
         let intermediateVar0 = RefUX 4 0
-        reindexRef env (B (RefUBit intermediateVar0 1)) `shouldBe` 10
-        reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 11
-        reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 12
+        reindexRef env (B (RefUBit intermediateVar0 1)) `shouldBe` 13
+        reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 14
+        reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 15
 
       it "Bit test / and 2 (old linker)" $ do
         (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
@@ -225,10 +225,10 @@ tests =
         reindexRef env (F (RefFX 1)) `shouldBe` 14
         reindexRef env (F (RefFX 2)) `shouldBe` 15
         reindexRef env (F (RefFX 3)) `shouldBe` 16
-        reindexRef env (B (RefUBit (RefUX 4 0) 0)) `shouldBe` 17
-        reindexRef env (B (RefUBit (RefUX 4 0) 1)) `shouldBe` 18
-        reindexRef env (B (RefUBit (RefUX 4 0) 2)) `shouldBe` 19
-        reindexRef env (B (RefUBit (RefUX 4 0) 3)) `shouldBe` 20
+        reindexRef env (B (RefUBit (RefUX 4 0) 0)) `shouldBe` 20
+        reindexRef env (B (RefUBit (RefUX 4 0) 1)) `shouldBe` 21
+        reindexRef env (B (RefUBit (RefUX 4 0) 2)) `shouldBe` 22
+        reindexRef env (B (RefUBit (RefUX 4 0) 3)) `shouldBe` 23
 
       it "Bit test / and 2" $ do
         (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do

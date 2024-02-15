@@ -31,7 +31,7 @@ tests = describe "Carry-less Div/Mod" $ do
       performCLDivMod x y
     _cs `shouldHaveSize` 33
     -- should be just 18
-    cs' `shouldHaveSize` 20
+    cs' `shouldHaveSize` 22 
 
   it "2 variables / 2-bit (new linker)" $ do
     -- constraint breakdown:

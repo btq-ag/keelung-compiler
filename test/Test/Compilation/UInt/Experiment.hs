@@ -4,7 +4,7 @@
 module Test.Compilation.UInt.Experiment (tests, run) where
 
 import Keelung hiding (compile)
--- import Keelung.Compiler.Options
+import Keelung.Compiler.Options
 import Test.Compilation.Util
 import Test.Hspec
 
@@ -15,7 +15,8 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
-  -- let options = defaultOptions {optUseNewLinker = False}
+  -- let options = defaultOptions {optUseNewLinker = False, optOptimize = False}
+  let options = defaultOptions {optUseNewLinker = False}
   -- let options = defaultOptions {optUseNewLinker = True}
   -- let options = defaultOptions {optUseNewLinker = True, optOptimize = False}
 
@@ -35,6 +36,6 @@ tests = describe "Compilation Experiment" $ do
             return $ -x - y
       let x = 2
       let y = 1
-      let expected = [toInteger (-x - y) `mod` 4]
-      debug (Binary 7) program
+      let expected = [1]
+      debugWithOpts options (Binary 7) program
       testCompiler (Binary 7) program [x, y] [] expected
