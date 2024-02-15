@@ -287,6 +287,8 @@ tests = describe "Addition / Subtraction" $ do
         testCompiler (Binary 7) program [x, y] [] expected
 
     it "mixed (positive / negative / constnat) / Byte" $ do
+      -- TODO: examine the following test case
+      -- (128,[(True,0),(False,28),(False,67),(False,255),(False,33),(True,101),(True,69),(True,218),(True,229)])
       let program constant signs = do
             inputs <- replicateM (length signs) (input Public :: Comp (UInt 8))
             return $ constant + sum (zipWith (\sign x -> if sign then x else -x) signs inputs)
