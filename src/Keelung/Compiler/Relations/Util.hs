@@ -31,7 +31,7 @@ class HasLevel a where
 
 instance HasLevel RefB where
   hasLevel (RefBX _) = 0
-  hasLevel (RefUBit {}) = 99
+  hasLevel (RefUBit ref _) = hasLevel ref
   hasLevel _ = 100
 
 instance HasLevel RefU where

@@ -23,6 +23,7 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Util
 import Keelung.Data.IntervalTable (IntervalTable)
 import Keelung.Data.IntervalTable qualified as IntervalTable
+import Keelung.Data.Reference (RefU (RefUX))
 import Keelung.Syntax (Var, Width)
 import Keelung.Syntax.Counters
 import Prelude hiding (null)
@@ -47,7 +48,7 @@ instance Show OccurU where
                           <> ": "
                           <> showList'
                             ( map
-                                (\(var, _) -> show var)
+                                (\(var, _) -> show (RefUX width var))
                                 ( filter
                                     (\(_, n) -> n > 0) -- only show variables that are used
                                     (IntMap.toList occurs)
@@ -77,7 +78,7 @@ toIntMap (OccurU xs) = xs
 toIntervalTable :: Counters -> OccurU -> IntervalTable
 toIntervalTable counters (OccurU xs) = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
 
--- | O(n). To an IntMap of widths to IntervalTable
+-- | O(lg n). To an IntMap of IntervalTables
 toIntervalTables :: Counters -> OccurU -> IntMap IntervalTable
 toIntervalTables counters (OccurU xs) = IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadUInt width), x)) xs
 

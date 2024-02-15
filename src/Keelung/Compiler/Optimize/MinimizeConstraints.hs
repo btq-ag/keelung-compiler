@@ -140,6 +140,7 @@ foldMaybeM f = foldM $ \acc x -> do
 
 ------------------------------------------------------------------------------
 
+-- | Trying to reduce an additive field constraint, returns Nothing if it cannot be reduced
 reduceAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Maybe (PolyL n))
 reduceAddL polynomial = do
   relations <- gets cmRelations

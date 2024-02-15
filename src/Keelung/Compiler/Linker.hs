@@ -291,18 +291,18 @@ reindexRefU env (RefUX w x) i = case envIndexTableU env of
         offset' = getOffset (envNewCounters env) (Intermediate, ReadField)
         varBeforeReindexing' = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x + i `mod` w
      in -- trace ("ref:  " <> show (RefUBit (RefUX w x) i))
-        --     $ trace ("old:  " <> show offset' <> " + " <> show (IntervalTable.reindex table (varBeforeReindexing' - offset')) <> " (" <> show varBeforeReindexing')
-        --     $ trace
-        --       ( "new:  "
-        --           <> show offset
-        --           <> " + "
-        --           <> show (IntervalTable.reindex table varBeforeReindexing)
-        --           <> " ("
-        --           <> show varBeforeReindexing
-        --           <> " "
-        --           <> show (getOffset (envNewCounters env) (Intermediate, ReadUInt w))
-        --       )
-        --     $
+        --       $ trace ("old:  " <> show offset' <> " + " <> show (IntervalTable.reindex table (varBeforeReindexing' - offset')) <> " (" <> show varBeforeReindexing')
+        --       $ trace
+        --         ( "new:  "
+        --             <> show offset
+        --             <> " + "
+        --             <> show (IntervalTable.reindex table varBeforeReindexing)
+        --             <> " ("
+        --             <> show varBeforeReindexing
+        --             <> " "
+        --             <> show (getOffset (envNewCounters env) (Intermediate, ReadUInt w))
+        --         )
+        --       $
         if new
           then IntervalTable.reindex table varBeforeReindexing + offset
           else IntervalTable.reindex table (varBeforeReindexing' - offset') + offset'
