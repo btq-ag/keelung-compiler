@@ -56,7 +56,7 @@ linkConstraintModule :: (GaloisField n, Integral n) => ConstraintModule n -> Con
 linkConstraintModule cm =
   ConstraintSystem
     { csOptions = cmOptions cm,
-      csCounters = envNewCounters env,
+      csCounters = envCounters env,
       csConstraints = constraints >>= linkConstraint env,
       csEqZeros = eqZeros,
       csDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
@@ -264,53 +264,32 @@ reindexSlice env slice sign =
     ]
 
 reindexRefF :: Env -> RefF -> Var
-reindexRefF env (RefFO x) = x + getOffset (envNewCounters env) (Output, ReadField)
-reindexRefF env (RefFI x) = x + getOffset (envNewCounters env) (PublicInput, ReadField)
-reindexRefF env (RefFP x) = x + getOffset (envNewCounters env) (PrivateInput, ReadField)
-reindexRefF env (RefFX x) = IntervalTable.reindex (envIndexTableF env) x + getOffset (envNewCounters env) (Intermediate, ReadField)
+reindexRefF env (RefFO x) = x + getOffset (envCounters env) (Output, ReadField)
+reindexRefF env (RefFI x) = x + getOffset (envCounters env) (PublicInput, ReadField)
+reindexRefF env (RefFP x) = x + getOffset (envCounters env) (PrivateInput, ReadField)
+reindexRefF env (RefFX x) = IntervalTable.reindex (envIndexTableF env) x + getOffset (envCounters env) (Intermediate, ReadField)
 
 reindexRefB :: Env -> RefB -> Var
-reindexRefB env (RefBO x) = x + getOffset (envNewCounters env) (Output, ReadBool)
-reindexRefB env (RefBI x) = x + getOffset (envNewCounters env) (PublicInput, ReadBool)
-reindexRefB env (RefBP x) = x + getOffset (envNewCounters env) (PrivateInput, ReadBool)
-reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (envNewCounters env) (Intermediate, ReadBool)
+reindexRefB env (RefBO x) = x + getOffset (envCounters env) (Output, ReadBool)
+reindexRefB env (RefBI x) = x + getOffset (envCounters env) (PublicInput, ReadBool)
+reindexRefB env (RefBP x) = x + getOffset (envCounters env) (PrivateInput, ReadBool)
+reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOffset (envCounters env) (Intermediate, ReadBool)
 reindexRefB env (RefUBit x i) = reindexRefU env x i
 
-new :: Bool
-new = False
-
 reindexRefU :: Env -> RefU -> Int -> Var
-reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envNewCounters env) (Output, ReadAllUInts)
-reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envNewCounters env) (PublicInput, ReadAllUInts)
-reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envNewCounters env) (PrivateInput, ReadAllUInts)
+reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envCounters env) (Output, ReadAllUInts)
+reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envCounters env) (PublicInput, ReadAllUInts)
+reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envCounters env) (PrivateInput, ReadAllUInts)
 reindexRefU env (RefUX w x) i = case envIndexTableU env of
   Left table ->
-    let offset = getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
-        varBeforeReindexing = getOffset (envNewCounters env) (Intermediate, ReadUInt w) + w * x + i `mod` w - offset
-
-        offset' = getOffset (envNewCounters env) (Intermediate, ReadField)
-        varBeforeReindexing' = getOffset (envOldCounters env) (Intermediate, ReadUInt w) + w * x + i `mod` w
-     in -- trace ("ref:  " <> show (RefUBit (RefUX w x) i))
-        --       $ trace ("old:  " <> show offset' <> " + " <> show (IntervalTable.reindex table (varBeforeReindexing' - offset')) <> " (" <> show varBeforeReindexing')
-        --       $ trace
-        --         ( "new:  "
-        --             <> show offset
-        --             <> " + "
-        --             <> show (IntervalTable.reindex table varBeforeReindexing)
-        --             <> " ("
-        --             <> show varBeforeReindexing
-        --             <> " "
-        --             <> show (getOffset (envNewCounters env) (Intermediate, ReadUInt w))
-        --         )
-        --       $
-        if new
-          then IntervalTable.reindex table varBeforeReindexing + offset
-          else IntervalTable.reindex table (varBeforeReindexing' - offset') + offset'
+    let offset = getOffset (envCounters env) (Intermediate, ReadAllUInts)
+        varBeforeReindexing = getOffset (envCounters env) (Intermediate, ReadUInt w) + w * x - offset
+     in IntervalTable.reindex table varBeforeReindexing + offset + i `mod` w
   Right tables ->
     case IntMap.lookup w tables of
       Nothing -> error "[ panic ] reindexRefU: impossible"
       Just (offset, table) ->
-        IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envNewCounters env) (Intermediate, ReadAllUInts)
+        IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envCounters env) (Intermediate, ReadAllUInts)
 
 -------------------------------------------------------------------------------
 
@@ -337,8 +316,7 @@ toConstraints cm env =
 
 -- | Allow us to determine which relations should be extracted from the pool
 data Env = Env
-  { envOldCounters :: !Counters,
-    envNewCounters :: !Counters,
+  { envCounters :: !Counters,
     envOccurF :: !IntSet,
     envOccurB :: !IntSet,
     envOccurU :: !(Either (IntMap IntSet) (IntMap IntervalTable)),
@@ -359,17 +337,9 @@ constructEnv cm =
       indexTableU =
         if optUseNewLinker (cmOptions cm)
           then Right $ OccurUB.toIntervalTablesWithOffsets (cmOccurrenceUB cm)
-          else
-            Left $
-              if new
-                then OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm)
-                else
-                  OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
-                    <> OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
-                    <> OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm)
+          else Left $ OccurU.toIntervalTable (cmCounters cm) (cmOccurrenceU cm)
    in Env
-        { envOldCounters = cmCounters cm,
-          envNewCounters = updateCounters indexTableF indexTableB indexTableU cm,
+        { envCounters = updateCounters indexTableF indexTableB indexTableU cm,
           envOccurF = OccurF.occuredSet (cmOccurrenceF cm),
           envOccurB = OccurB.occuredSet (cmOccurrenceB cm),
           envOccurU =

@@ -30,7 +30,7 @@ import Keelung.Syntax.Counters (Counters)
 import Keelung.Syntax.Counters qualified as Counters
 
 test :: (Integral n, GaloisField n) => ConstraintModule n -> Maybe Error
-test cm = checkReport (envNewCounters (constructEnv cm)) $ generateReindexReport (constructEnv cm) [] cm
+test cm = checkReport (envCounters (constructEnv cm)) $ generateReindexReport (constructEnv cm) [] cm
 
 --------------------------------------------------------------------------------
 
