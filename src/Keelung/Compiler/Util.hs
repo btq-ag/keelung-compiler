@@ -65,7 +65,17 @@ traceWhen :: Bool -> String -> a -> a
 traceWhen True msg = Trace.trace msg
 traceWhen False _ = id
 
+-- | Like 'traceWhen', but for monadic actions
+traceWhenM :: (Monad m) => Bool -> String -> m ()
+traceWhenM True msg = Trace.traceM msg
+traceWhenM False _ = return ()
+
 -- | Trace a message with a value when a condition is met
 traceShowWhen :: (Show s) => Bool -> s -> a -> a
 traceShowWhen True msg = Trace.traceShow msg
 traceShowWhen False _ = id
+
+-- | Like 'traceShowWhen', but for monadic actions
+traceShowWhenM :: (Monad m, Show s) => Bool -> s -> m ()
+traceShowWhenM True msg = Trace.traceShowM msg
+traceShowWhenM False _ = return ()

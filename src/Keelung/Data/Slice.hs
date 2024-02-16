@@ -68,7 +68,7 @@ fromRefU ref = Slice ref 0 (widthOf ref)
 
 -- | Construct a "Slice" from a "RefU" and an index
 fromRefUBit :: RefU -> Int -> Slice
-fromRefUBit ref i = Slice ref i 1
+fromRefUBit ref i = Slice ref i (i + 1)
 
 -- | Construct "Slice"s from a "Limb" with a list of signs
 fromLimb :: Limb -> [(Bool, Slice)]

@@ -417,24 +417,26 @@ relateS slice1 slice2 = do
 
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> RoundM n Bool
 relateL limb1 limb2 = case (Slice.fromLimb limb1, Slice.fromLimb limb2) of
-  ([(sign1, slice1)], [(sign2, slice2)]) -> if sign1 == sign2 
+  ([(sign1, slice1)], [(sign2, slice2)]) ->
+    if sign1 == sign2
       then relateS slice1 slice2
       else error "[ panic ] relateL: signs do not match"
   _ -> error "[ panic ] relateL: not a single slice"
-      -- then relat
 
-  -- cm <- get
-  -- result <-
-  --   lift $
-  --     lift $
-  --       EquivClass.runM $
-  --         Relations.relateS (Slice.fromLimb var1) (Slice.fromLimb var2) (cmRelations cm)
-  -- case result of
-  --   Nothing -> return False
-  --   Just relations -> do
-  --     markChanged RelationChanged
-  --     modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
-  --     return True
+-- then relat
+
+-- cm <- get
+-- result <-
+--   lift $
+--     lift $
+--       EquivClass.runM $
+--         Relations.relateS (Slice.fromLimb var1) (Slice.fromLimb var2) (cmRelations cm)
+-- case result of
+--   Nothing -> return False
+--   Just relations -> do
+--     markChanged RelationChanged
+--     modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
+--     return True
 
 --------------------------------------------------------------------------------
 
@@ -515,6 +517,23 @@ removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 
 --------------------------------------------------------------------------------
 
+-- isTarget :: PolyL n -> Bool
+-- isTarget = any (hasTargetLimb . fst) . PolyL.polyLimbs
+--   where
+--     hasTargetLimb :: Limb -> Bool
+--     hasTargetLimb limb =
+--       let refU = Limb.lmbRef limb
+--        in case refU of
+--             RefUX 2 i -> i >= 12 && i <= 15
+--             _ -> False
+
+-- isTargetSlice :: Slice -> Bool
+-- isTargetSlice slice =
+--       let refU = Slice.sliceRefU slice
+--        in case refU of
+--             RefUX 2 i -> i >= 12 && i <= 15
+--             _ -> False
+
 -- | Substitutes Limbs in a PolyL.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Changes)
@@ -552,7 +571,7 @@ _substLimb ::
   (Limb, n) ->
   (Either n (PolyL n), Maybe Changes)
 _substLimb relations initState (limb, multiplier) =
-  let pairs = [ (slice, if sign then multiplier else -multiplier ) | (sign, slice) <- Slice.fromLimb limb ]
+  let pairs = [(slice, if sign then multiplier else -multiplier) | (sign, slice) <- Slice.fromLimb limb, not (Slice.null slice)]
    in foldl (_substSlice relations) initState pairs
 
 _substSlice ::
@@ -563,7 +582,9 @@ _substSlice ::
   (Either n (PolyL n), Maybe Changes)
 _substSlice relations initState (sliceWhole, multiplier) =
   let SliceLookup _ segments = SliceRelations.lookup sliceWhole relations
-      segmentsWithSlices = map (\(index, segment) -> (Slice.Slice (Slice.sliceRefU sliceWhole) index (index + widthOf segment), segment)) (IntMap.toList segments)
+      tagWithSlice = map (\(index, segment) -> (Slice.Slice (Slice.sliceRefU sliceWhole) index (index + widthOf segment), segment))
+      removeNullSegment = filter (not . SliceLookup.nullSegment . snd)
+      segmentsWithSlices = tagWithSlice $ removeNullSegment (IntMap.toList segments)
    in foldl step initState segmentsWithSlices
   where
     step (accPoly, changes) (slice, segment) = case segment of
@@ -572,16 +593,10 @@ _substSlice relations initState (sliceWhole, multiplier) =
         Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral multiplier) xs, removeLimb (Slice.toLimb slice) changes)
       SliceLookup.ChildOf root ->
         let rootLimb = Slice.toLimb root
-        --  in 
-        --   if rootLimb == limb
-        --       then case accPoly of -- nothing changed. TODO: see if this is necessary
-        --         Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-        --         Right xs -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] xs), changes)
-        --       else 
-                in case accPoly of
-                -- replace `limb` with `root`
-                Left c -> (PolyL.fromLimbs c [(rootLimb, multiplier)], (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
-                Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] accPoly'), (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
+         in case accPoly of
+              -- replace `limb` with `root`
+              Left c -> (PolyL.fromLimbs c [(rootLimb, multiplier)], (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
+              Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] accPoly'), (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
       SliceLookup.Parent _ _ -> case accPoly of
         Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, multiplier)], changes)
         Right xs -> (Right (PolyL.insertLimbs 0 [(Slice.toLimb slice, multiplier)] xs), changes)
