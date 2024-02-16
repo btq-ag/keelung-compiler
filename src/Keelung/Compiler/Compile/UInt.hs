@@ -172,7 +172,6 @@ assertDivModU2 width dividend divisor quotient remainder = do
   compileSub (width * 2) productDQ dividendRef' remainderRef'
 
   -- 0 ≤ remainder < divisor
-  -- compileAssertion $ ExprB (LTU remainder divisor)
   case (remainderRef', divisorRef') of
     (Left xVar, Left yVar) -> do
       result <- Boolean.computeLTUVarVar xVar yVar
@@ -246,7 +245,6 @@ assertDivModUCC width dividend divisor quotient remainder = do
   productDQ <- freshRefU width
   compileMulU width productDQ (Right divisor) quotient
   compileSub width productDQ (Right dividend) remainder
-
   -- 0 ≤ remainder < divisor
   assertLT width remainder (toInteger divisor)
   -- add hint for DivMod

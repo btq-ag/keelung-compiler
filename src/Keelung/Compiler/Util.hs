@@ -6,6 +6,7 @@ import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.List qualified as List
 import Data.Proxy
+import Debug.Trace qualified as Trace
 import Keelung (GF181, N (N), gf181)
 import Keelung.Data.FieldInfo (FieldInfo (..))
 
@@ -56,3 +57,15 @@ gf181Info =
           fieldDeg = fromIntegral (Field.deg fieldNumber),
           fieldWidth = floor (logBase (2 :: Double) (fromIntegral (Field.order fieldNumber)))
         }
+
+--------------------------------------------------------------------------------
+
+-- | Trace a message when a condition is met
+traceWhen :: Bool -> String -> a -> a
+traceWhen True msg = Trace.trace msg
+traceWhen False _ = id
+
+-- | Trace a message with a value when a condition is met
+traceShowWhen :: (Show s) => Bool -> s -> a -> a
+traceShowWhen True msg = Trace.traceShow msg
+traceShowWhen False _ = id

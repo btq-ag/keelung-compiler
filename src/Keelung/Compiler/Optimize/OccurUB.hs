@@ -37,16 +37,19 @@ instance Show OccurUB where
     if null (OccurUB xs)
       then ""
       else
-        "  OccurrencesUB:\n  "
+        "  OccurrencesUB:\n"
           <> indent
-            ( showList'
-                ( map
-                    ( \(width, intervalSet) ->
-                        show width
-                          <> ": "
-                          <> show intervalSet
+            ( indent
+                ( unlines
+                    ( map
+                        ( \(width, intervalSet) ->
+                            "U"
+                              <> toSubscript width
+                              <> ": "
+                              <> show intervalSet
+                        )
+                        (IntMap.toList xs)
                     )
-                    (IntMap.toList xs)
                 )
             )
 

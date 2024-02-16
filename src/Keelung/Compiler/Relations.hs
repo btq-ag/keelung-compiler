@@ -85,9 +85,6 @@ assignS slice int relations = do
 relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
 
--- relateL :: (GaloisField n, Integral n) => Limb -> Limb -> Relations n -> EquivClass.M (Error n) (Relations n)
--- relateL limb1 limb2 = updateRelationsL (LimbRelations.relate limb1 limb2)
-
 -- var = slope * var2 + intercept
 relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
 relateR x slope y intercept xs = updateRelationsR (Ref.relateR (relationsS xs) x slope y intercept) xs

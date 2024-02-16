@@ -178,7 +178,7 @@ addC = mapM_ addOne
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
     countBitTestAsOccurU (B (RefUBit (RefUX width var) i)) = do
       result <- gets cmOccurrenceU
-      case result of 
+      case result of
         Left occurU -> modify' (\cs -> cs {cmOccurrenceU = Left $ OccurU.increase width var occurU})
         Right occurUB -> modify' (\cs -> cs {cmOccurrenceU = Right $ OccurUB.increase width var (i, i + 1) occurUB})
     countBitTestAsOccurU _ = return ()
@@ -272,7 +272,7 @@ writeRefUVal a x = addC [CSliceVal (Slice.fromRefU a) (toInteger x)]
 
 -- | Assign an Integer to a Limb
 writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
-writeLimbVal a x = addC [CSliceVal (Slice.fromLimb a) x]
+writeLimbVal limb val = addC $ map (uncurry CSliceVal) (Slice.fromLimbWithValue limb val)
 
 -- | Assign an Integer to a Slice
 writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
@@ -283,8 +283,17 @@ writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
 writeRefUEq a b = addC [CSliceEq (Slice.fromRefU a) (Slice.fromRefU b)]
 
 -- | Assert that two Limbs are equal
+-- TODO: eliminate this function
 writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
-writeLimbEq a b = addC [CSliceEq (Slice.fromLimb a) (Slice.fromLimb b)]
+writeLimbEq a b =
+  let as = Slice.fromLimb' a
+      bs = Slice.fromLimb' b
+   in case (as, bs) of
+        ([(signA, sliceA)], [(signB, sliceB)]) ->
+          if signA == signB
+            then writeSliceEq sliceA sliceB
+            else error $ "[ panic ] writeLimbEq: sign mismatch, " <> show signA <> " /= " <> show signB
+        _ -> error $ "[ panic ] writeLimbEq: unexpected number of slices, " <> show (length as) <> " /= " <> show (length bs)
 
 -- | Assert that two Slices are equal
 writeSliceEq :: (GaloisField n, Integral n) => Slice -> Slice -> M n ()
