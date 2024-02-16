@@ -28,8 +28,8 @@ tests = describe "Compilation Experiment" $ do
       let expected = [dividend `div` divisor, dividend `mod` divisor]
       -- debugWithOpts options (Binary 7) (program dividend divisor)
       -- testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
-      debugWithOpts options gf181 (program dividend divisor)
-      testCompilerWithOpts options gf181 (program dividend divisor) [] [] expected
+      debugWithOpts options (Binary 7) (program dividend divisor)
+      testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
 
   -- -- WON'T FIX: for the old linker
   -- describe "Binary Addition" $ do

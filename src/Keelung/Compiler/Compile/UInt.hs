@@ -5,8 +5,8 @@ module Keelung.Compiler.Compile.UInt
     assertLT,
     assertGTE,
     assertGT,
-    assertDivModU,
-    assertDivModU2,
+    assertDivModUOld,
+    assertDivModUNew,
     assertCLDivModU,
   )
 where
@@ -151,8 +151,8 @@ _allocDoubleWidth (Right val) = return $ Right (U.mapWidth (* 2) val)
 --    1. dividend = divisor * quotient + remainder
 --    2. 0 ≤ remainder < divisor
 --    3. 0 < divisor
-assertDivModU2 :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
-assertDivModU2 width dividend divisor quotient remainder = do
+assertDivModUNew :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
+assertDivModUNew width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder
@@ -207,8 +207,8 @@ assertDivModU2 width dividend divisor quotient remainder = do
 --    1. dividend = divisor * quotient + remainder
 --    2. 0 ≤ remainder < divisor
 --    3. 0 < divisor
-assertDivModU :: (GaloisField n, Integral n) => (Expr n -> M n ()) -> Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
-assertDivModU compileAssertion width dividend divisor quotient remainder = do
+assertDivModUOld :: (GaloisField n, Integral n) => (Expr n -> M n ()) -> Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
+assertDivModUOld compileAssertion width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder

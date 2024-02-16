@@ -107,9 +107,9 @@ compileSideEffect (DivMod width dividend divisor quotient remainder) = do
     then do
       fieldTypeData <- gets (FieldInfo.fieldTypeData . optFieldInfo . cmOptions)
       case fieldTypeData of
-        Binary _ -> UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
-        Prime _ -> UInt.assertDivModU2 width dividend divisor quotient remainder
-    else UInt.assertDivModU compileAssertion width dividend divisor quotient remainder
+        Binary _ -> UInt.assertDivModUNew width dividend divisor quotient remainder
+        Prime _ -> UInt.assertDivModUNew width dividend divisor quotient remainder
+    else UInt.assertDivModUOld compileAssertion width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do
   x <- UInt.wireU value
