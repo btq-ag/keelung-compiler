@@ -286,8 +286,8 @@ writeRefUEq a b = addC [CSliceEq (Slice.fromRefU a) (Slice.fromRefU b)]
 -- TODO: eliminate this function
 writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
 writeLimbEq a b =
-  let as = Slice.fromLimb' a
-      bs = Slice.fromLimb' b
+  let as = Slice.fromLimb a
+      bs = Slice.fromLimb b
    in case (as, bs) of
         ([(signA, sliceA)], [(signB, sliceB)]) ->
           if signA == signB

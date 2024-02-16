@@ -24,7 +24,6 @@ import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.Limb (Limb)
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -417,7 +416,7 @@ relateS slice1 slice2 = do
       return True
 
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> RoundM n Bool
-relateL limb1 limb2 = case (Slice.fromLimb' limb1, Slice.fromLimb' limb2) of
+relateL limb1 limb2 = case (Slice.fromLimb limb1, Slice.fromLimb limb2) of
   ([(sign1, slice1)], [(sign2, slice2)]) -> if sign1 == sign2 
       then relateS slice1 slice2
       else error "[ panic ] relateL: signs do not match"
@@ -525,7 +524,7 @@ substPolyL relations poly = do
       afterSubstSlice =
         foldl
           ( if Options.optUseNewLinker (Relations.relationsOptions relations)
-              then _substSlice (Relations.relationsS relations)
+              then _substLimb (Relations.relationsS relations)
               else substLimb
           )
           initState
@@ -546,15 +545,25 @@ substLimb (accPoly, changes) (limb, multiplier) = case accPoly of
   Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
 
 --- | Substitutes a Limb in a PolyL with SliceRelations.
-_substSlice ::
+_substLimb ::
   (Integral n, GaloisField n) =>
   SliceRelations ->
   (Either n (PolyL n), Maybe Changes) ->
   (Limb, n) ->
   (Either n (PolyL n), Maybe Changes)
-_substSlice relations initState (limb, multiplier) =
-  let SliceLookup _ segments = SliceRelations.lookup (Slice.fromLimb limb) relations
-      segmentsWithSlices = map (\(index, segment) -> (Slice.Slice (Limb.lmbRef limb) index (index + widthOf segment), segment)) (IntMap.toList segments)
+_substLimb relations initState (limb, multiplier) =
+  let pairs = [ (slice, if sign then multiplier else -multiplier ) | (sign, slice) <- Slice.fromLimb limb ]
+   in foldl (_substSlice relations) initState pairs
+
+_substSlice ::
+  (Integral n, GaloisField n) =>
+  SliceRelations ->
+  (Either n (PolyL n), Maybe Changes) ->
+  (Slice, n) ->
+  (Either n (PolyL n), Maybe Changes)
+_substSlice relations initState (sliceWhole, multiplier) =
+  let SliceLookup _ segments = SliceRelations.lookup sliceWhole relations
+      segmentsWithSlices = map (\(index, segment) -> (Slice.Slice (Slice.sliceRefU sliceWhole) index (index + widthOf segment), segment)) (IntMap.toList segments)
    in foldl step initState segmentsWithSlices
   where
     step (accPoly, changes) (slice, segment) = case segment of
@@ -563,11 +572,13 @@ _substSlice relations initState (limb, multiplier) =
         Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral multiplier) xs, removeLimb (Slice.toLimb slice) changes)
       SliceLookup.ChildOf root ->
         let rootLimb = Slice.toLimb root
-         in if rootLimb == limb
-              then case accPoly of -- nothing changed. TODO: see if this is necessary
-                Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-                Right xs -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] xs), changes)
-              else case accPoly of
+        --  in 
+        --   if rootLimb == limb
+        --       then case accPoly of -- nothing changed. TODO: see if this is necessary
+        --         Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
+        --         Right xs -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] xs), changes)
+        --       else 
+                in case accPoly of
                 -- replace `limb` with `root`
                 Left c -> (PolyL.fromLimbs c [(rootLimb, multiplier)], (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
                 Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] accPoly'), (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
