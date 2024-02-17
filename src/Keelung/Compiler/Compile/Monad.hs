@@ -80,16 +80,8 @@ freshRefU :: Width -> M n RefU
 freshRefU width = do
   counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadUInt width)
-  useNewLinker <- gets (optUseNewLinker . cmOptions)
-  if useNewLinker
-    then do
-      modifyCounter $ addCount (Intermediate, WriteUInt width) width
-      if width == 0
-        then return $ RefUX width index -- TODO: examine if allocating a RefU of width 0 is even necessary
-        else return $ RefUX width (index `div` width)
-    else do
-      modifyCounter $ addCount (Intermediate, WriteUInt width) 1
-      return $ RefUX width index
+  modifyCounter $ addCount (Intermediate, WriteUInt width) 1
+  return $ RefUX width index
 
 --------------------------------------------------------------------------------
 

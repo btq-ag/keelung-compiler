@@ -17,18 +17,20 @@ tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
   -- let options = defaultOptions {optUseNewLinker = False, optOptimize = False}
   -- let options = defaultOptions {optUseNewLinker = False}
-  let options = defaultOptions {optUseNewLinker = True}
-  -- let options = defaultOptions {optUseNewLinker = True, optOptimize = False}
+  -- let options = defaultOptions {optUseNewLinker = True}
+  let options = defaultOptions {optUseNewLinker = True, optOptimize = False}
 
   describe "DivMod" $ do
     it "constant dividend / constant divisor" $ do
       let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
-      let dividend = 135 :: Integer
-      let divisor = 33 :: Integer
+      let dividend = 152 :: Integer
+      let divisor = 88 :: Integer
       let expected = [dividend `div` divisor, dividend `mod` divisor]
       -- debugWithOpts options (Binary 7) (program dividend divisor)
       -- testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
-      debugWithOpts options (Prime 17) (program dividend divisor)
+      -- 4294967291
+      -- 4294967311
+      -- debugWithOpts options (Prime 4294967291) (program dividend divisor)
       testCompilerWithOpts options (Prime 17) (program dividend divisor) [] [] expected
 
 -- -- WON'T FIX: for the old linker
