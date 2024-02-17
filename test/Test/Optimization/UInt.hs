@@ -38,7 +38,7 @@ tests = describe "UInt" $ do
         return $ c .&. 5
       cs `shouldHaveSize` 34
       -- TODO: should be 24
-      cs' `shouldHaveSize` 26
+      cs' `shouldHaveSize` 31
 
   describe "Addition / Subtraction" $ do
     it "2 variables / 8 bit / GF181" $ do

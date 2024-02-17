@@ -281,10 +281,10 @@ writeLimbEq a b =
   let as = Slice.fromLimb a
       bs = Slice.fromLimb b
    in case (as, bs) of
-        ([(signA, sliceA)], [(signB, sliceB)]) ->
-          if signA == signB
+        ([(coeffA, sliceA)], [(coeffB, sliceB)]) ->
+          if coeffA == coeffB
             then writeSliceEq sliceA sliceB
-            else error $ "[ panic ] writeLimbEq: sign mismatch, " <> show signA <> " /= " <> show signB
+            else error $ "[ panic ] writeLimbEq: coefficient mismatch, " <> show coeffA <> " /= " <> show coeffB
         _ -> error $ "[ panic ] writeLimbEq: unexpected number of slices, " <> show (length as) <> " /= " <> show (length bs)
 
 -- | Assert that two Slices are equal

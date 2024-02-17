@@ -417,26 +417,11 @@ relateS slice1 slice2 = do
 
 relateL :: (GaloisField n, Integral n) => Limb -> Limb -> RoundM n Bool
 relateL limb1 limb2 = case (Slice.fromLimb limb1, Slice.fromLimb limb2) of
-  ([(sign1, slice1)], [(sign2, slice2)]) ->
-    if sign1 == sign2
+  ([(coeff1, slice1)], [(coeff2, slice2)]) ->
+    if coeff1 == coeff2
       then relateS slice1 slice2
-      else error "[ panic ] relateL: signs do not match"
+      else error "[ panic ] relateL: coefficients do not match"
   _ -> error "[ panic ] relateL: not a single slice"
-
--- then relat
-
--- cm <- get
--- result <-
---   lift $
---     lift $
---       EquivClass.runM $
---         Relations.relateS (Slice.fromLimb var1) (Slice.fromLimb var2) (cmRelations cm)
--- case result of
---   Nothing -> return False
---   Just relations -> do
---     markChanged RelationChanged
---     modify' $ \cm' -> removeOccurrences (Set.fromList [var1, var2]) $ cm' {cmRelations = relations}
---     return True
 
 --------------------------------------------------------------------------------
 
@@ -571,7 +556,7 @@ _substLimb ::
   (Limb, n) ->
   (Either n (PolyL n), Maybe Changes)
 _substLimb relations initState (limb, multiplier) =
-  let pairs = [(slice, if sign then multiplier else -multiplier) | (sign, slice) <- Slice.fromLimb limb, not (Slice.null slice)]
+  let pairs = [(slice, fromInteger coeff * multiplier) | (coeff, slice) <- Slice.fromLimb limb, not (Slice.null slice)]
    in foldl (_substSlice relations) initState pairs
 
 _substSlice ::

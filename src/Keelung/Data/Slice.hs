@@ -6,6 +6,8 @@ module Keelung.Data.Slice
     fromRefU,
 
     -- * Conversion
+
+    -- fromLimb,
     fromLimb,
     fromLimbWithValue,
     toLimb,
@@ -70,13 +72,13 @@ fromRefU ref = Slice ref 0 (widthOf ref)
 fromRefUBit :: RefU -> Int -> Slice
 fromRefUBit ref i = Slice ref i (i + 1)
 
--- | Construct "Slice"s from a "Limb" with a list of signs
-fromLimb :: Limb -> [(Bool, Slice)]
+-- | Construct "Slice"s from a "Limb" with a list of coeffients
+fromLimb :: Limb -> [(Integer, Slice)]
 fromLimb limb = case Limb.lmbSigns limb of
-  Left sign -> [(sign, Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb))]
+  Left sign -> [(if sign then 1 else -1, Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb))]
   Right signs ->
-    [ (sign, fromRefUBit (Limb.lmbRef limb) offset)
-      | (offset, sign) <- zip [Limb.lmbOffset limb .. Limb.lmbOffset limb + widthOf limb - 1] signs
+    [ (if sign then 2 ^ i else -(2 ^ i), fromRefUBit (Limb.lmbRef limb) (i + Limb.lmbOffset limb))
+      | (i, sign) <- zip [0 .. widthOf limb - 1] signs
     ]
 
 -- | Like "fromLimb", but pairs the slices with chunks of the value adjusted by the signs
