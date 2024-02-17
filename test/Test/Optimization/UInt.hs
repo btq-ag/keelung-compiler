@@ -36,7 +36,7 @@ tests = describe "UInt" $ do
         b <- input Private
         c <- reuse $ a * b
         return $ c .&. 5
-      cs `shouldHaveSize` 32
+      cs `shouldHaveSize` 34
       -- TODO: should be 24
       cs' `shouldHaveSize` 26
 

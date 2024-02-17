@@ -16,26 +16,30 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
   -- let options = defaultOptions {optUseNewLinker = False, optOptimize = False}
-  let options = defaultOptions {optUseNewLinker = False}
+  -- let options = defaultOptions {optUseNewLinker = False}
   -- let options = defaultOptions {optUseNewLinker = True}
-  -- let options = defaultOptions {optUseNewLinker = True, optOptimize = False}
+  let options = defaultOptions {optUseNewLinker = True, optOptimize = False}
 
   describe "DivMod" $ do
-    --   it "constant dividend / constant divisor" $ do
-    --     let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 4)
-    --     let dividend = 12
-    --     let divisor = 5
-    --     let expected = [dividend `div` divisor, dividend `mod` divisor]
-    --     debugWithOpts options (Binary 7) (program dividend divisor)
-    --     testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+    it "constant dividend / constant divisor" $ do
+      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
+      let dividend = 152 :: Integer
+      let divisor = 88 :: Integer
+      let expected = [dividend `div` divisor, dividend `mod` divisor]
+      -- debugWithOpts options (Binary 7) (program dividend divisor)
+      -- testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+      -- 4294967291
+      -- 4294967311
+      -- debugWithOpts options (Prime 4294967291) (program dividend divisor)
+      testCompilerWithOpts options (Prime 17) (program dividend divisor) [] [] expected
 
-    it "2 negative variables / UInt 2" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 2)
-            y <- input Public
-            return $ -x - y
-      let x = 2
-      let y = 1
-      let expected = [1]
-      debugWithOpts options (Binary 7) program
-      testCompiler (Binary 7) program [x, y] [] expected
+-- -- WON'T FIX: for the old linker
+-- describe "Binary Addition" $ do
+--   it "mixed (positive / negative / constnat) / Byte" $ do
+--     let program = do
+--           x <- input Public :: Comp (UInt 2)
+--           y <- input Public
+--           z <- input Public
+--           return $ 1 + x + y + z
+--     debug (Binary 7) program
+--     testCompiler (Binary 7) program [0, 0, 1] [] [2]

@@ -207,7 +207,7 @@ isPowerOf2 fieldBitWidth coeff =
         then Nothing
         else Just result
   where
-    -- Speed this up
+    -- TODO: Speed this up
     check :: Integer -> Maybe Int
     check 2 = Just 1
     check 4 = Just 2

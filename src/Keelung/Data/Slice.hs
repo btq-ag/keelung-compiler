@@ -7,6 +7,7 @@ module Keelung.Data.Slice
 
     -- * Conversion
     fromLimb,
+    fromLimbWithValue,
     toLimb,
 
     -- * Predicates
@@ -24,6 +25,7 @@ module Keelung.Data.Slice
 where
 
 import Control.DeepSeq (NFData)
+import Data.Bits qualified
 import GHC.Generics (Generic)
 import Keelung (HasWidth, widthOf)
 import Keelung.Data.Limb (Limb)
@@ -64,9 +66,28 @@ instance Semigroup Slice where
 fromRefU :: RefU -> Slice
 fromRefU ref = Slice ref 0 (widthOf ref)
 
--- | Construct a "Slice" from a "Limb"
-fromLimb :: Limb -> Slice
-fromLimb limb = Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb)
+-- | Construct a "Slice" from a "RefU" and an index
+fromRefUBit :: RefU -> Int -> Slice
+fromRefUBit ref i = Slice ref i (i + 1)
+
+-- | Construct "Slice"s from a "Limb" with a list of signs
+fromLimb :: Limb -> [(Bool, Slice)]
+fromLimb limb = case Limb.lmbSigns limb of
+  Left sign -> [(sign, Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb))]
+  Right signs ->
+    [ (sign, fromRefUBit (Limb.lmbRef limb) offset)
+      | (offset, sign) <- zip [Limb.lmbOffset limb .. Limb.lmbOffset limb + widthOf limb - 1] signs
+    ]
+
+-- | Like "fromLimb", but pairs the slices with chunks of the value adjusted by the signs
+fromLimbWithValue :: Limb -> Integer -> [(Slice, Integer)]
+fromLimbWithValue limb val = case Limb.lmbSigns limb of
+  Left sign -> [(Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb), if sign then val else -val)]
+  Right signs ->
+    [ let bit = Data.Bits.testBit val (offset - Limb.lmbOffset limb)
+       in (fromRefUBit (Limb.lmbRef limb) offset, if Data.Bits.xor sign bit then 1 else 0)
+      | (offset, sign) <- zip [Limb.lmbOffset limb .. Limb.lmbOffset limb + widthOf limb - 1] signs
+    ]
 
 -- | Convert a "Slice" to a "Limb"
 toLimb :: Slice -> Limb

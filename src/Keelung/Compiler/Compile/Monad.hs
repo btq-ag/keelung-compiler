@@ -43,7 +43,20 @@ runM options compilers counters program =
   runExcept
     ( execStateT
         (runReaderT program compilers)
-        (ConstraintModule options (tempSetFlag counters (optUseNewLinker options)) OccurF.new (OccurB.new False) OccurU.new OccurUB.new (Relations.new options) mempty mempty mempty mempty mempty mempty)
+        ( ConstraintModule
+            options
+            (tempSetFlag counters (optUseNewLinker options))
+            OccurF.new
+            (OccurB.new False)
+            (if optUseNewLinker options then Right OccurUB.new else Left OccurU.new)
+            (Relations.new options)
+            mempty
+            mempty
+            mempty
+            mempty
+            mempty
+            mempty
+        )
     )
 
 modifyCounter :: (Counters -> Counters) -> M n ()
@@ -67,16 +80,8 @@ freshRefU :: Width -> M n RefU
 freshRefU width = do
   counters <- gets cmCounters
   let index = getCount counters (Intermediate, ReadUInt width)
-  useNewLinker <- gets (optUseNewLinker . cmOptions)
-  if useNewLinker
-    then do
-      modifyCounter $ addCount (Intermediate, WriteUInt width) width
-      if width == 0
-        then return $ RefUX width index -- TODO: examine if allocating a RefU of width 0 is even necessary
-        else return $ RefUX width (index `div` width)
-    else do
-      modifyCounter $ addCount (Intermediate, WriteUInt width) 1
-      return $ RefUX width index
+  modifyCounter $ addCount (Intermediate, WriteUInt width) 1
+  return $ RefUX width index
 
 --------------------------------------------------------------------------------
 
@@ -164,11 +169,10 @@ addC = mapM_ addOne
 
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
     countBitTestAsOccurU (B (RefUBit (RefUX width var) i)) = do
-      useNewLinker <- gets (optUseNewLinker . cmOptions)
-      if useNewLinker
-        then modify' (\cs -> cs {cmOccurrenceUB = OccurUB.increase width var (i, i + 1) (cmOccurrenceUB cs)})
-        else -- then return ()
-          modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (cmOccurrenceU cs)})
+      result <- gets cmOccurrenceU
+      case result of
+        Left occurU -> modify' (\cs -> cs {cmOccurrenceU = Left $ OccurU.increase width var occurU})
+        Right occurUB -> modify' (\cs -> cs {cmOccurrenceU = Right $ OccurUB.increase width var (i, i + 1) occurUB})
     countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
@@ -260,7 +264,7 @@ writeRefUVal a x = addC [CSliceVal (Slice.fromRefU a) (toInteger x)]
 
 -- | Assign an Integer to a Limb
 writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
-writeLimbVal a x = addC [CSliceVal (Slice.fromLimb a) x]
+writeLimbVal limb val = addC $ map (uncurry CSliceVal) (Slice.fromLimbWithValue limb val)
 
 -- | Assign an Integer to a Slice
 writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
@@ -271,8 +275,17 @@ writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
 writeRefUEq a b = addC [CSliceEq (Slice.fromRefU a) (Slice.fromRefU b)]
 
 -- | Assert that two Limbs are equal
+-- TODO: eliminate this function
 writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
-writeLimbEq a b = addC [CSliceEq (Slice.fromLimb a) (Slice.fromLimb b)]
+writeLimbEq a b =
+  let as = Slice.fromLimb a
+      bs = Slice.fromLimb b
+   in case (as, bs) of
+        ([(signA, sliceA)], [(signB, sliceB)]) ->
+          if signA == signB
+            then writeSliceEq sliceA sliceB
+            else error $ "[ panic ] writeLimbEq: sign mismatch, " <> show signA <> " /= " <> show signB
+        _ -> error $ "[ panic ] writeLimbEq: unexpected number of slices, " <> show (length as) <> " /= " <> show (length bs)
 
 -- | Assert that two Slices are equal
 writeSliceEq :: (GaloisField n, Integral n) => Slice -> Slice -> M n ()
