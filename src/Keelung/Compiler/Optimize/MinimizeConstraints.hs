@@ -572,22 +572,25 @@ _substSlice relations initState (sliceWhole, multiplier) =
       segmentsWithSlices = tagWithSlice $ removeNullSegment (IntMap.toList segments)
    in foldl step initState segmentsWithSlices
   where
-    step (accPoly, changes) (slice, segment) = case segment of
-      SliceLookup.Constant constant -> case accPoly of
-        Left c -> (Left (fromIntegral constant * multiplier + c), removeLimb (Slice.toLimb slice) changes)
-        Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral multiplier) xs, removeLimb (Slice.toLimb slice) changes)
-      SliceLookup.ChildOf root ->
-        let rootLimb = Slice.toLimb root
-         in case accPoly of
-              -- replace `limb` with `root`
-              Left c -> (PolyL.fromLimbs c [(rootLimb, multiplier)], (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
-              Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, multiplier)] accPoly'), (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
-      SliceLookup.Parent _ _ -> case accPoly of
-        Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, multiplier)], changes)
-        Right xs -> (Right (PolyL.insertLimbs 0 [(Slice.toLimb slice, multiplier)] xs), changes)
-      SliceLookup.Empty _ -> case accPoly of
-        Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, multiplier)], changes)
-        Right xs -> (Right (PolyL.insertLimbs 0 [(Slice.toLimb slice, multiplier)] xs), changes)
+    step (accPoly, changes) (slice, segment) =
+      let offset = Slice.sliceStart slice - Slice.sliceStart sliceWhole
+          coefficient = multiplier * (2 ^ offset)
+       in case segment of
+            SliceLookup.Constant constant -> case accPoly of
+              Left c -> (Left (fromIntegral constant * coefficient + c), removeLimb (Slice.toLimb slice) changes)
+              Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral coefficient) xs, removeLimb (Slice.toLimb slice) changes)
+            SliceLookup.ChildOf root ->
+              let rootLimb = Slice.toLimb root
+               in case accPoly of
+                    -- replace `limb` with `root`
+                    Left c -> (PolyL.fromLimbs c [(rootLimb, coefficient)], (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
+                    Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, coefficient)] accPoly'), (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
+            SliceLookup.Parent _ _ -> case accPoly of
+              Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, coefficient)], changes)
+              Right xs -> (Right (PolyL.insertLimbs 0 [(Slice.toLimb slice, coefficient)] xs), changes)
+            SliceLookup.Empty _ -> case accPoly of
+              Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, coefficient)], changes)
+              Right xs -> (Right (PolyL.insertLimbs 0 [(Slice.toLimb slice, coefficient)] xs), changes)
 
 -- | Substitutes a Ref in a PolyL.
 substRef ::
