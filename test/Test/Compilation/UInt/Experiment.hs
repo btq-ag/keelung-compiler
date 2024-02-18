@@ -21,13 +21,21 @@ tests = describe "Compilation Experiment" $ do
   -- let options = defaultOptions {optUseNewLinker = True, optOptimize = False}
 
   describe "DivMod" $ do
-    it "constant dividend / constant divisor" $ do
-      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 2)
+    -- let expected = [dividend `div` divisor, dividend `mod` divisor]
+
+    it "variable dividend / constant divisor" $ do
+      let program divisor = do
+            dividend <- input Public :: Comp (UInt 2)
+            performDivMod dividend divisor
+
       let dividend = 3 :: Integer
       let divisor = 1 :: Integer
+
       let expected = [dividend `div` divisor, dividend `mod` divisor]
-      -- debugWithOpts options (Binary 7) (program dividend divisor)
-      testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+      -- debugWithOpts options (Binary 7) (program (fromIntegral divisor))
+      testCompilerWithOpts options (Binary 7) (program (fromIntegral divisor)) [dividend] [] expected
+
+-- debugSolverWithOpts options (Binary 7) (program (fromIntegral divisor)) [dividend] []
 
 -- debugSolverWithOpts options (Binary 7) (program dividend divisor) [] []
 -- 4294967291

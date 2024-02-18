@@ -159,7 +159,7 @@ tests = do
               x <- inputUInt @4 Public
               assert $ x `neq` 3
         testCompiler gf181 program [5] [] []
-        throwBoth
+        throwErrors
           gf181
           program
           [3]
@@ -170,7 +170,7 @@ tests = do
       it "neq 4" $ do
         let program = do
               assert $ 3 `neq` (3 :: UInt 4)
-        throwBoth
+        throwErrors
           gf181
           program
           []

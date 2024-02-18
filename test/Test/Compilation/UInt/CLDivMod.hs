@@ -48,7 +48,7 @@ tests =
 
     it "assertCLDivMod (with wrong quotient constant)" $ do
       let program = assertCLDivMod 7 (3 :: UInt 4) 3 1
-      throwBoth
+      throwErrors
         (Prime 17)
         program
         []
@@ -58,7 +58,7 @@ tests =
 
     it "assertCLDivMod (with wrong remainder constant)" $ do
       let program = assertCLDivMod 7 (3 :: UInt 4) 2 0
-      throwBoth
+      throwErrors
         (Prime 17)
         program
         []
@@ -147,7 +147,7 @@ tests =
             return (divisor, remainder)
 
       forAll (choose (1, 15)) $ \dividend -> do
-        throwBoth
+        throwErrors
           (Prime 17)
           program
           [dividend, 0]
@@ -165,7 +165,7 @@ tests =
             return (divisor, remainder)
 
       forAll (choose (1, 15)) $ \quotient -> do
-        throwBoth
+        throwErrors
           (Prime 17)
           program
           [0, quotient]

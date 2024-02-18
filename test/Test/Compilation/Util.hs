@@ -11,7 +11,8 @@ module Test.Compilation.Util
     debugSolverWithOpts,
     debugSolver,
     throwR1CS,
-    throwBoth,
+    throwErrorsWithOpts,
+    throwErrors,
     assertSize,
     gf181Info,
   )
@@ -135,7 +136,7 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       -- constraint system solvers
       solveR1CSWithOpts options' program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
-      
+
 testCompiler :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 testCompiler = testCompilerWithOpts defaultOptions
 
@@ -189,30 +190,33 @@ throwR1CS fieldType program rawPublicInputs rawPrivateInputs csError = caseField
       solveR1CSO0 fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Left csError
 
-throwBoth :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Error n -> Error n -> IO ()
-throwBoth fieldType program rawPublicInputs rawPrivateInputs stError csError = caseFieldType fieldType handlePrime handleBinary
+throwErrorsWithOpts :: (GaloisField n, Integral n, Encode t, Show t) => Options -> FieldType -> Comp t -> [Integer] -> [Integer] -> Error n -> Error n -> IO ()
+throwErrorsWithOpts options fieldType program rawPublicInputs rawPrivateInputs stError csError = caseFieldType fieldType handlePrime handleBinary
   where
     handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
+      -- overwrite fieldInfo
+      let options' = options {optFieldInfo = fieldInfo}
       -- syntax tree interpreters
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Left stError
       -- constraint system interpreters
-      solveR1CS fieldInfo program rawPublicInputs rawPrivateInputs
-        `shouldBe` Left csError
-      solveR1CSO0 fieldInfo program rawPublicInputs rawPrivateInputs
+      solveR1CSWithOpts options' program rawPublicInputs rawPrivateInputs
         `shouldBe` Left csError
 
     handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
+      -- overwrite fieldInfo
+      let options' = options {optFieldInfo = fieldInfo}
       -- constraint system interpreters
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs
         `shouldBe` Left stError
       -- constraint system interpreters
-      solveR1CS fieldInfo program rawPublicInputs rawPrivateInputs
+      solveR1CSWithOpts options' program rawPublicInputs rawPrivateInputs
         `shouldBe` Left csError
-      solveR1CSO0 fieldInfo program rawPublicInputs rawPrivateInputs
-        `shouldBe` Left csError
+
+throwErrors :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Error n -> Error n -> IO ()
+throwErrors = throwErrorsWithOpts defaultOptions
 
 assertSize :: (Encode t) => Int -> Comp t -> IO ()
 assertSize afterSize program = do

@@ -502,23 +502,6 @@ removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 
 --------------------------------------------------------------------------------
 
--- isTarget :: PolyL n -> Bool
--- isTarget = any (hasTargetLimb . fst) . PolyL.polyLimbs
---   where
---     hasTargetLimb :: Limb -> Bool
---     hasTargetLimb limb =
---       let refU = Limb.lmbRef limb
---        in case refU of
---             RefUX 2 i -> i >= 12 && i <= 15
---             _ -> False
-
--- isTargetSlice :: Slice -> Bool
--- isTargetSlice slice =
---       let refU = Slice.sliceRefU slice
---        in case refU of
---             RefUX 2 i -> i >= 12 && i <= 15
---             _ -> False
-
 -- | Substitutes Limbs in a PolyL.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Changes)

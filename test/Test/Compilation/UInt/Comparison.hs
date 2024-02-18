@@ -32,7 +32,7 @@ tests = describe "Comparisons" $ do
       let bound = -1
       let x = 1
       it "GF181" $ do
-        throwBoth
+        throwErrors
           gf181
           (program bound)
           [fromInteger x]
@@ -40,7 +40,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertLTEBoundTooSmallError bound))
           (CompilerError (Compiler.AssertLTEBoundTooSmallError bound) :: Error GF181)
       it "Prime 2" $ do
-        throwBoth
+        throwErrors
           (Prime 2)
           (program bound)
           [fromInteger x]
@@ -48,7 +48,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertLTEBoundTooSmallError bound))
           (CompilerError (Compiler.AssertLTEBoundTooSmallError bound) :: Error (Prime 2))
       it "Binary 7" $ do
-        throwBoth
+        throwErrors
           (Binary 7)
           (program bound)
           [fromInteger x]
@@ -60,7 +60,7 @@ tests = describe "Comparisons" $ do
       let bound = 15
       let x = 1
       it "GF181" $ do
-        throwBoth
+        throwErrors
           gf181
           (program bound)
           [fromInteger x]
@@ -68,7 +68,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertLTEBoundTooLargeError bound width))
           (CompilerError (Compiler.AssertLTEBoundTooLargeError bound width) :: Error GF181)
       it "Prime 2" $ do
-        throwBoth
+        throwErrors
           (Prime 2)
           (program bound)
           [fromInteger x]
@@ -76,7 +76,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertLTEBoundTooLargeError bound width))
           (CompilerError (Compiler.AssertLTEBoundTooLargeError bound width) :: Error (Prime 2))
       it "Binary 7" $ do
-        throwBoth
+        throwErrors
           (Binary 7)
           (program bound)
           [fromInteger x]
@@ -91,7 +91,7 @@ tests = describe "Comparisons" $ do
             if x <= bound
               then testCompiler gf181 (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   gf181
                   (program bound)
                   [fromInteger x]
@@ -104,7 +104,7 @@ tests = describe "Comparisons" $ do
             if x <= bound
               then testCompiler (Prime 2) (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   (Prime 2)
                   (program bound)
                   [fromInteger x]
@@ -117,7 +117,7 @@ tests = describe "Comparisons" $ do
             if x <= bound
               then testCompiler (Binary 7) (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   (Binary 7)
                   (program bound)
                   [fromInteger x]
@@ -134,7 +134,7 @@ tests = describe "Comparisons" $ do
       let bound = 0
       let x = 1
       it "GF181" $ do
-        throwBoth
+        throwErrors
           gf181
           (program bound)
           [fromInteger x]
@@ -142,7 +142,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertLTBoundTooSmallError bound))
           (CompilerError (Compiler.AssertLTBoundTooSmallError bound) :: Error GF181)
       it "Prime 2" $ do
-        throwBoth
+        throwErrors
           (Prime 2)
           (program bound)
           [fromInteger x]
@@ -150,7 +150,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertLTBoundTooSmallError bound))
           (CompilerError (Compiler.AssertLTBoundTooSmallError bound) :: Error (Prime 2))
       it "Binary 7" $ do
-        throwBoth
+        throwErrors
           (Binary 7)
           (program bound)
           [fromInteger x]
@@ -162,7 +162,7 @@ tests = describe "Comparisons" $ do
       let bound = 16
       let x = 1
       it "GF181" $ do
-        throwBoth
+        throwErrors
           gf181
           (program bound)
           [fromInteger x]
@@ -170,7 +170,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertLTBoundTooLargeError bound width))
           (CompilerError (Compiler.AssertLTBoundTooLargeError bound width) :: Error GF181)
       it "Prime 2" $ do
-        throwBoth
+        throwErrors
           (Prime 2)
           (program bound)
           [fromInteger x]
@@ -178,7 +178,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertLTBoundTooLargeError bound width))
           (CompilerError (Compiler.AssertLTBoundTooLargeError bound width) :: Error (Prime 2))
       it "Binary 7" $ do
-        throwBoth
+        throwErrors
           (Binary 7)
           (program bound)
           [fromInteger x]
@@ -193,7 +193,7 @@ tests = describe "Comparisons" $ do
             if x < bound
               then testCompiler gf181 (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   gf181
                   (program bound)
                   [fromInteger x]
@@ -206,7 +206,7 @@ tests = describe "Comparisons" $ do
             if x < bound
               then testCompiler (Prime 2) (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   (Prime 2)
                   (program bound)
                   [fromInteger x]
@@ -219,7 +219,7 @@ tests = describe "Comparisons" $ do
             if x < bound
               then testCompiler (Binary 7) (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   (Binary 7)
                   (program bound)
                   [fromInteger x]
@@ -236,7 +236,7 @@ tests = describe "Comparisons" $ do
       let bound = 0
       let x = 1
       it "GF181" $ do
-        throwBoth
+        throwErrors
           gf181
           (program bound)
           [fromInteger x]
@@ -244,7 +244,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertGTEBoundTooSmallError bound))
           (CompilerError (Compiler.AssertGTEBoundTooSmallError bound) :: Error GF181)
       it "Prime 2" $ do
-        throwBoth
+        throwErrors
           (Prime 2)
           (program bound)
           [fromInteger x]
@@ -252,7 +252,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertGTEBoundTooSmallError bound))
           (CompilerError (Compiler.AssertGTEBoundTooSmallError bound) :: Error (Prime 2))
       it "Binary 7" $ do
-        throwBoth
+        throwErrors
           (Binary 7)
           (program bound)
           [fromInteger x]
@@ -264,7 +264,7 @@ tests = describe "Comparisons" $ do
       let bound = 16
       let x = 1
       it "GF181" $ do
-        throwBoth
+        throwErrors
           gf181
           (program bound)
           [fromInteger x]
@@ -272,7 +272,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertGTEBoundTooLargeError bound width))
           (CompilerError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error GF181)
       it "Prime 2" $ do
-        throwBoth
+        throwErrors
           (Prime 2)
           (program bound)
           [fromInteger x]
@@ -280,7 +280,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertGTEBoundTooLargeError bound width))
           (CompilerError (Compiler.AssertGTEBoundTooLargeError bound width) :: Error (Prime 2))
       it "Binary 7" $ do
-        throwBoth
+        throwErrors
           (Binary 7)
           (program bound)
           [fromInteger x]
@@ -295,7 +295,7 @@ tests = describe "Comparisons" $ do
             if x >= bound
               then testCompiler gf181 (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   gf181
                   (program bound)
                   [fromInteger x]
@@ -308,7 +308,7 @@ tests = describe "Comparisons" $ do
             if x >= bound
               then testCompiler (Prime 2) (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   (Prime 2)
                   (program bound)
                   [fromInteger x]
@@ -321,7 +321,7 @@ tests = describe "Comparisons" $ do
             if x >= bound
               then testCompiler (Binary 7) (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   (Binary 7)
                   (program bound)
                   [fromInteger x]
@@ -338,7 +338,7 @@ tests = describe "Comparisons" $ do
       let bound = -1
       let x = 1
       it "GF181" $ do
-        throwBoth
+        throwErrors
           gf181
           (program bound)
           [fromInteger x]
@@ -346,7 +346,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertGTBoundTooSmallError bound))
           (CompilerError (Compiler.AssertGTBoundTooSmallError bound) :: Error GF181)
       it "Prime 2" $ do
-        throwBoth
+        throwErrors
           (Prime 2)
           (program bound)
           [fromInteger x]
@@ -354,7 +354,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertGTBoundTooSmallError bound))
           (CompilerError (Compiler.AssertGTBoundTooSmallError bound) :: Error (Prime 2))
       it "Binary 7" $ do
-        throwBoth
+        throwErrors
           (Binary 7)
           (program bound)
           [fromInteger x]
@@ -366,7 +366,7 @@ tests = describe "Comparisons" $ do
       let bound = 15
       let x = 1
       it "GF181" $ do
-        throwBoth
+        throwErrors
           gf181
           (program bound)
           [fromInteger x]
@@ -374,7 +374,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertGTBoundTooLargeError bound width))
           (CompilerError (Compiler.AssertGTBoundTooLargeError bound width) :: Error GF181)
       it "Prime 2" $ do
-        throwBoth
+        throwErrors
           (Prime 2)
           (program bound)
           [fromInteger x]
@@ -382,7 +382,7 @@ tests = describe "Comparisons" $ do
           (InterpreterError (Interpreter.AssertGTBoundTooLargeError bound width))
           (CompilerError (Compiler.AssertGTBoundTooLargeError bound width) :: Error (Prime 2))
       it "Binary 7" $ do
-        throwBoth
+        throwErrors
           (Binary 7)
           (program bound)
           [fromInteger x]
@@ -397,7 +397,7 @@ tests = describe "Comparisons" $ do
             if x > bound
               then testCompiler gf181 (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   gf181
                   (program bound)
                   [fromInteger x]
@@ -410,7 +410,7 @@ tests = describe "Comparisons" $ do
             if x > bound
               then testCompiler (Prime 2) (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   (Prime 2)
                   (program bound)
                   [fromInteger x]
@@ -423,7 +423,7 @@ tests = describe "Comparisons" $ do
             if x > bound
               then testCompiler (Binary 7) (program bound) [fromInteger x] [] []
               else
-                throwBoth
+                throwErrors
                   (Binary 7)
                   (program bound)
                   [fromInteger x]

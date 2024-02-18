@@ -22,7 +22,7 @@ tests = do
     describe "Errors" $ do
       it "missing 1 public input" $ do
         let program = complement <$> inputBool Public
-        throwBoth
+        throwErrors
           gf181
           program
           []
@@ -32,7 +32,7 @@ tests = do
 
       it "missing 1 private input" $ do
         let program = complement <$> inputBool Private
-        throwBoth
+        throwErrors
           gf181
           program
           []
@@ -43,7 +43,7 @@ tests = do
       it "assert (1 = 2) (Field)" $ do
         let program = do
               assert (1 `eq` (2 :: Field))
-        throwBoth
+        throwErrors
           gf181
           program
           []
@@ -54,7 +54,7 @@ tests = do
       it "assert (true = false) (Boolean)" $ do
         let program = do
               assert (true `eq` false)
-        throwBoth
+        throwErrors
           gf181
           program
           []
@@ -65,7 +65,7 @@ tests = do
       it "assert (1 = 2) (UInt)" $ do
         let program = do
               assert (1 `eq` (2 :: UInt 4))
-        throwBoth
+        throwErrors
           gf181
           program
           []
