@@ -22,16 +22,25 @@ tests = describe "Compilation Experiment" $ do
 
   describe "DivMod" $ do
     it "constant dividend / constant divisor" $ do
-      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
-      let dividend = 229 :: Integer
-      let divisor = 128 :: Integer
+      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 2)
+      let dividend = 3 :: Integer
+      let divisor = 1 :: Integer
       let expected = [dividend `div` divisor, dividend `mod` divisor]
       -- debugWithOpts options (Binary 7) (program dividend divisor)
-      -- testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
-      -- 4294967291
-      -- 4294967311
-      debugWithOpts options (Binary 7) (program dividend divisor)
       testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+
+-- debugSolverWithOpts options (Binary 7) (program dividend divisor) [] []
+-- 4294967291
+-- 4294967311
+
+-- let genPair = do
+--         dividend <- choose (0, 3)
+--         divisor <- choose (1, 3)
+--         return (dividend, divisor)
+-- forAll genPair $ \(dividend, divisor) -> do
+--   let expected = [dividend `div` divisor, dividend `mod` divisor]
+--   -- debugWithOpts options (Binary 7) (program dividend divisor)
+--   testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
 
 -- -- WON'T FIX: for the old linker
 -- describe "Binary Addition" $ do

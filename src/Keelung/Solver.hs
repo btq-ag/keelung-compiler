@@ -321,9 +321,11 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
-            throwError $ ConflictingValues "quotient value mismatch"
+            throwError $
+              ConflictingValues "quotient value mismatch"
           when (expectedRemainderVal /= actualRemainderVal) $
-            throwError $ ConflictingValues "remainder value mismatch"
+            throwError $
+              ConflictingValues "remainder value mismatch"
           return Eliminated
         (Just divisorVal, Just actualQuotientVal, Nothing) -> do
           when (toInteger divisorVal == 0) $
@@ -331,7 +333,8 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
           when (expectedQuotientVal /= actualQuotientVal) $
-            throwError $ ConflictingValues "quotient value mismatch with remainder unknown"
+            throwError $
+              ConflictingValues "quotient value mismatch with remainder unknown"
           bindLimbs "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
@@ -340,7 +343,8 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
-            throwError $ ConflictingValues "remainder value mismatch with quotient unknown"
+            throwError $
+              ConflictingValues "remainder value mismatch with quotient unknown"
           bindLimbs "quotient" quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
@@ -355,7 +359,8 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           let expectedDivisorVal = if isCarryLess then dividendVal `U.clDiv` actualQuotientVal else dividendVal `div` actualQuotientVal
               expectedRemainderVal = if isCarryLess then dividendVal `U.clMod` expectedDivisorVal else dividendVal `mod` expectedDivisorVal
           when (expectedRemainderVal /= actualRemainderVal) $
-            throwError $ ConflictingValues "remainder value mismatch with divisor unknown"
+            throwError $
+              ConflictingValues "remainder value mismatch with divisor unknown"
           bindLimbs "divisor" divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do
