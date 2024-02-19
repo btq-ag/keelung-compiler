@@ -24,7 +24,6 @@ module Keelung.Data.PolyL
 where
 
 import Control.DeepSeq (NFData)
-import Data.Bifunctor (Bifunctor (second))
 import Data.Foldable (Foldable (..), toList)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -44,14 +43,11 @@ data PolyL n = PolyL
   { -- | constant term
     polyConstant :: n,
     -- | (Limb, multiplier)
-    polyLimbs :: Seq (Limb, n),
+    polyLimbs :: Map Limb n,
     -- | (Ref, coefficient)
     polyRefs :: Map Ref n
   }
   deriving (Eq, Functor, Ord, Generic, NFData)
-
-instance (Semigroup n, Num n) => Semigroup (PolyL n) where
-  PolyL c1 ls1 vars1 <> PolyL c2 ls2 vars2 = PolyL (c1 + c2) (ls1 <> ls2) (vars1 <> vars2)
 
 instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
   show (PolyL constant limbs vars)
@@ -61,7 +57,7 @@ instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
           else "- " <> concat restOfTerms
     | otherwise = concat (show constant : firstSign : toList restOfTerms)
     where
-      limbTerms = mconcat $ fmap printLimb (toList limbs)
+      limbTerms = mconcat $ fmap printLimb (Map.toList limbs)
       varTerms = mconcat $ fmap printTerm (Map.toList vars)
       (firstSign, restOfTerms) = case varTerms <> limbTerms of
         Seq.Empty -> error "[ panic ] Empty PolyL"
@@ -90,10 +86,10 @@ fromLimbs constant limbs =
   let limbs' = filter ((/= 0) . snd) limbs
    in if null limbs'
         then Left constant
-        else Right (PolyL constant (Seq.fromList limbs') mempty)
+        else Right (PolyL constant (Map.fromList limbs') mempty) -- TODO: examine the correctness of this
 
 fromLimb :: (Num n, Eq n) => n -> Limb -> PolyL n
-fromLimb constant limb = PolyL constant (Seq.singleton (limb, 1)) mempty
+fromLimb constant limb = PolyL constant (Map.singleton limb 1) mempty
 
 -- fromPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
 -- fromPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
@@ -107,12 +103,12 @@ fromRefs constant xs =
         else Right (PolyL constant mempty (Map.fromList xs'))
 
 insertLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
-insertLimbs c' limbs (PolyL c ls vars) = PolyL (c + c') (Seq.fromList limbs <> ls) vars
+insertLimbs c' limbs (PolyL c ls vars) = PolyL (c + c') (Map.fromList limbs <> ls) vars
 
 insertRefs :: (Num n, Eq n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
 insertRefs c' xs (PolyL c limbs vars) =
   let vars' = cleanVars $ Map.unionWith (+) vars (Map.fromList xs)
-   in if Seq.null limbs && Map.null vars'
+   in if Map.null limbs && Map.null vars'
         then Left (c + c')
         else Right $ PolyL (c + c') limbs vars'
 
@@ -122,7 +118,7 @@ addConstant c' (PolyL c ls vars) = PolyL (c + c') ls vars
 -- | Multiply all coefficients and the constant by some non-zero number
 multiplyBy :: (Num n, Eq n) => n -> PolyL n -> Either n (PolyL n)
 multiplyBy 0 _ = Left 0
-multiplyBy m (PolyL c ls vars) = Right $ PolyL (m * c) (fmap (second (m *)) ls) (fmap (m *) vars)
+multiplyBy m (PolyL c ls vars) = Right $ PolyL (m * c) (fmap (m *) ls) (fmap (m *) vars)
 
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 data View n
@@ -138,43 +134,49 @@ data View n
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 view :: PolyL n -> View n
 view (PolyL constant limbs vars) =
-  case (Map.toList vars, toList limbs) of
+  case (Map.toList vars, Map.toList limbs) of
     ([], []) -> error "[ panic ] Empty PolyL"
     ([], [term]) -> LimbMonomial constant term
     ([], [term1, term2]) -> LimbBinomial constant term1 term2
-    ([], _) -> LimbPolynomial constant (toList limbs)
+    ([], _) -> LimbPolynomial constant (Map.toList limbs)
     ([term], []) -> RefMonomial constant term
     ([term1, term2], []) -> RefBinomial constant term1 term2
     (_, []) -> RefPolynomial constant vars
-    _ -> MixedPolynomial constant vars (toList limbs)
+    _ -> MixedPolynomial constant vars (Map.toList limbs)
 
 -- | Convert all Limbs to Refs and return a map of Refs to coefficients
 viewAsRefMap :: PolyL n -> (n, Map Ref n)
-viewAsRefMap (PolyL constant limbs vars) = (constant, vars <> Map.fromList (toList limbs >>= limbToTerms))
+viewAsRefMap (PolyL constant limbs vars) = (constant, vars <> Map.fromList (Map.toList limbs >>= limbToTerms))
   where
     limbToTerms :: (Limb, n) -> [(Ref, n)]
     limbToTerms (limb, n) = [(B (RefUBit (lmbRef limb) i), n) | i <- [0 .. lmbWidth limb - 1]]
 
 -- | Return a set of all Refs in the PolyL
 limbsAndRefs :: PolyL n -> (Set RefU, Set Limb, Set Ref)
-limbsAndRefs (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (toList ls)), Set.fromList (map fst (toList ls)), Map.keysSet vars)
+limbsAndRefs (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (Map.toList ls)), Set.fromList (map fst (Map.toList ls)), Map.keysSet vars)
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int
-size (PolyL c ls vars) = (if c == 0 then 0 else 1) + sum (fmap (lmbWidth . fst) ls) + Map.size vars
+size (PolyL c ls vars) = (if c == 0 then 0 else 1) + sum (fmap lmbWidth (Map.keys ls)) + Map.size vars
 
 -- | Merge two PolyLs
 merge :: (Num n, Eq n) => PolyL n -> PolyL n -> Either n (PolyL n)
 merge (PolyL c1 ls1 vars1) (PolyL c2 ls2 vars2) =
-  let limbs = ls1 <> ls2
-      vars = cleanVars $ Map.unionWith (+) vars1 vars2
+  let limbs = mergeLimbs ls1 ls2
+      vars = mergeRefs vars1 vars2
    in if null limbs && Map.null vars
         then Left (c1 + c2)
         else Right (PolyL (c1 + c2) limbs vars)
+  where
+    mergeLimbs :: (Num n, Eq n) => Map Limb n -> Map Limb n -> Map Limb n
+    mergeLimbs xs ys = Map.filter (/= 0) $ Map.unionWith (+) xs ys
+
+    mergeRefs :: (Num n, Eq n) => Map Ref n -> Map Ref n -> Map Ref n
+    mergeRefs xs ys = Map.filter (/= 0) $ Map.unionWith (+) xs ys
 
 -- | Negate a polynomial
 negate :: (Num n, Eq n) => PolyL n -> PolyL n
-negate (PolyL c ls vars) = PolyL (-c) (fmap (second Prelude.negate) ls) (fmap Prelude.negate vars)
+negate (PolyL c ls vars) = PolyL (-c) (fmap Prelude.negate ls) (fmap Prelude.negate vars)
 
 --------------------------------------------------------------------------------
 

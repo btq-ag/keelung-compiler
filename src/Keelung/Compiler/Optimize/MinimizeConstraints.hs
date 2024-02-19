@@ -250,7 +250,9 @@ reduceMulLCPP a polyB polyC = case PolyL.multiplyBy (-a) polyB of
         -- => cm - constant = 0
         modify' $ removeOccurrence polyB
         addAddL (PolyL.addConstant (-constant) polyC)
-  Right polyBa -> addAddL (polyC <> polyBa)
+  Right polyBa -> case PolyL.merge polyC polyBa of
+    Left _ -> return ()
+    Right poly -> addAddL poly
 
 ------------------------------------------------------------------------------
 
@@ -515,7 +517,7 @@ substPolyL relations poly = do
               else substLimb
           )
           initState
-          (PolyL.polyLimbs poly)
+          (Map.toList $ PolyL.polyLimbs poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstSlice (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed

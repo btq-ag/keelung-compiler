@@ -151,7 +151,7 @@ instance GenerateReindexReport RefU where
 
 instance GenerateReindexReport (PolyL n) where
   generateReindexReport env tags poly =
-    let limbReindexReport = generateReindexReport env tags (fmap fst (PolyL.polyLimbs poly))
+    let limbReindexReport = generateReindexReport env tags (Map.keys (PolyL.polyLimbs poly))
         refReindexReport = generateReindexReport env tags (Map.keys (PolyL.polyRefs poly))
      in limbReindexReport <> refReindexReport
 

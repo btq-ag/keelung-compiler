@@ -210,7 +210,7 @@ updateCounters tableF tableB tableU cm =
 linkPolyL :: (Integral n, GaloisField n) => Env -> PolyL n -> Either n (Poly n)
 linkPolyL env poly =
   let constant = PolyL.polyConstant poly
-      limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb env)) (PolyL.polyLimbs poly))
+      limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb env)) (Map.toList (PolyL.polyLimbs poly)))
       varPolynomial = IntMap.fromList (map (first (reindexRef env)) (Map.toList (PolyL.polyRefs poly)))
    in Poly.buildWithIntMap constant (IntMap.unionWith (+) limbPolynomial varPolynomial)
 
