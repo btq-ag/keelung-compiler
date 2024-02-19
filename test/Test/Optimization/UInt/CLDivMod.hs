@@ -47,4 +47,4 @@ tests = describe "Carry-less Div/Mod" $ do
       performCLDivMod x y
     _cs2 `shouldHaveSize` 33
     -- should be just 18
-    cs2' `shouldHaveSize` 22
+    cs2' `shouldHaveSize` 28

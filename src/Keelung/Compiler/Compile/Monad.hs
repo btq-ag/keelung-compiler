@@ -299,13 +299,14 @@ writeSliceEq a b =
 
 --------------------------------------------------------------------------------
 
--- | Hints
+-- | TODO: examine whether we should modify the occurrences of EqZero hints
 addEqZeroHint :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> RefF -> M n ()
 addEqZeroHint c xs m = case PolyL.fromRefs c xs of
   Left 0 -> writeRefFVal m 0
   Left constant -> writeRefFVal m (recip constant)
   Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) Seq.<| cmEqZeros cs}
 
+-- | TODO: examine whether we should modify the occurrences of EqZero hints
 addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyL n) -> RefF -> M n ()
 addEqZeroHintWithPoly (Left 0) m = writeRefFVal m 0
 addEqZeroHintWithPoly (Left constant) m = writeRefFVal m (recip constant)
@@ -317,11 +318,15 @@ addDivModHint x y q r = modify' $ \cs ->
     cs {cmDivMods = (x, y, q, r) Seq.<| cmDivMods cs}
 
 addCLDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
-addCLDivModHint x y q r = modify' $ \cs -> cs {cmCLDivMods = (x, y, q, r) Seq.<| cmCLDivMods cs}
+addCLDivModHint x y q r = modify' $ \cs ->
+    addOccurrences (Set.fromList [Hint x, Hint y, Hint q, Hint r]) $
+      cs {cmCLDivMods = (x, y, q, r) Seq.<| cmCLDivMods cs}
 
 -- | Width of all values are doubled in this hint
 addModInvHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> U -> M n ()
-addModInvHint a output n p = modify' $ \cs -> cs {cmModInvs = (right (U.widen (widthOf p)) a, right (U.widen (widthOf p)) output, right (U.widen (widthOf p)) n, U.widen (widthOf p) p) Seq.<| cmModInvs cs}
+addModInvHint a output n p = modify' $ \cs -> 
+  addOccurrences (Set.fromList [Hint a, Hint output, Hint n]) $
+    cs {cmModInvs = (right (U.widen (widthOf p)) a, right (U.widen (widthOf p)) output, right (U.widen (widthOf p)) n, U.widen (widthOf p) p) Seq.<| cmModInvs cs}
 
 --------------------------------------------------------------------------------
 
