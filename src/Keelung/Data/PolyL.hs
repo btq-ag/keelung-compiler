@@ -81,12 +81,12 @@ instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
         | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
         | otherwise = Seq.fromList [" + ", show c <> show x]
 
-fromLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> Either n (PolyL n)
+fromLimbs :: (Num n, Eq n, Show n) => n -> [(Limb, n)] -> Either n (PolyL n)
 fromLimbs constant limbs =
-  let limbs' = filter ((/= 0) . snd) limbs
+  let limbs' = Map.filter (/= 0) (Map.fromListWith (+) limbs)
    in if null limbs'
         then Left constant
-        else Right (PolyL constant (Map.fromList limbs') mempty) -- TODO: examine the correctness of this
+        else Right (PolyL constant limbs' mempty) -- TODO: examine the correctness of this
 
 fromLimb :: (Num n, Eq n) => n -> Limb -> PolyL n
 fromLimb constant limb = PolyL constant (Map.singleton limb 1) mempty
@@ -102,8 +102,10 @@ fromRefs constant xs =
         then Left constant
         else Right (PolyL constant mempty (Map.fromList xs'))
 
-insertLimbs :: (Num n, Eq n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
-insertLimbs c' limbs (PolyL c ls vars) = PolyL (c + c') (Map.fromList limbs <> ls) vars
+insertLimbs :: (Num n, Eq n, Show n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
+insertLimbs c' limbs (PolyL c ls vars) =
+  let limbs' = Map.filter (/= 0) (Map.fromListWith (+) limbs <> ls)
+   in PolyL (c + c') limbs' vars
 
 insertRefs :: (Num n, Eq n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
 insertRefs c' xs (PolyL c limbs vars) =

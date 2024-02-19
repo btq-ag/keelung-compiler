@@ -23,17 +23,13 @@ tests = describe "Compilation Experiment" $ do
   describe "DivMod" $ do
     -- let expected = [dividend `div` divisor, dividend `mod` divisor]
 
-    it "variable dividend / constant divisor" $ do
-      let program divisor = do
-            dividend <- input Public :: Comp (UInt 2)
-            performDivMod dividend divisor
-
-      let dividend = 3 :: Integer
-      let divisor = 1 :: Integer
-
-      let expected = [dividend `div` divisor, dividend `mod` divisor]
-      -- debugWithOpts options (Binary 7) (program (fromIntegral divisor))
-      testCompilerWithOpts options (Binary 7) (program (fromIntegral divisor)) [dividend] [] expected
+    it "more than 4 positive variables" $ do
+      let program n = do
+            x <- input Public :: Comp (UInt 4)
+            return $ sum (replicate (fromInteger n) x)
+      let expected = [10 * 10 `mod` 16]
+      debugWithOpts options (Prime 61) (program 10)
+      testCompilerWithOpts options (Prime 61) (program 10) [10] [] expected
 
 -- debugSolverWithOpts options (Binary 7) (program (fromIntegral divisor)) [dividend] []
 
