@@ -8,7 +8,7 @@ import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup qualified as SliceLookup
-import Test.Data.SliceLookup (arbitrarySliceOfWidth, arbitraryUOfWidth)
+import Test.Arbitrary
 import Test.Hspec
 import Test.QuickCheck
 

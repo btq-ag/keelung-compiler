@@ -3,7 +3,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
--- | Polynomial made of Limbs
+-- | Polynomial made of References and Slices
 module Keelung.Data.PolyL
   ( PolyL (polyConstant, polyLimbs, polyRefs),
     limbsAndRefs,
@@ -20,6 +20,7 @@ module Keelung.Data.PolyL
     viewAsRefMap,
     merge,
     negate,
+    isValid
   )
 where
 
@@ -185,3 +186,7 @@ negate (PolyL c ls vars) = PolyL (-c) (fmap Prelude.negate ls) (fmap Prelude.neg
 -- | Helper function for cleaning a Map of Refs
 cleanVars :: (Num n, Eq n) => Map Ref n -> Map Ref n
 cleanVars = Map.filter (/= 0)
+
+-- | See if a PolyL is valid
+isValid :: PolyL n -> Bool
+isValid (PolyL _ ls vars) = not (Map.null ls) || not (Map.null vars)

@@ -213,6 +213,7 @@ test-suite keelung-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Test.Arbitrary
       Test.Compilation
       Test.Compilation.Boolean
       Test.Compilation.Boolean.Conditional
@@ -248,6 +249,7 @@ test-suite keelung-test
       Test.Data.IntervalSet
       Test.Data.IntervalTable
       Test.Data.LC
+      Test.Data.PolyRS
       Test.Data.SliceLookup
       Test.Intergration
       Test.Optimization
