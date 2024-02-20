@@ -102,14 +102,10 @@ compileSideEffect (BitsToUInt width varU bits) = do
       Right True -> writeAdd 1 [(B (RefUBit refU i), -1)]
       Right False -> writeAdd 0 [(B (RefUBit refU i), 1)]
 compileSideEffect (DivMod width dividend divisor quotient remainder) = do
-  useNewLinker <- gets (optUseNewLinker . cmOptions)
-  if useNewLinker
-    then do
-      fieldTypeData <- gets (FieldInfo.fieldTypeData . optFieldInfo . cmOptions)
-      case fieldTypeData of
-        Binary _ -> UInt.assertDivModUNew width dividend divisor quotient remainder
-        Prime _ -> UInt.assertDivModUNew width dividend divisor quotient remainder
-    else UInt.assertDivModUOld compileAssertion width dividend divisor quotient remainder
+  fieldTypeData <- gets (FieldInfo.fieldTypeData . optFieldInfo . cmOptions)
+  case fieldTypeData of
+    Binary _ -> UInt.assertDivModUNew width dividend divisor quotient remainder
+    Prime _ -> UInt.assertDivModUNew width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do
   x <- UInt.wireU value

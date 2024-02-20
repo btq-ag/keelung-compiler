@@ -22,8 +22,6 @@ data Options = Options
     optConstProp :: Bool,
     -- | Whether to perform optimization
     optOptimize :: Bool,
-    -- | Whether to use the new linker
-    optUseNewLinker :: Bool,
     -- | Whether to disable testing on unoptimized program
     optDisableTestingOnO0 :: Bool
   }
@@ -36,7 +34,6 @@ defaultOptions =
     { optFieldInfo = gf181Info,
       optConstProp = True,
       optOptimize = True,
-      optUseNewLinker = True,
       optDisableTestingOnO0 = False
     }
 

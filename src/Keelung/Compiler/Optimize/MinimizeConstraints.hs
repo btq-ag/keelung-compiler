@@ -17,7 +17,6 @@ import Data.Set qualified as Set
 import Keelung (widthOf)
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
-import Keelung.Compiler.Options qualified as Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
@@ -512,10 +511,7 @@ substPolyL relations poly = do
       initState = (Left constant, Nothing)
       afterSubstSlice =
         foldl
-          ( if Options.optUseNewLinker (Relations.relationsOptions relations)
-              then _substLimb (Relations.relationsS relations)
-              else substLimb
-          )
+          (substLimb (Relations.relationsS relations))
           initState
           (Map.toList $ PolyL.polyLimbs poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstSlice (PolyL.polyRefs poly)
@@ -523,34 +519,24 @@ substPolyL relations poly = do
     (_, Nothing) -> Nothing -- nothing changed
     (result, Just changes) -> Just (result, changes)
 
--- | Substitutes a Limb in a PolyL.
-substLimb ::
-  (Integral n, GaloisField n) =>
-  (Either n (PolyL n), Maybe Changes) ->
-  (Limb, n) ->
-  (Either n (PolyL n), Maybe Changes)
-substLimb (accPoly, changes) (limb, multiplier) = case accPoly of
-  Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-  Right xs -> (PolyL.insertLimbs 0 [(limb, multiplier)] xs, changes)
-
 --- | Substitutes a Limb in a PolyL with SliceRelations.
-_substLimb ::
+substLimb ::
   (Integral n, GaloisField n) =>
   SliceRelations ->
   (Either n (PolyL n), Maybe Changes) ->
   (Limb, n) ->
   (Either n (PolyL n), Maybe Changes)
-_substLimb relations initState (limb, multiplier) =
+substLimb relations initState (limb, multiplier) =
   let pairs = [(slice, fromInteger coeff * multiplier) | (coeff, slice) <- Slice.fromLimb limb, not (Slice.null slice)]
-   in foldl (_substSlice relations) initState pairs
+   in foldl (substSlice relations) initState pairs
 
-_substSlice ::
+substSlice ::
   (Integral n, GaloisField n) =>
   SliceRelations ->
   (Either n (PolyL n), Maybe Changes) ->
   (Slice, n) ->
   (Either n (PolyL n), Maybe Changes)
-_substSlice relations initState (sliceWhole, multiplier) =
+substSlice relations initState (sliceWhole, multiplier) =
   let SliceLookup _ segments = SliceRelations.lookup sliceWhole relations
       tagWithSlice = map (\(index, segment) -> (Slice.Slice (Slice.sliceRefU sliceWhole) index (index + widthOf segment), segment))
       removeNullSegment = filter (not . SliceLookup.nullSegment . snd)

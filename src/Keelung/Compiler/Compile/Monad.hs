@@ -45,10 +45,10 @@ runM options compilers counters program =
         (runReaderT program compilers)
         ( ConstraintModule
             options
-            (tempSetFlag counters (optUseNewLinker options))
+            (tempSetFlag counters True)
             OccurF.new
             (OccurB.new False)
-            (if optUseNewLinker options then Right OccurUB.new else Left OccurU.new)
+            (Right OccurUB.new)
             (Relations.new options)
             mempty
             mempty

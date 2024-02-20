@@ -4,12 +4,12 @@ module Test.Optimization.Util
   ( debug,
     executeGF181WithOpts,
     executeGF181,
-    executeGF181',
     executePrimeWithOpts,
     executePrime,
     executeBinaryWithOpts,
     executeBinary,
     shouldHaveSize,
+    Linker.linkConstraintModule,
   )
 where
 
@@ -50,9 +50,6 @@ executeGF181WithOpts options program = do
 
 executeGF181 :: (Encode t) => Comp t -> IO (ConstraintModule (N GF181), ConstraintModule (N GF181))
 executeGF181 = executeGF181WithOpts (defaultOptions {optFieldInfo = gf181Info})
-
-executeGF181' :: (Encode t) => Comp t -> IO (ConstraintModule (N GF181), ConstraintModule (N GF181))
-executeGF181' = executeGF181WithOpts (defaultOptions {optFieldInfo = gf181Info, optUseNewLinker = True})
 
 -- | Returns the original and optimized constraint system
 executePrimeWithOpts :: (Encode t, GaloisField n, Integral n) => Options -> Integer -> Comp t -> IO (ConstraintModule n, ConstraintModule n)

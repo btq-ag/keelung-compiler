@@ -4,7 +4,6 @@
 module Test.Compilation.UInt.Experiment (tests, run) where
 
 import Keelung hiding (compile)
-import Keelung.Compiler.Options
 import Test.Compilation.Util
 import Test.Hspec
 
@@ -17,7 +16,6 @@ tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
   -- let options = defaultOptions {optUseNewLinker = False, optOptimize = False}
   -- let options = defaultOptions {optUseNewLinker = False}
-  let options = defaultOptions {optUseNewLinker = True}
   -- let options = defaultOptions {optUseNewLinker = True, optOptimize = False}
 
   describe "DivMod" $ do
@@ -28,8 +26,8 @@ tests = describe "Compilation Experiment" $ do
             x <- input Public :: Comp (UInt 4)
             return $ sum (replicate (fromInteger n) x)
       let expected = [10 * 10 `mod` 16]
-      debugWithOpts options (Prime 61) (program 10)
-      testCompilerWithOpts options (Prime 61) (program 10) [10] [] expected
+      debug (Prime 61) (program 10)
+      testCompiler (Prime 61) (program 10) [10] [] expected
 
 -- debugSolverWithOpts options (Binary 7) (program (fromIntegral divisor)) [dividend] []
 

@@ -8,7 +8,6 @@ import Data.IntMap.Strict qualified as IntMap
 import Keelung
 import Keelung.Compiler.Linker (constructEnv, reindexRef)
 import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
-import Keelung.Compiler.Options
 import Keelung.Data.IntervalTable (IntervalTable (..))
 import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference
@@ -152,31 +151,8 @@ tests =
         reindexRef env (B (RefUBit intermediate4 2)) `shouldBe` 7
         reindexRef env (B (RefUBit intermediate4 3)) `shouldBe` 8
 
-      it "Bit test / and 1 (old linker)" $ do
-        (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Private
-          return $ (x .&. y) !!! 0
-        let env = constructEnv cm
-        reindexRef env (B (RefBO 0)) `shouldBe` 0
-        let inputVar0 = RefUI 4 0
-        reindexRef env (B (RefUBit inputVar0 0)) `shouldBe` 1
-        reindexRef env (B (RefUBit inputVar0 1)) `shouldBe` 2
-        reindexRef env (B (RefUBit inputVar0 2)) `shouldBe` 3
-        reindexRef env (B (RefUBit inputVar0 3)) `shouldBe` 4
-        let inputVar1 = RefUP 4 0
-        reindexRef env (B (RefUBit inputVar1 0)) `shouldBe` 5
-        reindexRef env (B (RefUBit inputVar1 1)) `shouldBe` 6
-        reindexRef env (B (RefUBit inputVar1 2)) `shouldBe` 7
-        reindexRef env (B (RefUBit inputVar1 3)) `shouldBe` 8
-        let intermediateVar0 = RefUX 4 0
-        reindexRef env (B (RefUBit intermediateVar0 0)) `shouldBe` 12
-        reindexRef env (B (RefUBit intermediateVar0 1)) `shouldBe` 13
-        reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 14
-        reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 15
-
-      it "Bit test / and 1 (new linker)" $ do
-        (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+      it "Bit test / and 1" $ do
+        (_, cm) <- executeGF181 $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           return $ (x .&. y) !!! 0
@@ -196,42 +172,9 @@ tests =
         reindexRef env (B (RefUBit intermediateVar0 1)) `shouldBe` 13
         reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 14
         reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 15
-
-      it "Bit test / and 2 (old linker)" $ do
-        (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Private
-          z <- inputUInt @4 Public
-          return $ (x .&. y .&. z) !!! 0
-        let env = constructEnv cm
-
-        reindexRef env (B (RefBO 0)) `shouldBe` 0
-        let inputVar0 = RefUI 4 0
-        reindexRef env (B (RefUBit inputVar0 0)) `shouldBe` 1
-        reindexRef env (B (RefUBit inputVar0 1)) `shouldBe` 2
-        reindexRef env (B (RefUBit inputVar0 2)) `shouldBe` 3
-        reindexRef env (B (RefUBit inputVar0 3)) `shouldBe` 4
-        let inputVar2 = RefUI 4 1
-        reindexRef env (B (RefUBit inputVar2 0)) `shouldBe` 5
-        reindexRef env (B (RefUBit inputVar2 1)) `shouldBe` 6
-        reindexRef env (B (RefUBit inputVar2 2)) `shouldBe` 7
-        reindexRef env (B (RefUBit inputVar2 3)) `shouldBe` 8
-        let inputVar1 = RefUP 4 0
-        reindexRef env (B (RefUBit inputVar1 0)) `shouldBe` 9
-        reindexRef env (B (RefUBit inputVar1 1)) `shouldBe` 10
-        reindexRef env (B (RefUBit inputVar1 2)) `shouldBe` 11
-        reindexRef env (B (RefUBit inputVar1 3)) `shouldBe` 12
-        reindexRef env (F (RefFX 0)) `shouldBe` 13
-        reindexRef env (F (RefFX 1)) `shouldBe` 14
-        reindexRef env (F (RefFX 2)) `shouldBe` 15
-        reindexRef env (F (RefFX 3)) `shouldBe` 16
-        reindexRef env (B (RefUBit (RefUX 4 0) 0)) `shouldBe` 20
-        reindexRef env (B (RefUBit (RefUX 4 0) 1)) `shouldBe` 21
-        reindexRef env (B (RefUBit (RefUX 4 0) 2)) `shouldBe` 22
-        reindexRef env (B (RefUBit (RefUX 4 0) 3)) `shouldBe` 23
 
       it "Bit test / and 2" $ do
-        (_, cm) <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+        (_, cm) <- executeGF181 $ do
           x <- inputUInt @4 Public
           y <- inputUInt @4 Private
           z <- inputUInt @4 Public

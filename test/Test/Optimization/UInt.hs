@@ -4,7 +4,6 @@ module Test.Optimization.UInt (tests, run) where
 
 import Control.Monad (forM_)
 import Keelung hiding (compileO0)
-import Keelung.Compiler.Options
 import Test.Hspec
 import Test.Optimization.UInt.AESMul qualified as UInt.AESMul
 import Test.Optimization.UInt.CLDivMod qualified as UInt.CLDivMod
@@ -20,25 +19,19 @@ tests = describe "UInt" $ do
   UInt.AESMul.tests
 
   describe "Variable management" $ do
-    -- can be lower
-    it "keelung Issue #17 (old linker)" $ do
-      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
-        a <- input Private :: Comp (UInt 5)
+    -- 4 * 3 for input / output
+    -- 4 for output
+    -- 1 for multiplication
+    -- 8 for multiplication output - 2
+    it "keelung Issue #17" $ do
+      (cs, cs') <- executeGF181 $ do
+        a <- input Private :: Comp (UInt 4)
         b <- input Private
         c <- reuse $ a * b
         return $ c .&. 5
-      cs `shouldHaveSize` 37
-      cs' `shouldHaveSize` 37
-
-    it "keelung Issue #17 (new linker)" $ do
-      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
-        a <- input Private :: Comp (UInt 5)
-        b <- input Private
-        c <- reuse $ a * b
-        return $ c .&. 5
-      cs `shouldHaveSize` 34
-      -- TODO: should be 24
-      cs' `shouldHaveSize` 31
+      cs `shouldHaveSize` 28
+      -- TODO: should be 23
+      cs' `shouldHaveSize` 25
 
   describe "Addition / Subtraction" $ do
     it "2 variables / 8 bit / GF181" $ do
@@ -121,15 +114,8 @@ tests = describe "UInt" $ do
     -- 8 for carry bit
     -- 1 for multiplication
 
-    it "2 variables / byte / GF181 (old linker)" $ do
-      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public
-        return $ x * y
-      cs `shouldHaveSize` 42
-      cs' `shouldHaveSize` 42 -- TODO: should've been 33
     it "2 variables / byte / GF181 (new linker)" $ do
-      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+      (cs, cs') <- executeGF181 $ do
         x <- input Public :: Comp (UInt 8)
         y <- input Public
         return $ x * y
@@ -152,45 +138,24 @@ tests = describe "UInt" $ do
     --                   ## #### ####
     ------------------------------------------
 
-    it "2 variables / byte / Prime 257 (old linker)" $ do
-      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = False}) 257 $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public
-        return $ x * y
-      cs `shouldHaveSize` 55
-      cs' `shouldHaveSize` 55 -- TODO: should've been 50
-    it "2 variables / byte / Prime 257 (new linker)" $ do
-      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True}) 257 $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public
-        return $ x * y
-      cs `shouldHaveSize` 55
-      cs' `shouldHaveSize` 50
-    it "2 variables / byte / Prime 1031 (old linker)" $ do
-      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = False}) 1031 $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public
-        return $ x * y
-      cs `shouldHaveSize` 55
-      cs' `shouldHaveSize` 55 -- TODO: should've been 50
-
-    it "2 variables / byte / Prime 1031 (new linker)" $ do
-      (cs, cs') <- executePrimeWithOpts (defaultOptions {optUseNewLinker = True}) 1031 $ do
+    it "2 variables / byte / Prime 257" $ do
+      (cs, cs') <- executePrime 257 $ do
         x <- input Public :: Comp (UInt 8)
         y <- input Public
         return $ x * y
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 50
 
-    -- TODO: can be lower
-    it "variable / constant (old linker)" $ do
-      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = False}) $ do
-        x <- input Public :: Comp (UInt 4)
-        return $ x * 4
-      cs `shouldHaveSize` 18
-      cs' `shouldHaveSize` 18 -- TODO: should've been 13
+    it "2 variables / byte / Prime 1031" $ do
+      (cs, cs') <- executePrime 1031 $ do
+        x <- input Public :: Comp (UInt 8)
+        y <- input Public
+        return $ x * y
+      cs `shouldHaveSize` 55
+      cs' `shouldHaveSize` 50
+
     it "variable / constant (new linker)" $ do
-      (cs, cs') <- executeGF181WithOpts (defaultOptions {optUseNewLinker = True}) $ do
+      (cs, cs') <- executeGF181 $ do
         x <- input Public :: Comp (UInt 4)
         return $ x * 4
       cs `shouldHaveSize` 18

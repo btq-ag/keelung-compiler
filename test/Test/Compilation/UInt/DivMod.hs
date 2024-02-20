@@ -250,8 +250,7 @@ tests =
             (InterpreterError (Interpreter.DivModRemainderError False 7 3 1 0))
             (SolverError (Solver.ConflictingValues "remainder value mismatch") :: Error (Binary 7))
 
-        it "assertDivMod (divisor & remainder unknown & quotient = 0) (old linker)" $ do
-          let options = defaultOptions {optUseNewLinker = False}
+        it "assertDivMod (divisor & remainder unknown & quotient = 0)" $ do
           let program = do
                 dividend <- input Public :: Comp (UInt 4)
                 divisor <- freshVarUInt
@@ -261,60 +260,21 @@ tests =
                 return (divisor, remainder)
 
           forAll (choose (1, 15)) $ \dividend -> do
-            throwErrorsWithOpts
-              options
-              gf181
-              program
-              [dividend, 0]
-              []
-              (InterpreterError Interpreter.DivModQuotientIsZeroError)
-              (SolverError (Solver.QuotientIsZeroError [(4, Left 12)]) :: Error GF181)
-            throwErrorsWithOpts
-              options
-              (Prime 17)
-              program
-              [dividend, 0]
-              []
-              (InterpreterError Interpreter.DivModQuotientIsZeroError)
-              (SolverError (Solver.QuotientIsZeroError [(4, Left 12)]) :: Error (Prime 17))
-            throwErrorsWithOpts
-              options
-              (Binary 7)
-              program
-              [dividend, 0]
-              []
-              (InterpreterError Interpreter.DivModQuotientIsZeroError)
-              (SolverError (Solver.QuotientIsZeroError [(4, Left 12)]) :: Error (Binary 7))
-
-        it "assertDivMod (divisor & remainder unknown & quotient = 0) (new linker)" $ do
-          let options = defaultOptions {optUseNewLinker = True}
-          let program = do
-                dividend <- input Public :: Comp (UInt 4)
-                divisor <- freshVarUInt
-                quotient <- input Public
-                remainder <- freshVarUInt
-                assertDivMod dividend divisor quotient remainder
-                return (divisor, remainder)
-
-          forAll (choose (1, 15)) $ \dividend -> do
-            throwErrorsWithOpts
-              options
+            throwErrors
               gf181
               program
               [dividend, 0]
               []
               (InterpreterError Interpreter.DivModQuotientIsZeroError)
               (SolverError (Solver.QuotientIsZeroError [(8, Left 44)]) :: Error GF181)
-            throwErrorsWithOpts
-              options
+            throwErrors
               (Prime 17)
               program
               [dividend, 0]
               []
               (InterpreterError Interpreter.DivModQuotientIsZeroError)
               (SolverError (Solver.QuotientIsZeroError [(8, Left 103)]) :: Error (Prime 17))
-            throwErrorsWithOpts
-              options
+            throwErrors
               (Binary 7)
               program
               [dividend, 0]
@@ -322,8 +282,7 @@ tests =
               (InterpreterError Interpreter.DivModQuotientIsZeroError)
               (SolverError (Solver.QuotientIsZeroError [(8, Left 112)]) :: Error (Binary 7))
 
-        it "assertDivMod (divisor & remainder unknown & dividend = 0) (old linker)" $ do
-          let options = defaultOptions {optUseNewLinker = False}
+        it "assertDivMod (divisor & remainder unknown & dividend = 0)" $ do
           let program = do
                 dividend <- input Public :: Comp (UInt 4)
                 divisor <- freshVarUInt
@@ -333,60 +292,21 @@ tests =
                 return (divisor, remainder)
 
           forAll (choose (1, 15)) $ \quotient -> do
-            throwErrorsWithOpts
-              options
-              gf181
-              program
-              [0, quotient]
-              []
-              (InterpreterError Interpreter.DivModDividendIsZeroError)
-              (SolverError (Solver.DividendIsZeroError [(4, Left 8)]) :: Error GF181)
-            throwErrorsWithOpts
-              options
-              (Prime 17)
-              program
-              [0, quotient]
-              []
-              (InterpreterError Interpreter.DivModDividendIsZeroError)
-              (SolverError (Solver.DividendIsZeroError [(4, Left 8)]) :: Error (Prime 17))
-            throwErrorsWithOpts
-              options
-              (Binary 7)
-              program
-              [0, quotient]
-              []
-              (InterpreterError Interpreter.DivModDividendIsZeroError)
-              (SolverError (Solver.DividendIsZeroError [(4, Left 8)]) :: Error (Binary 7))
-
-        it "assertDivMod (divisor & remainder unknown & dividend = 0) (new linker)" $ do
-          let options = defaultOptions {optUseNewLinker = True}
-          let program = do
-                dividend <- input Public :: Comp (UInt 4)
-                divisor <- freshVarUInt
-                quotient <- input Public
-                remainder <- freshVarUInt
-                assertDivMod dividend divisor quotient remainder
-                return (divisor, remainder)
-
-          forAll (choose (1, 15)) $ \quotient -> do
-            throwErrorsWithOpts
-              options
+            throwErrors
               gf181
               program
               [0, quotient]
               []
               (InterpreterError Interpreter.DivModDividendIsZeroError)
               (SolverError (Solver.DividendIsZeroError [(8, Left 28)]) :: Error GF181)
-            throwErrorsWithOpts
-              options
+            throwErrors
               (Prime 17)
               program
               [0, quotient]
               []
               (InterpreterError Interpreter.DivModDividendIsZeroError)
               (SolverError (Solver.DividendIsZeroError [(8, Left 87)]) :: Error (Prime 17))
-            throwErrorsWithOpts
-              options
+            throwErrors
               (Binary 7)
               program
               [0, quotient]

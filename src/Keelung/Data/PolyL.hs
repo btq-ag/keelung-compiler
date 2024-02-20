@@ -8,7 +8,6 @@ module Keelung.Data.PolyL
   ( -- * Eliminators
     PolyL (polyConstant, polyLimbs, polyRefs),
     new,
-    limbsAndRefs,
 
     -- * Constructors
     fromLimbs,
@@ -38,8 +37,6 @@ import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Data.Set (Set)
-import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung (widthOf)
 import Keelung.Data.Limb (Limb (..))
@@ -181,10 +178,6 @@ view (PolyL constant limbs vars) =
     ([term1, term2], []) -> RefBinomial constant term1 term2
     (_, []) -> RefPolynomial constant vars
     _ -> MixedPolynomial constant vars (Map.toList limbs)
-
--- | Return a set of all Refs in the PolyL
-limbsAndRefs :: PolyL n -> (Set RefU, Set Limb, Set Ref)
-limbsAndRefs (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (Map.toList ls)), Set.fromList (map fst (Map.toList ls)), Map.keysSet vars)
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int

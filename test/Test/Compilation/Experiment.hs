@@ -3,13 +3,12 @@
 
 module Test.Compilation.Experiment where
 
+import Control.Monad (forM_)
 import Keelung
-import Keelung.Compiler.Options
+import Keelung.Data.U qualified as U
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck
-import qualified Keelung.Data.U as U
-import Control.Monad (forM_)
 
 -- import Test.QuickCheck
 
@@ -215,16 +214,16 @@ tests = describe "Experiment" $ do
   --       testCompilerWithOpts (defaultOptions {optUseNewLinker = True, optOptimize = True}) (Binary 7) program [x, y] [] expected
 
   describe "Carry-less Multiplication" $ do
-      it "1 variable / 1 constant" $ do
-        let program y = do
-              x <- input Public
-              return $ x .*. fromInteger y :: Comp (UInt 8)
-        let genPair = do
-              x <- choose (0, 255)
-              -- y <- choose (0, 255)
-              return (x, 0)
-        forAll genPair $ \(x, y) -> do
-          let expected = [toInteger (U.clMul (U.new 8 x) (U.new 8 y))]
-          forM_ [gf181, Prime 17] $ \field -> do
-            debugWithOpts (defaultOptions {optUseNewLinker = True}) field (program (fromIntegral y))
-            testCompilerWithOpts (defaultOptions {optUseNewLinker = True}) field (program (fromIntegral y)) [toInteger x] [] expected
+    it "1 variable / 1 constant" $ do
+      let program y = do
+            x <- input Public
+            return $ x .*. fromInteger y :: Comp (UInt 8)
+      let genPair = do
+            x <- choose (0, 255)
+            -- y <- choose (0, 255)
+            return (x, 0)
+      forAll genPair $ \(x, y) -> do
+        let expected = [toInteger (U.clMul (U.new 8 x) (U.new 8 y))]
+        forM_ [gf181, Prime 17] $ \field -> do
+          debug field (program (fromIntegral y))
+          testCompiler field (program (fromIntegral y)) [toInteger x] [] expected

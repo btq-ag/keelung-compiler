@@ -30,15 +30,17 @@ tests = describe "Experiment" $ do
   --   property $ \(n :: Binary 283) -> do
   --     testCompiler (Binary 283) (program 254) [toInteger n] [] [toInteger (n ^ (254 :: Int))]
 
-  -- 8 * 3 for input / output
-  -- 8 for carry bit
+  -- 4 * 3 for input / output
+  -- 4 for output
   -- 1 for multiplication
-  it "2 variables / byte / GF181" $ do
+  -- 8 - 2 for multiplication output
+  it "keelung Issue #17 (new linker)" $ do
     (cs, cs') <- executeGF181 $ do
-      x <- input Public :: Comp (UInt 8)
-      y <- input Public
-      return $ x * y
-    cs `shouldHaveSize` 42
-    cs' `shouldHaveSize` 33
-
--- cs' `shouldHaveSize` 42
+      a <- input Private :: Comp (UInt 4)
+      b <- input Private
+      c <- reuse $ a * b
+      return $ c .&. 5
+    cs `shouldHaveSize` 28
+    -- TODO: should be 23
+    print cs'
+    cs' `shouldHaveSize` 25

@@ -19,6 +19,7 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet qualified as IntSet
+import Data.Map qualified as Map
 import Data.Sequence (Seq)
 import Data.Set (Set)
 import Data.Set qualified as Set
@@ -205,15 +206,13 @@ removeOccurrences xs cm = foldl (flip removeOccurrence) cm xs
 
 instance UpdateOccurrences (PolyL n) where
   addOccurrence poly cm =
-    let (refUs, limbs, refs) = PolyL.limbsAndRefs poly
-     in if optUseNewLinker (cmOptions cm)
-          then (addOccurrences limbs . addOccurrences refs) cm
-          else (addOccurrences refUs . addOccurrences limbs . addOccurrences refs) cm
+    let limbs = Map.keysSet $ PolyL.polyLimbs poly
+        refs = Map.keysSet $ PolyL.polyRefs poly
+     in (addOccurrences limbs . addOccurrences refs) cm
   removeOccurrence poly cm =
-    let (refUs, limbs, refs) = PolyL.limbsAndRefs poly
-     in if optUseNewLinker (cmOptions cm)
-          then (removeOccurrences limbs . removeOccurrences refs) cm
-          else (removeOccurrences refUs . removeOccurrences limbs . removeOccurrences refs) cm
+    let limbs = Map.keysSet $ PolyL.polyLimbs poly
+        refs = Map.keysSet $ PolyL.polyRefs poly
+     in (removeOccurrences limbs . removeOccurrences refs) cm
 
 newtype Hint = Hint (Either RefU U)
   deriving (Show, Eq, Ord)

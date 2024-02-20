@@ -19,7 +19,6 @@ module Test.Compilation.Util
 where
 
 import Control.Arrow (left)
-import Control.Monad (when)
 import Data.Field.Galois
 import Data.Foldable (toList)
 import Data.Proxy (Proxy (..))
@@ -118,8 +117,7 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- tests for variable reindexing (only when optUseNewLinker is True)
-      when (optUseNewLinker options) $
-        testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Prime n)) (Maybe ReindexReport.Error))
+      testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Prime n)) (Maybe ReindexReport.Error))
       -- constraint system solvers
       solveR1CSWithOpts options' program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
@@ -131,8 +129,7 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
       -- tests for variable reindexing (only when optUseNewLinker is True)
-      when (optUseNewLinker options) $
-        testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
+      testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
       -- constraint system solvers
       solveR1CSWithOpts options' program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
