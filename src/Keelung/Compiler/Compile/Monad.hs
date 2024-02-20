@@ -154,7 +154,9 @@ writeAddWithLC xs = case xs of
 writeAddWithLCAndLimbs :: (GaloisField n, Integral n) => LC n -> n -> [(Limb, n)] -> M n ()
 writeAddWithLCAndLimbs lc constant limbs = case lc of
   Constant _ -> return ()
-  Polynomial poly -> addC [CAddL (PolyL.insertLimbs constant limbs poly)]
+  Polynomial poly -> case PolyL.insertLimbs constant limbs poly of
+    Left _ -> return ()
+    Right poly' -> addC [CAddL poly']
 
 addC :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
 addC = mapM_ addOne
@@ -319,12 +321,12 @@ addDivModHint x y q r = modify' $ \cs ->
 
 addCLDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
 addCLDivModHint x y q r = modify' $ \cs ->
-    addOccurrences (Set.fromList [Hint x, Hint y, Hint q, Hint r]) $
-      cs {cmCLDivMods = (x, y, q, r) Seq.<| cmCLDivMods cs}
+  addOccurrences (Set.fromList [Hint x, Hint y, Hint q, Hint r]) $
+    cs {cmCLDivMods = (x, y, q, r) Seq.<| cmCLDivMods cs}
 
 -- | Width of all values are doubled in this hint
 addModInvHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> U -> M n ()
-addModInvHint a output n p = modify' $ \cs -> 
+addModInvHint a output n p = modify' $ \cs ->
   addOccurrences (Set.fromList [Hint a, Hint output, Hint n]) $
     cs {cmModInvs = (right (U.widen (widthOf p)) a, right (U.widen (widthOf p)) output, right (U.widen (widthOf p)) n, U.widen (widthOf p) p) Seq.<| cmModInvs cs}
 

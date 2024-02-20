@@ -7,6 +7,7 @@
 module Keelung.Data.PolyL
   ( -- * Eliminators
     PolyL (polyConstant, polyLimbs, polyRefs),
+    new,
     limbsAndRefs,
 
     -- * Constructors
@@ -32,6 +33,7 @@ module Keelung.Data.PolyL
 where
 
 import Control.DeepSeq (NFData)
+import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (..), toList)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -40,12 +42,12 @@ import Data.Sequence qualified as Seq
 import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
+import Keelung (widthOf)
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Prelude hiding (negate, null)
 import Prelude qualified
-import Data.Field.Galois (GaloisField)
 
 -- | Polynomial made of Limbs + a constant
 data PolyL n = PolyL
@@ -90,36 +92,47 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
         | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
         | otherwise = Seq.fromList [" + ", show c <> show x]
 
-fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
-fromLimbs constant limbs =
-  let limbs' = Map.filter (/= 0) (Map.fromListWith (+) limbs)
-   in if null limbs'
-        then Left constant
-        else Right (PolyL constant limbs' mempty) -- TODO: examine the correctness of this
+--------------------------------------------------------------------------------
 
+-- | Construct a PolyL from a constant, Refs, and Limbs
+new :: (Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> Either n (PolyL n)
+new constant refs limbs = case (toMap refs, toMap limbs) of
+  (Nothing, Nothing) -> Left constant
+  (Nothing, Just limbs') -> Right (PolyL constant limbs' mempty)
+  (Just refs', Nothing) -> Right (PolyL constant mempty refs')
+  (Just refs', Just limbs') -> Right (PolyL constant limbs' refs')
+
+-- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
+fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
+fromLimbs constant xs =
+  case toMap xs of
+    Nothing -> Left constant
+    Just limbs -> Right (PolyL constant limbs mempty)
+
+-- | Construct a PolyL from a constant and a single Limb
 fromLimb :: (Integral n) => n -> Limb -> PolyL n
 fromLimb constant limb = PolyL constant (Map.singleton limb 1) mempty
 
--- fromPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
--- fromPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
-
--- | Build a PolyL from a constant and a list of (Ref, coefficient) pairs
+-- | Construct a PolyL from a constant and a list of (Ref, coefficient) pairs
 fromRefs :: (Integral n) => n -> [(Ref, n)] -> Either n (PolyL n)
-fromRefs constant xs =
-  let xs' = filter ((/= 0) . snd) xs
-   in if null xs'
-        then Left constant
-        else Right (PolyL constant mempty (Map.fromList xs'))
+fromRefs constant xs = case toMap xs of
+  Nothing -> Left constant
+  Just refs -> Right (PolyL constant mempty refs)
 
-insertLimbs :: (Integral n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
-insertLimbs c' limbs (PolyL c ls vars) =
-  let limbs' = Map.filter (/= 0) (Map.fromListWith (+) limbs <> ls)
-   in PolyL (c + c') limbs' vars
+--------------------------------------------------------------------------------
+
+-- | Insert a list of (Limb, coefficient) pairs into a PolyL
+insertLimbs :: (Integral n) => n -> [(Limb, n)] -> PolyL n -> Either n (PolyL n)
+insertLimbs c' limbs (PolyL c ls refs) =
+  let limbs' = mergeListAndClean ls limbs
+   in if null limbs' && null refs
+        then Left (c + c')
+        else Right (PolyL (c + c') limbs' refs)
 
 insertRefs :: (Integral n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
 insertRefs c' xs (PolyL c limbs vars) =
-  let vars' = cleanVars $ Map.unionWith (+) vars (Map.fromList xs)
-   in if Map.null limbs && Map.null vars'
+  let vars' = mergeListAndClean vars xs
+   in if null vars' && null limbs
         then Left (c + c')
         else Right $ PolyL (c + c') limbs vars'
 
@@ -171,19 +184,13 @@ size :: (Eq n, Num n) => PolyL n -> Int
 size (PolyL c ls vars) = (if c == 0 then 0 else 1) + sum (fmap lmbWidth (Map.keys ls)) + Map.size vars
 
 -- | Merge two PolyLs
-merge :: (Num n, Eq n) => PolyL n -> PolyL n -> Either n (PolyL n)
+merge :: (Integral n) => PolyL n -> PolyL n -> Either n (PolyL n)
 merge (PolyL c1 ls1 vars1) (PolyL c2 ls2 vars2) =
-  let limbs = mergeLimbs ls1 ls2
-      vars = mergeRefs vars1 vars2
-   in if null limbs && Map.null vars
+  let limbs = mergeAndClean ls1 ls2
+      vars = mergeAndClean vars1 vars2
+   in if null limbs && null vars
         then Left (c1 + c2)
         else Right (PolyL (c1 + c2) limbs vars)
-  where
-    mergeLimbs :: (Num n, Eq n) => Map Limb n -> Map Limb n -> Map Limb n
-    mergeLimbs xs ys = Map.filter (/= 0) $ Map.unionWith (+) xs ys
-
-    mergeRefs :: (Num n, Eq n) => Map Ref n -> Map Ref n -> Map Ref n
-    mergeRefs xs ys = Map.filter (/= 0) $ Map.unionWith (+) xs ys
 
 -- | Negate a polynomial
 negate :: (Num n, Eq n) => PolyL n -> PolyL n
@@ -191,10 +198,20 @@ negate (PolyL c ls vars) = PolyL (-c) (fmap Prelude.negate ls) (fmap Prelude.neg
 
 --------------------------------------------------------------------------------
 
--- | Helper function for cleaning a Map of Refs
-cleanVars :: (Num n, Eq n) => Map Ref n -> Map Ref n
-cleanVars = Map.filter (/= 0)
-
 -- | See if a PolyL is valid
-isValid :: PolyL n -> Bool
-isValid (PolyL _ ls vars) = not (Map.null ls) || not (Map.null vars)
+isValid :: (Integral n) => PolyL n -> Bool
+isValid (PolyL _ ls vars) = not (null (Map.filter (/= 0) ls)) || not (Map.null (Map.filter (/= 0) vars)) && all ((> 0) . widthOf) (Map.keys ls)
+
+-- | Helper function for converting a list of (a, n) pairs to a Map
+toMap :: (Integral n, Ord a) => [(a, n)] -> Maybe (Map a n)
+toMap xs =
+  let result = Map.filter (/= 0) (Map.fromListWith (+) xs)
+   in if Map.null result
+        then Nothing
+        else Just result
+
+mergeAndClean :: (Integral n, Ord a) => Map a n -> Map a n -> Map a n
+mergeAndClean xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
+
+mergeListAndClean :: (Integral n, Ord a) => Map a n -> [(a, n)] -> Map a n
+mergeListAndClean xs ys = Map.filter (/= 0) (Map.unionWith (+) xs (Map.fromListWith (+) ys))

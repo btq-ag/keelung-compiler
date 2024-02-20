@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+
 -- | Polynomial of References and Slices
 module Test.Data.PolyRS
   ( tests,
@@ -5,9 +7,11 @@ module Test.Data.PolyRS
   )
 where
 
+import Data.Field.Galois (Prime)
+import Data.Map (Map)
+import Data.Map qualified as Map
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
-import Keelung.Field (GF181)
 import Test.Arbitrary ()
 import Test.Hspec
 import Test.QuickCheck
@@ -17,108 +21,72 @@ import Test.QuickCheck
 run :: IO ()
 run = hspec tests
 
+toMap :: (Integral n, Ord a) => [(a, n)] -> Map a n
+toMap = Map.filter (/= 0) . Map.fromListWith (+)
+
+merge :: (Integral n, Ord a) => Map a n -> Map a n -> Map a n
+merge xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
+
 tests :: SpecWith ()
 tests = describe "PolyRS" $ do
   it "should be valid" $ do
     property $ \poly -> do
-      PolyL.isValid (poly :: PolyL GF181) `shouldBe` True
+      PolyL.isValid (poly :: PolyL (Prime 17)) `shouldBe` True
 
--- describe "widthOf SliceLookup" $ do
---   it "should be the sum of all lengths of its segments" $ do
---     property $ \sliceLookup -> do
---       widthOf sliceLookup `shouldBe` sum (widthOf <$> IntMap.elems (lookupSegments sliceLookup))
+  describe "fromLimbs" $ do
+    it "should result in valid PolyL" $ do
+      property $ \(constant, limbs) -> do
+        case PolyL.fromLimbs constant limbs of
+          Left constant' -> do
+            constant' `shouldBe` constant
+            null (toMap limbs) `shouldBe` True
+          Right poly -> do
+            PolyL.polyConstant poly `shouldBe` constant
+            PolyL.polyLimbs poly `shouldBe` toMap limbs
+            PolyL.isValid (poly :: PolyL (Prime 17)) `shouldBe` True
 
--- describe "split & merge" $ do
---   it "should result in valid SliceLookups after normalization" $ do
---     let genParam = do
---           sliceLookup <- arbitrary
---           index <- chooseInt (0, widthOf sliceLookup - 1)
---           pure (sliceLookup, index)
---     forAll genParam $ \(sliceLookup, index) -> do
---       let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
---       SliceLookup.isValid sliceLookup1 `shouldBe` True
---       SliceLookup.isValid sliceLookup2 `shouldBe` True
---       SliceLookup.isValid (SliceLookup.normalize (sliceLookup1 <> sliceLookup2)) `shouldBe` True
+  describe "fromLimb" $ do
+    it "should result in valid PolyL" $ do
+      property $ \(constant, limb) -> do
+        let poly = PolyL.fromLimb constant limb
+        PolyL.polyConstant poly `shouldBe` constant
+        PolyL.polyLimbs poly `shouldBe` Map.singleton limb 1
+        PolyL.isValid (poly :: PolyL (Prime 17)) `shouldBe` True
 
---   it "should preserve lengths of segments (`(+) . widthOf . split = widthOf`)" $ do
---     let genParam = do
---           sliceLookup <- arbitrary
---           index <- chooseInt (0, widthOf sliceLookup - 1)
---           pure (sliceLookup, index)
---     forAll genParam $ \(sliceLookup, index) -> do
---       let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
---       widthOf sliceLookup1 + widthOf sliceLookup2 `shouldBe` widthOf sliceLookup
+  describe "fromRefs" $ do
+    it "should result in valid PolyL" $ do
+      property $ \(constant, refs) -> do
+        case PolyL.fromRefs constant refs of
+          Left constant' -> do
+            constant' `shouldBe` constant
+            null (toMap refs) `shouldBe` True
+          Right poly -> do
+            PolyL.polyConstant poly `shouldBe` constant
+            PolyL.polyRefs poly `shouldBe` toMap refs
+            PolyL.isValid (poly :: PolyL (Prime 17)) `shouldBe` True
 
--- describe "splice" $ do
---   it "should result in a SliceLookup of the same width as of the interval" $ do
---     let genParam = do
---           sliceLookup <- arbitrary
---           let slice = lookupSlice sliceLookup
---           start <- chooseInt (sliceStart slice, (sliceEnd slice - 1) `max` sliceStart slice)
---           end <- chooseInt (start, (sliceEnd slice - 1) `max` sliceStart slice)
---           pure (sliceLookup, (start, end))
---     forAll genParam $ \(sliceLookup, (start, end)) -> do
---       let result = SliceLookup.splice (start, end) sliceLookup
---       widthOf result `shouldBe` end - start
+  describe "insertLimbs" $ do
+    it "should result in valid PolyL" $ do
+      property $ \(constant, limbs, poly) -> do
+        case PolyL.insertLimbs constant limbs poly of
+          Left constant' -> do
+            constant' `shouldBe` constant + PolyL.polyConstant poly
+            null (toMap limbs) && null (PolyL.polyRefs poly) `shouldBe` True
+          Right polynomial -> do
+            PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` constant + PolyL.polyConstant poly
+            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
+            PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly `merge` toMap limbs
+            PolyL.isValid polynomial `shouldBe` True
 
--- describe "normalize" $ do
---   it "should be the coequalizer of `merge . split` and `id`" $ do
---     let genParam = do
---           sliceLookup <- arbitrary
---           index <- chooseInt (0, (widthOf sliceLookup - 1) `max` 0)
---           pure (sliceLookup, index)
---     forAll genParam $ \(sliceLookup, index) -> do
---       let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
---       SliceLookup.normalize (sliceLookup1 <> sliceLookup2) `shouldBe` SliceLookup.normalize sliceLookup
-
---   it "should result in valid SliceLookups" $ do
---     property $ \sliceLookup -> do
---       SliceLookup.isValid (SliceLookup.normalize sliceLookup) `shouldBe` True
-
--- describe "map" $ do
---   it "`map id = id`" $ do
---     property $ \sliceLookup -> do
---       let mapped = SliceLookup.map id sliceLookup
---       SliceLookup.isValid mapped `shouldBe` True
---       mapped `shouldBe` sliceLookup
-
--- describe "mapInterval" $ do
---   it "`mapInterval id = id`" $ do
---     let genParam = do
---           sliceLookup <- arbitrary
---           start <- chooseInt (0, widthOf sliceLookup - 1)
---           end <- chooseInt (start, widthOf sliceLookup)
---           pure (sliceLookup, (start, end))
---     forAll genParam $ \(sliceLookup, interval) -> do
---       let mapped = SliceLookup.mapInterval id interval sliceLookup
---       SliceLookup.isValid (SliceLookup.normalize mapped) `shouldBe` True
---       SliceLookup.normalize mapped `shouldBe` SliceLookup.normalize sliceLookup
-
--- describe "mapIntervalWithSlice" $ do
---   it "`mapIntervalWithSlice (\\_ x -> x) = id`" $ do
---     let genParam = do
---           sliceLookup <- arbitrary
---           start <- chooseInt (0, widthOf sliceLookup - 1)
---           end <- chooseInt (start, widthOf sliceLookup)
---           let slice = Slice (sliceRefU $ lookupSlice sliceLookup) start end
---           pure (sliceLookup, slice)
---     forAll genParam $ \(sliceLookup, slice) -> do
---       let mapped = SliceLookup.mapIntervalWithSlice (\_ x -> x) slice sliceLookup
---       SliceLookup.isValid (SliceLookup.normalize mapped) `shouldBe` True
---       SliceLookup.normalize mapped `shouldBe` SliceLookup.normalize sliceLookup
-
--- describe "pad" $ do
---   it "should result in valid SliceLookups" $ do
---     property $ \sliceLookup -> do
---       let padded = SliceLookup.pad sliceLookup
---       SliceLookup.isValid (SliceLookup.normalize padded) `shouldBe` True
-
--- describe "fromSegment" $ do
---   it "should result in valid SliceLookups" $ do
---     let genParam = do
---           slice <- arbitrary
---           segment <- arbitrarySegmentOfSlice slice
---           pure (slice, segment)
---     forAll genParam $ \(slice, segment) -> do
---       let sliceLookup = SliceLookup.fromSegment slice segment
---       SliceLookup.isValid sliceLookup `shouldBe` True
+-- describe "insertRefs" $ do
+--   it "should result in valid PolyL" $ do
+--     property $ \(constant, refs, poly) -> do
+--       case PolyL.insertRefs constant refs poly :: PolyL (N (Prime 17)) of
+--         Left constant' -> do
+--           constant' `shouldBe` constant + PolyL.polyConstant poly
+--           null (toMap refs) `shouldBe` True
+--         Right poly' -> do
+--           PolyL.polyConstant poly' `shouldBe` constant + PolyL.polyConstant poly
+--           PolyL.polyLimbs poly' `shouldBe` PolyL.polyLimbs poly
+--           PolyL.polyRefs poly' `shouldBe` PolyL.polyRefs poly `merge` toMap refs
+--           PolyL.isValid poly' `shouldBe` True

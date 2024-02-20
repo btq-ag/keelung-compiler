@@ -3,8 +3,11 @@ module Test.Arbitrary where
 
 import Data.Bifunctor (first)
 import Data.IntMap qualified as IntMap
+import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Set qualified as Set
+import Keelung (Var)
+import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -16,35 +19,42 @@ import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf), Width)
 import Test.QuickCheck
+import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
-instance Arbitrary RefU where
-  arbitrary = arbitraryRefUOfWidth 1 16
+-- | Default range of Var
+defaultVar :: Gen Var
+defaultVar = chooseInt (0, 10)
 
-arbitraryRefUOfWidth :: Width -> Width -> Gen RefU
-arbitraryRefUOfWidth widthLowerBound widthUpperBound = do
-  width <- chooseInt (widthLowerBound, widthUpperBound)
-  var <- chooseInt (0, 99)
+defaultWidth :: Gen Width
+defaultWidth = chooseInt (0, 8)
+
+instance Arbitrary RefU where
+  arbitrary = defaultWidth >>= arbitraryRefUOfWidth
+
+arbitraryRefUOfWidth :: Width -> Gen RefU
+arbitraryRefUOfWidth width = do
+  var <- defaultVar
   constructor <- elements [RefUO, RefUI, RefUP, RefUX]
   pure $ constructor width var
 
 instance Arbitrary RefF where
   arbitrary =
     oneof
-      [ RefFO <$> chooseInt (0, 99),
-        RefFI <$> chooseInt (0, 99),
-        RefFP <$> chooseInt (0, 99),
-        RefFX <$> chooseInt (0, 99)
+      [ RefFO <$> defaultVar,
+        RefFI <$> defaultVar,
+        RefFP <$> defaultVar,
+        RefFX <$> defaultVar
       ]
 
 instance Arbitrary RefB where
   arbitrary =
     oneof
-      [ RefBO <$> chooseInt (0, 99),
-        RefBI <$> chooseInt (0, 99),
-        RefBP <$> chooseInt (0, 99),
-        RefBX <$> chooseInt (0, 99)
+      [ RefBO <$> defaultVar,
+        RefBI <$> defaultVar,
+        RefBP <$> defaultVar,
+        RefBX <$> defaultVar
       ]
 
 instance Arbitrary Ref where
@@ -53,7 +63,7 @@ instance Arbitrary Ref where
 --------------------------------------------------------------------------------
 
 instance Arbitrary U where
-  arbitrary = chooseInt (1, 16) >>= arbitraryUOfWidth
+  arbitrary = defaultWidth >>= arbitraryUOfWidth
 
 arbitraryUOfWidth :: Width -> Gen U
 arbitraryUOfWidth width = do
@@ -70,13 +80,13 @@ arbitrarySegmentOfSlice (Slice.Slice _ start end) =
         [ SliceLookup.Constant <$> arbitraryUOfWidth width,
           SliceLookup.ChildOf <$> arbitrarySliceOfWidth width,
           do
-            childrenCount <- chooseInt (1, 16)
+            childrenCount <- defaultWidth
             children <- vectorOf childrenCount $ arbitrarySliceOfWidth width
             pure $ SliceLookup.Parent width (Map.fromList (map (\child -> (Slice.sliceRefU child, Set.singleton child)) children))
         ]
 
 instance Arbitrary Slice where
-  arbitrary = chooseInt (1, 16) >>= arbitrarySliceOfWidth
+  arbitrary = defaultWidth >>= arbitrarySliceOfWidth
 
 arbitrarySliceOfWidth :: Width -> Gen Slice
 arbitrarySliceOfWidth width = do
@@ -84,7 +94,7 @@ arbitrarySliceOfWidth width = do
   start <- chooseInt (0, 16)
   let end = start + width
   refUWidth <- chooseInt (end, end + 16)
-  ref <- arbitraryRefUOfWidth refUWidth (refUWidth + 16)
+  ref <- arbitraryRefUOfWidth refUWidth
   pure $ Slice.Slice ref start end
 
 instance Arbitrary SliceLookup where
@@ -92,7 +102,7 @@ instance Arbitrary SliceLookup where
     start <- chooseInt (0, 16)
     segments <- removeAdjectSameKind <$> arbitrary
     let width = sum (map widthOf segments)
-    var <- arbitraryRefUOfWidth width (width + 16)
+    var <- arbitraryRefUOfWidth width
     pure $
       SliceLookup.normalize $
         SliceLookup.SliceLookup
@@ -111,14 +121,38 @@ instance Arbitrary SliceLookup where
 
 --------------------------------------------------------------------------------
 
+instance Arbitrary Limb where
+  arbitrary = do
+    width <- chooseInt (1, 8)
+    slice <- arbitrarySliceOfWidth width
+    return $ Slice.toLimb slice
+
+--------------------------------------------------------------------------------
+
+data Case = EmptyRefs | EmptyLimbs | BothNonEmpty
+
+instance Arbitrary Case where
+  arbitrary = elements [EmptyRefs, EmptyLimbs, BothNonEmpty]
+
 instance (Arbitrary n, Integral n) => Arbitrary (PolyL n) where
   arbitrary = do
+    result <- arbitrary
+    (refs, slices) <- case result of
+      EmptyRefs -> do
+        slices <- arbitrary `suchThat` valid
+        pure (mempty, Map.toList slices)
+      EmptyLimbs -> do
+        refs <- arbitrary `suchThat` valid
+        pure (Map.toList refs, mempty)
+      BothNonEmpty -> do
+        refs <- arbitrary `suchThat` valid
+        slices <- arbitrary `suchThat` valid
+        pure (Map.toList refs, Map.toList slices)
+    let limbs = fmap (first Slice.toLimb) slices
     constant <- arbitrary
-    slices <- arbitrary
-    let limbs = map (first Slice.toLimb) slices
-    refs <- arbitrary
-    case PolyL.fromRefs constant refs of
-      Left _ -> case PolyL.fromLimbs constant limbs of
-        Left _ -> PolyL.fromLimb constant . Slice.toLimb <$> arbitrary
-        Right poly -> return poly
-      Right poly -> pure $ PolyL.insertLimbs 0 limbs poly
+    case PolyL.new constant refs limbs of
+      Left _ -> error "impossible"
+      Right poly -> pure poly
+    where
+      valid :: (Arbitrary n, Integral n) => Map a n -> Bool
+      valid = not . Map.null . Map.filter (/= 0)

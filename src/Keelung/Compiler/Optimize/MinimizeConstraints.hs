@@ -531,7 +531,7 @@ substLimb ::
   (Either n (PolyL n), Maybe Changes)
 substLimb (accPoly, changes) (limb, multiplier) = case accPoly of
   Left c -> (PolyL.fromLimbs c [(limb, multiplier)], changes)
-  Right xs -> (Right (PolyL.insertLimbs 0 [(limb, multiplier)] xs), changes)
+  Right xs -> (PolyL.insertLimbs 0 [(limb, multiplier)] xs, changes)
 
 --- | Substitutes a Limb in a PolyL with SliceRelations.
 _substLimb ::
@@ -559,7 +559,7 @@ _substSlice relations initState (sliceWhole, multiplier) =
   where
     step (accPoly, changes) (slice, segment) =
       let offset = Slice.sliceStart slice - Slice.sliceStart sliceWhole
-          coefficient = multiplier * (2 ^ offset)
+          coefficient = multiplier * 2 ^ offset
        in case segment of
             SliceLookup.Constant constant -> case accPoly of
               Left c -> (Left (fromIntegral constant * coefficient + c), removeLimb (Slice.toLimb slice) changes)
@@ -569,13 +569,13 @@ _substSlice relations initState (sliceWhole, multiplier) =
                in case accPoly of
                     -- replace `limb` with `root`
                     Left c -> (PolyL.fromLimbs c [(rootLimb, coefficient)], (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
-                    Right accPoly' -> (Right (PolyL.insertLimbs 0 [(rootLimb, coefficient)] accPoly'), (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
+                    Right accPoly' -> (PolyL.insertLimbs 0 [(rootLimb, coefficient)] accPoly', (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
             SliceLookup.Parent _ _ -> case accPoly of
               Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, coefficient)], changes)
-              Right xs -> (Right (PolyL.insertLimbs 0 [(Slice.toLimb slice, coefficient)] xs), changes)
+              Right xs -> (PolyL.insertLimbs 0 [(Slice.toLimb slice, coefficient)] xs, changes)
             SliceLookup.Empty _ -> case accPoly of
               Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, coefficient)], changes)
-              Right xs -> (Right (PolyL.insertLimbs 0 [(Slice.toLimb slice, coefficient)] xs), changes)
+              Right xs -> (PolyL.insertLimbs 0 [(Slice.toLimb slice, coefficient)] xs, changes)
 
 -- | Substitutes a Ref in a PolyL.
 substRef ::
