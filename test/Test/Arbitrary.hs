@@ -19,7 +19,6 @@ import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf), Width)
 import Test.QuickCheck
-import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 

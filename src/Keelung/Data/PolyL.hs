@@ -26,7 +26,6 @@ module Keelung.Data.PolyL
     -- * Predicates
     view,
     View (..),
-    viewAsRefMap,
     size,
     isValid,
   )
@@ -144,6 +143,21 @@ multiplyBy :: (Integral n) => n -> PolyL n -> Either n (PolyL n)
 multiplyBy 0 _ = Left 0
 multiplyBy m (PolyL c ls vars) = Right $ PolyL (m * c) (fmap (m *) ls) (fmap (m *) vars)
 
+-- | Merge two PolyLs
+merge :: (Integral n) => PolyL n -> PolyL n -> Either n (PolyL n)
+merge (PolyL c1 ls1 vars1) (PolyL c2 ls2 vars2) =
+  let limbs = mergeAndClean ls1 ls2
+      vars = mergeAndClean vars1 vars2
+   in if null limbs && null vars
+        then Left (c1 + c2)
+        else Right (PolyL (c1 + c2) limbs vars)
+
+-- | Negate a polynomial
+negate :: (Num n, Eq n) => PolyL n -> PolyL n
+negate (PolyL c ls vars) = PolyL (-c) (fmap Prelude.negate ls) (fmap Prelude.negate vars)
+
+--------------------------------------------------------------------------------
+
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 data View n
   = RefMonomial n (Ref, n)
@@ -168,13 +182,6 @@ view (PolyL constant limbs vars) =
     (_, []) -> RefPolynomial constant vars
     _ -> MixedPolynomial constant vars (Map.toList limbs)
 
--- | Convert all Limbs to Refs and return a map of Refs to coefficients
-viewAsRefMap :: PolyL n -> (n, Map Ref n)
-viewAsRefMap (PolyL constant limbs vars) = (constant, vars <> Map.fromList (Map.toList limbs >>= limbToTerms))
-  where
-    limbToTerms :: (Limb, n) -> [(Ref, n)]
-    limbToTerms (limb, n) = [(B (RefUBit (lmbRef limb) i), n) | i <- [0 .. lmbWidth limb - 1]]
-
 -- | Return a set of all Refs in the PolyL
 limbsAndRefs :: PolyL n -> (Set RefU, Set Limb, Set Ref)
 limbsAndRefs (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (Map.toList ls)), Set.fromList (map fst (Map.toList ls)), Map.keysSet vars)
@@ -182,19 +189,6 @@ limbsAndRefs (PolyL _ ls vars) = (Set.fromList (map (lmbRef . fst) (Map.toList l
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int
 size (PolyL c ls vars) = (if c == 0 then 0 else 1) + sum (fmap lmbWidth (Map.keys ls)) + Map.size vars
-
--- | Merge two PolyLs
-merge :: (Integral n) => PolyL n -> PolyL n -> Either n (PolyL n)
-merge (PolyL c1 ls1 vars1) (PolyL c2 ls2 vars2) =
-  let limbs = mergeAndClean ls1 ls2
-      vars = mergeAndClean vars1 vars2
-   in if null limbs && null vars
-        then Left (c1 + c2)
-        else Right (PolyL (c1 + c2) limbs vars)
-
--- | Negate a polynomial
-negate :: (Num n, Eq n) => PolyL n -> PolyL n
-negate (PolyL c ls vars) = PolyL (-c) (fmap Prelude.negate ls) (fmap Prelude.negate vars)
 
 --------------------------------------------------------------------------------
 
