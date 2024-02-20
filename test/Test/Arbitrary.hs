@@ -1,9 +1,12 @@
 -- | Instances of 'Arbitrary'
 module Test.Arbitrary where
 
+import Data.Bifunctor (first)
 import Data.IntMap qualified as IntMap
 import Data.Map qualified as Map
 import Data.Set qualified as Set
+import Keelung.Data.PolyL (PolyL)
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
@@ -25,6 +28,29 @@ arbitraryRefUOfWidth widthLowerBound widthUpperBound = do
   var <- chooseInt (0, 99)
   constructor <- elements [RefUO, RefUI, RefUP, RefUX]
   pure $ constructor width var
+
+instance Arbitrary RefF where
+  arbitrary =
+    oneof
+      [ RefFO <$> chooseInt (0, 99),
+        RefFI <$> chooseInt (0, 99),
+        RefFP <$> chooseInt (0, 99),
+        RefFX <$> chooseInt (0, 99)
+      ]
+
+instance Arbitrary RefB where
+  arbitrary =
+    oneof
+      [ RefBO <$> chooseInt (0, 99),
+        RefBI <$> chooseInt (0, 99),
+        RefBP <$> chooseInt (0, 99),
+        RefBX <$> chooseInt (0, 99)
+      ]
+
+instance Arbitrary Ref where
+  arbitrary = oneof [F <$> arbitrary, B <$> arbitrary]
+
+--------------------------------------------------------------------------------
 
 instance Arbitrary U where
   arbitrary = chooseInt (1, 16) >>= arbitraryUOfWidth
@@ -82,3 +108,17 @@ instance Arbitrary SliceLookup where
               (segment' : acc') -> if SliceLookup.sameKindOfSegment segment segment' then acc' else segment : acc
           )
           []
+
+--------------------------------------------------------------------------------
+
+instance (Arbitrary n, Integral n) => Arbitrary (PolyL n) where
+  arbitrary = do
+    constant <- arbitrary
+    slices <- arbitrary
+    let limbs = map (first Slice.toLimb) slices
+    refs <- arbitrary
+    case PolyL.fromRefs constant refs of
+      Left _ -> case PolyL.fromLimbs constant limbs of
+        Left _ -> PolyL.fromLimb constant . Slice.toLimb <$> arbitrary
+        Right poly -> return poly
+      Right poly -> pure $ PolyL.insertLimbs 0 limbs poly

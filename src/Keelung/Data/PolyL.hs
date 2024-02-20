@@ -5,22 +5,29 @@
 
 -- | Polynomial made of References and Slices
 module Keelung.Data.PolyL
-  ( PolyL (polyConstant, polyLimbs, polyRefs),
+  ( -- * Eliminators
+    PolyL (polyConstant, polyLimbs, polyRefs),
     limbsAndRefs,
+
+    -- * Constructors
     fromLimbs,
     fromLimb,
     fromRefs,
+
+    -- * Operations
     insertLimbs,
     insertRefs,
     addConstant,
     multiplyBy,
-    size,
+    merge,
+    negate,
+
+    -- * Predicates
     view,
     View (..),
     viewAsRefMap,
-    merge,
-    negate,
-    isValid
+    size,
+    isValid,
   )
 where
 
@@ -38,6 +45,7 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Prelude hiding (negate, null)
 import Prelude qualified
+import Data.Field.Galois (GaloisField)
 
 -- | Polynomial made of Limbs + a constant
 data PolyL n = PolyL
@@ -50,7 +58,7 @@ data PolyL n = PolyL
   }
   deriving (Eq, Functor, Ord, Generic, NFData)
 
-instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
+instance (Integral n, GaloisField n) => Show (PolyL n) where
   show (PolyL constant limbs vars)
     | constant == 0 =
         if firstSign == " + "
@@ -65,7 +73,7 @@ instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
         (x Seq.:<| xs) -> (x, xs)
 
       -- return a pair of the sign ("+" or "-") and the string representation
-      printLimb :: (Eq n, Num n, Ord n, Show n) => (Limb, n) -> Seq String
+      printLimb :: (Integral n, GaloisField n) => (Limb, n) -> Seq String
       printLimb (x, c) =
         let (sign, terms) = Limb.showAsTerms x
          in case c of
@@ -74,7 +82,7 @@ instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
               -1 -> Seq.fromList [if sign then " - " else " + ", terms]
               _ -> Seq.fromList [if sign then " + " else " - ", show c <> terms]
 
-      printTerm :: (Eq n, Num n, Ord n, Show n) => (Ref, n) -> Seq String
+      printTerm :: (Integral n, GaloisField n) => (Ref, n) -> Seq String
       printTerm (x, c)
         | c == 0 = error "printTerm: coefficient of 0"
         | c == 1 = Seq.fromList [" + ", show x]
@@ -82,44 +90,44 @@ instance (Eq n, Num n, Ord n, Show n) => Show (PolyL n) where
         | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
         | otherwise = Seq.fromList [" + ", show c <> show x]
 
-fromLimbs :: (Num n, Eq n, Show n) => n -> [(Limb, n)] -> Either n (PolyL n)
+fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
 fromLimbs constant limbs =
   let limbs' = Map.filter (/= 0) (Map.fromListWith (+) limbs)
    in if null limbs'
         then Left constant
         else Right (PolyL constant limbs' mempty) -- TODO: examine the correctness of this
 
-fromLimb :: (Num n, Eq n) => n -> Limb -> PolyL n
+fromLimb :: (Integral n) => n -> Limb -> PolyL n
 fromLimb constant limb = PolyL constant (Map.singleton limb 1) mempty
 
 -- fromPolyG :: (Num n, Eq n) => PolyG n -> PolyL n
 -- fromPolyG poly = let (constant, vars) = PolyG.viewAsMap poly in PolyL constant mempty vars
 
 -- | Build a PolyL from a constant and a list of (Ref, coefficient) pairs
-fromRefs :: (Num n, Eq n) => n -> [(Ref, n)] -> Either n (PolyL n)
+fromRefs :: (Integral n) => n -> [(Ref, n)] -> Either n (PolyL n)
 fromRefs constant xs =
   let xs' = filter ((/= 0) . snd) xs
    in if null xs'
         then Left constant
         else Right (PolyL constant mempty (Map.fromList xs'))
 
-insertLimbs :: (Num n, Eq n, Show n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
+insertLimbs :: (Integral n) => n -> [(Limb, n)] -> PolyL n -> PolyL n
 insertLimbs c' limbs (PolyL c ls vars) =
   let limbs' = Map.filter (/= 0) (Map.fromListWith (+) limbs <> ls)
    in PolyL (c + c') limbs' vars
 
-insertRefs :: (Num n, Eq n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
+insertRefs :: (Integral n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
 insertRefs c' xs (PolyL c limbs vars) =
   let vars' = cleanVars $ Map.unionWith (+) vars (Map.fromList xs)
    in if Map.null limbs && Map.null vars'
         then Left (c + c')
         else Right $ PolyL (c + c') limbs vars'
 
-addConstant :: (Num n) => n -> PolyL n -> PolyL n
+addConstant :: (Integral n) => n -> PolyL n -> PolyL n
 addConstant c' (PolyL c ls vars) = PolyL (c + c') ls vars
 
 -- | Multiply all coefficients and the constant by some non-zero number
-multiplyBy :: (Num n, Eq n) => n -> PolyL n -> Either n (PolyL n)
+multiplyBy :: (Integral n) => n -> PolyL n -> Either n (PolyL n)
 multiplyBy 0 _ = Left 0
 multiplyBy m (PolyL c ls vars) = Right $ PolyL (m * c) (fmap (m *) ls) (fmap (m *) vars)
 

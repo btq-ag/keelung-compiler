@@ -21,7 +21,7 @@ fromPolyL :: Either n (PolyL n) -> LC n
 fromPolyL = either Constant Polynomial
 
 -- | Converting from a 'Either RefU U' to a list of 'LC n'.
-fromRefU :: (Num n, Eq n, Show n, Ord n) => Width -> Either RefU U -> [LC n]
+fromRefU :: (Integral n, GaloisField n) => Width -> Either RefU U -> [LC n]
 fromRefU desiredWidth (Right val) =
   map go [0, desiredWidth .. width - 1]
   where
@@ -35,7 +35,7 @@ fromRefU desiredWidth (Left var) =
    in map (Polynomial . PolyL.fromLimb 0) limbs
 
 -- | Converting from a 'Either RefU U' to a list of 'LC n'.
-fromRefU2 :: (GaloisField n) => FieldInfo -> Either RefU U -> [LC n]
+fromRefU2 :: (GaloisField n, Integral n) => FieldInfo -> Either RefU U -> [LC n]
 fromRefU2 fieldInfo (Right val) =
   let width = widthOf val
       go :: (Num n, Eq n) => Int -> LC n
@@ -58,22 +58,22 @@ toPolyL (Constant c) = Left c
 toPolyL (Polynomial xs) = Right xs
 
 -- | A LC is a semigroup under addition.
-instance (Semigroup n, GaloisField n) => Semigroup (LC n) where
+instance (Integral n, GaloisField n) => Semigroup (LC n) where
   Constant c <> Constant d = Constant (c + d)
   Polynomial xs <> Polynomial ys = fromPolyL (PolyL.merge xs ys)
   Polynomial xs <> Constant c = Polynomial (PolyL.addConstant c xs)
   Constant c <> Polynomial xs = Polynomial (PolyL.addConstant c xs)
 
 -- | A LC is a monoid under addition.
-instance (Semigroup n, GaloisField n) => Monoid (LC n) where
+instance (Integral n, GaloisField n) => Monoid (LC n) where
   mempty = Constant 0
 
-(@) :: GaloisField n => n -> Ref -> LC n
+(@) :: (Integral n, GaloisField n) => n -> Ref -> LC n
 n @ x = fromPolyL (PolyL.fromRefs 0 [(x, n)])
 
-neg :: GaloisField n => LC n -> LC n
+neg :: (Integral n, GaloisField n) => LC n -> LC n
 neg = scale (-1)
 
-scale :: GaloisField n => n -> LC n -> LC n
+scale :: (Integral n, GaloisField n) => n -> LC n -> LC n
 scale n (Constant c) = Constant (n * c)
 scale n (Polynomial xs) = fromPolyL (PolyL.multiplyBy n xs)
