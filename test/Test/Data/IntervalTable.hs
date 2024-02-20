@@ -7,7 +7,7 @@ import Control.Monad (forM_)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung
 import Keelung.Compiler.Linker (constructEnv, reindexRef)
-import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
+import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Data.IntervalTable (IntervalTable (..))
 import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference
@@ -115,18 +115,18 @@ tests =
 
         map (IntervalTable.reindex table) [0, 1, 6, 7] `shouldBe` [0 .. 3]
 
-    describe "from OccurUB" $ do
+    describe "from OccurU" $ do
       it "1" $ do
-        let occurUB = OccurUB.increase 4 1 (2, 4) $ OccurUB.increase 4 0 (0, 2) OccurUB.new
-        let tables = OccurUB.toIntervalTables occurUB
+        let occurU = OccurU.increase 4 1 (2, 4) $ OccurU.increase 4 0 (0, 2) OccurU.new
+        let tables = OccurU.toIntervalTables occurU
         case IntMap.lookup 4 tables of
           Nothing -> error "should not happen"
           Just table -> do
             map (IntervalTable.reindex table) [0, 1, 6, 7] `shouldBe` [0 .. 3]
 
       it "2" $ do
-        let occurUB = OccurUB.increase 4 1 (1, 3) $ OccurUB.increase 4 1 (2, 4) $ OccurUB.increase 4 0 (0, 2) OccurUB.new
-        let tables = OccurUB.toIntervalTables occurUB
+        let occurU = OccurU.increase 4 1 (1, 3) $ OccurU.increase 4 1 (2, 4) $ OccurU.increase 4 0 (0, 2) OccurU.new
+        let tables = OccurU.toIntervalTables occurU
         case IntMap.lookup 4 tables of
           Nothing -> error "should not happen"
           Just table -> do

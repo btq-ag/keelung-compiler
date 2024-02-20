@@ -467,8 +467,6 @@ addAddL poly = case PolyL.view poly of
 
 --------------------------------------------------------------------------------
 
---------------------------------------------------------------------------------
-
 -- | Keep track of what has been changed in the substitution
 data Changes = Changes
   { addedLimbs :: Set Limb,

@@ -116,7 +116,7 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       let options' = options {optFieldInfo = fieldInfo}
       -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
-      -- tests for variable reindexing (only when optUseNewLinker is True)
+      -- tests for variable reindexing
       testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Prime n)) (Maybe ReindexReport.Error))
       -- constraint system solvers
       solveR1CSWithOpts options' program rawPublicInputs rawPrivateInputs
@@ -128,7 +128,7 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       let options' = options {optFieldInfo = fieldInfo}
       -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
-      -- tests for variable reindexing (only when optUseNewLinker is True)
+      -- tests for variable reindexing
       testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
       -- constraint system solvers
       solveR1CSWithOpts options' program rawPublicInputs rawPrivateInputs

@@ -1,61 +1,55 @@
 {-# LANGUAGE DeriveGeneric #-}
 
--- | Module for RefF bookkeeping
+-- | Module for RefU bookkeeping
 module Keelung.Compiler.Optimize.OccurU
   ( OccurU,
     new,
+    member,
+    -- size,
     null,
-    toList,
-    toIntMap,
-    toIntervalTable,
+    -- fromIntervalSet,
     toIntervalTables,
+    toIntervalTablesWithOffsets,
     increase,
     decrease,
-    occuredSet,
   )
 where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
-import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
+import Keelung (Var, Width)
 import Keelung.Compiler.Util
+import Keelung.Data.IntervalSet (IntervalSet)
+import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.IntervalTable (IntervalTable)
 import Keelung.Data.IntervalTable qualified as IntervalTable
-import Keelung.Data.Reference (RefU (RefUX))
-import Keelung.Syntax (Var, Width)
-import Keelung.Syntax.Counters
 import Prelude hiding (null)
 
-newtype OccurU
-  = OccurU (IntMap (IntMap Int)) -- mapping of width to (mapping of var to count)
+newtype OccurU = OccurU (IntMap IntervalSet) -- IntMap of (width, IntervalSet) pairs
   deriving (Eq, Generic)
 
 instance NFData OccurU
 
 instance Show OccurU where
-  show xs =
-    if null xs
+  show (OccurU xs) =
+    if null (OccurU xs)
       then ""
       else
-        "  OccurrencesU:\n  "
+        "  OccurrencesU:\n"
           <> indent
-            ( showList'
-                ( map
-                    ( \(width, occurs) ->
-                        show width
-                          <> ": "
-                          <> showList'
-                            ( map
-                                (\(var, _) -> show (RefUX width var))
-                                ( filter
-                                    (\(_, n) -> n > 0) -- only show variables that are used
-                                    (IntMap.toList occurs)
-                                )
-                            )
+            ( indent
+                ( unlines
+                    ( map
+                        ( \(width, intervalSet) ->
+                            "U"
+                              <> toSubscript width
+                              <> ": "
+                              <> show intervalSet
+                        )
+                        (IntMap.toList xs)
                     )
-                    (toList xs)
                 )
             )
 
@@ -63,34 +57,65 @@ instance Show OccurU where
 new :: OccurU
 new = OccurU mempty
 
--- | O(1). Test whether a OccurU is empty
+-- | O(min(n, W)): Is this bit used somewhere?
+member :: OccurU -> Width -> Var -> Int -> Bool
+member (OccurU xs) width var index = case IntMap.lookup width xs of
+  Nothing -> False
+  Just intervals -> IntervalSet.member intervals (width * var + index)
+
+-- | O(min(n, W)): Get the total number of bits used in this OccurU
+-- size :: OccurU -> Int
+-- size (OccurU xs) = IntMap.foldl' (\acc varMap -> acc + IntMap.foldl' (\acc' (n, _) -> acc' + n) 0 varMap) 0 xs
+
+-- | O(min(n, W)). Test whether a OccurU is empty
 null :: OccurU -> Bool
 null (OccurU xs) = IntMap.null xs
 
--- | O(1).  To a list of (RefF, Int) pairs
-toList :: OccurU -> [(Int, IntMap Int)]
-toList (OccurU xs) = IntMap.toList xs
+-- | O(n). To an IntMap of widths to IntervalTable
+toIntervalTables :: OccurU -> IntMap IntervalTable
+toIntervalTables (OccurU xs) = IntMap.mapWithKey IntervalSet.toIntervalTable xs
 
-toIntMap :: OccurU -> IntMap (IntMap Int)
-toIntMap (OccurU xs) = xs
+toIntervalTablesWithOffsets :: OccurU -> IntMap (Int, IntervalTable)
+toIntervalTablesWithOffsets (OccurU xs) = snd $ IntMap.foldlWithKey' step (0, mempty) xs
+  where
+    step :: (Int, IntMap (Int, IntervalTable)) -> Width -> IntervalSet -> (Int, IntMap (Int, IntervalTable))
+    step (offset, acc) width intervalSet =
+      let table = IntervalSet.toIntervalTable width intervalSet
+       in (offset + IntervalTable.size table, IntMap.insert width (offset, table) acc)
 
--- | O(lg n). To an IntervalTable
-toIntervalTable :: Counters -> OccurU -> IntervalTable
-toIntervalTable counters (OccurU xs) = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
+-- IntMap.mapWithKey IntervalSet.toIntervalTable xs
 
--- | O(lg n). To an IntMap of IntervalTables
-toIntervalTables :: Counters -> OccurU -> IntMap IntervalTable
-toIntervalTables counters (OccurU xs) = IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap 1 (getCount counters (Intermediate, ReadUInt width), x)) xs
+-- where
+--   convert :: Width -> IntervalSet -> IntervalTable
+--   convert width intervals = IntervalTable.IntervalTable width _ _
 
--- | O(1). Bump the count of a RefF
-increase :: Width -> Var -> OccurU -> OccurU
-increase width var (OccurU xs) = case IntMap.lookup width xs of
-  Nothing -> OccurU $ IntMap.insert width (IntMap.singleton var 1) xs
-  Just existing -> OccurU $ IntMap.insert width (IntMap.insertWith (+) var 1 existing) xs
+-- -- | O(n). To an IntervalTable
+-- toIntervalTable :: OccurU -> IntervalTable
+-- toIntervalTable (OccurU xs) = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width varMaps -> mconcat $ IntMap.elems $ IntMap.map (_ width) varMaps) xs
+--   where
+--     convert :: Width -> (Int, IntMap Int) -> IntervalTable
+--     convert width (n, intervals)
 
--- | O(1). Decrease the count of a RefF
-decrease :: Width -> Var -> OccurU -> OccurU
-decrease width var (OccurU xs) = OccurU $ IntMap.adjust (IntMap.adjust (\count -> pred count `max` 0) var) width xs
+-- toIntervalTable :: Counters -> OccurU -> IntervalTable
+-- toIntervalTable counters (OccurU xs) =
+--   let bitsPart = mconcat $ IntMap.elems $ IntMap.mapWithKey (\width x -> IntervalTable.fromOccurrenceMap width (getCount counters (Intermediate, ReadUInt width), x)) xs
+--    in bitsPart
 
-occuredSet :: OccurU -> IntMap IntSet
-occuredSet (OccurU xs) = IntMap.map (IntMap.keysSet . IntMap.filter (> 0)) xs
+-- | O(1). Bump the count of an interval of bits in a RefU
+adjust :: Int -> Width -> Var -> (Int, Int) -> OccurU -> OccurU
+adjust amount width var (start, end) (OccurU xs) = OccurU $ IntMap.alter increase' width xs
+  where
+    interval' :: (Int, Int)
+    interval' = (width * var + start, width * var + end)
+
+    increase' :: Maybe IntervalSet -> Maybe IntervalSet
+    increase' Nothing = Just $ IntervalSet.adjust interval' amount IntervalSet.new
+    increase' (Just intervalSet) = Just $ IntervalSet.adjust interval' amount intervalSet
+
+-- | O(1). Increase the count of an interval of bits in a RefU
+increase :: Width -> Var -> (Int, Int) -> OccurU -> OccurU
+increase = adjust 1
+
+-- | O(1). Decrease the count of an interval of bits in a RefU
+decrease :: Width -> Var -> (Int, Int) -> OccurU -> OccurU
+decrease = adjust (-1)

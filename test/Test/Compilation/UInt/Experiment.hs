@@ -14,10 +14,6 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Compilation Experiment" $ do
-  -- let options = defaultOptions {optUseNewLinker = False, optOptimize = False}
-  -- let options = defaultOptions {optUseNewLinker = False}
-  -- let options = defaultOptions {optUseNewLinker = True, optOptimize = False}
-
   describe "DivMod" $ do
     -- let expected = [dividend `div` divisor, dividend `mod` divisor]
 
@@ -43,14 +39,3 @@ tests = describe "Compilation Experiment" $ do
 --   let expected = [dividend `div` divisor, dividend `mod` divisor]
 --   -- debugWithOpts options (Binary 7) (program dividend divisor)
 --   testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
-
--- -- WON'T FIX: for the old linker
--- describe "Binary Addition" $ do
---   it "mixed (positive / negative / constnat) / Byte" $ do
---     let program = do
---           x <- input Public :: Comp (UInt 2)
---           y <- input Public
---           z <- input Public
---           return $ 1 + x + y + z
---     debug (Binary 7) program
---     testCompiler (Binary 7) program [0, 0, 1] [] [2]

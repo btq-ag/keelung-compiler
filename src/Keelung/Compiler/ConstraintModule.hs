@@ -30,8 +30,6 @@ import Keelung.Compiler.Optimize.OccurF (OccurF)
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
-import Keelung.Compiler.Optimize.OccurUB (OccurUB)
-import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
@@ -55,7 +53,7 @@ data ConstraintModule n = ConstraintModule
     -- for counting the occurrences of variables in constraints (excluding the ones that are in Relations)
     cmOccurrenceF :: !OccurF,
     cmOccurrenceB :: !OccurB,
-    cmOccurrenceU :: !(Either OccurU OccurUB),
+    cmOccurrenceU :: !OccurU,
     cmRelations :: Relations n,
     -- addative constraints
     cmAddL :: Seq (PolyL n),
@@ -87,10 +85,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showModInvHints
       <> show (cmOccurrenceF cm)
       <> show (cmOccurrenceB cm)
-      <> ( case cmOccurrenceU cm of
-             Left x -> show x
-             Right x -> show x
-         )
+      <> show (cmOccurrenceU cm)
       <> prettyVariables (cmCounters cm)
       <> "}"
     where
@@ -221,15 +216,11 @@ newtype Hint = Hint (Either RefU U)
 instance UpdateOccurrences Hint where
   addOccurrence ref cm =
     case ref of
-      Hint (Left (RefUX width var)) -> case cmOccurrenceU cm of
-        Left _ -> cm
-        Right occorUB -> cm {cmOccurrenceU = Right $ OccurUB.increase width var (0, width) occorUB}
+      Hint (Left (RefUX width var)) -> cm {cmOccurrenceU = OccurU.increase width var (0, width) (cmOccurrenceU cm)}
       _ -> cm
   removeOccurrence ref cm =
     case ref of
-      Hint (Left (RefUX width var)) -> case cmOccurrenceU cm of
-        Left _ -> cm
-        Right occorUB -> cm {cmOccurrenceU = Right $ OccurUB.decrease width var (0, width) occorUB}
+      Hint (Left (RefUX width var)) -> cm {cmOccurrenceU = OccurU.decrease width var (0, width) (cmOccurrenceU cm)}
       _ -> cm
 
 instance UpdateOccurrences Ref where
@@ -255,43 +246,21 @@ instance UpdateOccurrences RefF where
 instance UpdateOccurrences RefB where
   addOccurrence ref cm =
     case ref of
-      RefUBit (RefUX width var) i -> case cmOccurrenceU cm of
-        Left occurU -> cm {cmOccurrenceU = Left $ OccurU.increase width var occurU}
-        Right occorUB -> cm {cmOccurrenceU = Right $ OccurUB.increase width var (i, i + 1) occorUB}
+      RefUBit (RefUX width var) i -> cm {cmOccurrenceU = OccurU.increase width var (i, i + 1) (cmOccurrenceU cm)}
       RefBX var -> cm {cmOccurrenceB = OccurB.increase var (cmOccurrenceB cm)}
       _ -> cm
   removeOccurrence ref cm =
     case ref of
-      RefUBit (RefUX width var) i -> case cmOccurrenceU cm of
-        Left occurU -> cm {cmOccurrenceU = Left $ OccurU.decrease width var occurU}
-        Right occorUB -> cm {cmOccurrenceU = Right $ OccurUB.decrease width var (i, i + 1) occorUB}
+      RefUBit (RefUX width var) i -> cm {cmOccurrenceU = OccurU.decrease width var (i, i + 1) (cmOccurrenceU cm)}
       RefBX var -> cm {cmOccurrenceB = OccurB.decrease var (cmOccurrenceB cm)}
-      _ -> cm
-
-instance UpdateOccurrences RefU where
-  addOccurrence ref cm =
-    case ref of
-      RefUX width var -> case cmOccurrenceU cm of
-        Left occurU -> cm {cmOccurrenceU = Left $ OccurU.increase width var occurU}
-        Right _ -> cm
-      _ -> cm
-  removeOccurrence ref cm =
-    case ref of
-      RefUX width var -> case cmOccurrenceU cm of
-        Left occurU -> cm {cmOccurrenceU = Left $ OccurU.decrease width var occurU}
-        Right _ -> cm
       _ -> cm
 
 instance UpdateOccurrences Limb where
   addOccurrence limb cm =
     case lmbRef limb of
-      RefUX width var -> case cmOccurrenceU cm of
-        Left _ -> cm
-        Right occorUB -> cm {cmOccurrenceU = Right $ OccurUB.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) occorUB}
+      RefUX width var -> cm {cmOccurrenceU = OccurU.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceU cm)}
       _ -> cm
   removeOccurrence limb cm =
     case lmbRef limb of
-      RefUX width var -> case cmOccurrenceU cm of
-        Left _ -> cm
-        Right occorUB -> cm {cmOccurrenceU = Right $ OccurUB.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) occorUB}
+      RefUX width var -> cm {cmOccurrenceU = OccurU.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceU cm)}
       _ -> cm

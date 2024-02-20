@@ -28,7 +28,6 @@ import Keelung.Compiler.ConstraintSystem qualified as Linked
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
-import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Options
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.Reference qualified as RefRelations
@@ -82,25 +81,11 @@ linkConstraintModule cm =
 
 -- | Predicate on whether a Slice should be exported as constraints
 sliceShouldBeKept :: Env -> Slice -> Bool
-sliceShouldBeKept env slice = case envOccurU env of
-  Left _ -> error "[ panic ] sliceShouldBeKept: UseNewLinker not enabled"
-  Right tables -> case sliceRefU slice of
-    RefUX width var -> case IntMap.lookup width tables of
-      Nothing -> False
-      Just table -> IntervalTable.member (width * var + sliceStart slice, width * var + sliceEnd slice) table
-    _ -> True -- it's a pinned UInt variable
-
--- | Predicate on whether a RefU should be exported as constraints
-refUShouldBeKept :: Env -> RefU -> Bool
-refUShouldBeKept env ref = case envOccurU env of
-  Left table -> case ref of
-    RefUX width var ->
-      -- it's a UInt intermediate variable that occurs in the circuit
-      case IntMap.lookup width table of
-        Nothing -> False
-        Just xs -> IntSet.member var xs
-    _ -> True -- it's a pinned UInt variable
-  Right _ -> error "[ panic ] refUShouldBeKept: UseNewLinker enabled"
+sliceShouldBeKept env slice = case sliceRefU slice of
+  RefUX width var -> case IntMap.lookup width (envOccurU env) of
+    Nothing -> False
+    Just table -> IntervalTable.member (width * var + sliceStart slice, width * var + sliceEnd slice) table
+  _ -> True -- it's a pinned UInt variable
 
 shouldBeKept :: Env -> Ref -> Bool
 shouldBeKept env (F ref) = case ref of
@@ -112,9 +97,7 @@ shouldBeKept env (B ref) = case ref of
   RefBX var ->
     --  it's a Boolean intermediate variable that occurs in the circuit
     var `IntSet.member` envOccurB env
-  RefUBit var i -> case envOccurU env of
-    Left _ -> refUShouldBeKept env var --  it's a Bit test of a UInt intermediate variable that occurs in the circuit
-    Right tables -> refUBitShouldBeKept tables var i
+  RefUBit var i -> refUBitShouldBeKept (envOccurU env) var i
   _ -> True -- it's a pinned Field variable
   where
     refUBitShouldBeKept :: IntMap IntervalTable -> RefU -> Int -> Bool
@@ -185,25 +168,12 @@ linkConstraint env (CMulL as bs cs) =
         )
     ]
 
-updateCounters :: IntervalTable -> IntervalTable -> Either (IntervalTable, IntMap IntervalTable) (IntMap (Int, IntervalTable)) -> ConstraintModule n -> Counters
-updateCounters tableF tableB tableU cm =
-  case tableU of
-    Left (_, tables) -> updateCountersOld tables (cmCounters cm)
-    Right tables -> updateCountersNew tables (cmCounters cm)
-  where
-    updateCountersOld :: IntMap IntervalTable -> Counters -> Counters
-    updateCountersOld tables counters =
-      let newFXCount = (WriteField, IntervalTable.size tableF)
-          newBXCount = (WriteBool, IntervalTable.size tableB)
-          newUXCounts = IntMap.mapWithKey (\width set -> (WriteUInt width, IntervalTable.size set)) tables
-          actions = newFXCount : newBXCount : IntMap.elems newUXCounts
-       in foldr (\(selector, count) -> setCount (Intermediate, selector) count) counters actions
-
-    updateCountersNew :: IntMap (Int, IntervalTable) -> Counters -> Counters
-    updateCountersNew tables =
-      setCount (Intermediate, WriteField) (IntervalTable.size tableF)
-        . setCount (Intermediate, WriteBool) (IntervalTable.size tableB)
-        . setCountOfIntermediateUIntBits (fmap (IntervalTable.size . snd) tables)
+updateCounters :: IntervalTable -> IntervalTable -> IntMap (Int, IntervalTable) -> ConstraintModule n -> Counters
+updateCounters tableF tableB tableU =
+  setCount (Intermediate, WriteField) (IntervalTable.size tableF)
+    . setCount (Intermediate, WriteBool) (IntervalTable.size tableB)
+    . setCountOfIntermediateUIntBits (fmap (IntervalTable.size . snd) tableU)
+    . cmCounters
 
 --------------------------------------------------------------------------------
 
@@ -280,16 +250,10 @@ reindexRefU :: Env -> RefU -> Int -> Var
 reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envCounters env) (Output, ReadAllUInts)
 reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envCounters env) (PublicInput, ReadAllUInts)
 reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envCounters env) (PrivateInput, ReadAllUInts)
-reindexRefU env (RefUX w x) i = case envIndexTableU env of
-  Left (table, _) ->
-    let offset = getOffset (envCounters env) (Intermediate, ReadAllUInts)
-        varBeforeReindexing = getOffset (envCounters env) (Intermediate, ReadUInt w) + w * x - offset
-     in IntervalTable.reindex table varBeforeReindexing + offset + i `mod` w
-  Right tables ->
-    case IntMap.lookup w tables of
-      Nothing -> error "[ panic ] reindexRefU: impossible"
-      Just (offset, table) ->
-        IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envCounters env) (Intermediate, ReadAllUInts)
+reindexRefU env (RefUX w x) i = case IntMap.lookup w (envIndexTableU env) of
+  Nothing -> error "[ panic ] reindexRefU: impossible"
+  Just (offset, table) ->
+    IntervalTable.reindex table (w * x + i `mod` w) + offset + getOffset (envCounters env) (Intermediate, ReadAllUInts)
 
 -------------------------------------------------------------------------------
 
@@ -298,10 +262,8 @@ toConstraints :: (GaloisField n, Integral n) => ConstraintModule n -> Env -> Seq
 toConstraints cm env =
   let -- constraints extracted from relations between Refs
       refConstraints = RefRelations.toConstraints (shouldBeKept env) (Relations.relationsR (cmRelations cm))
-      -- constraints extracted from relations between Slices (only when optUseUIntUnionFind = True)
-      sliceConstraints = case cmOccurrenceU cm of
-        Left _ -> SliceRelations.toConstraints (refUShouldBeKept env) (Relations.relationsS (cmRelations cm))
-        Right occurUB -> SliceRelations.toConstraintsWithNewLinker occurUB (sliceShouldBeKept env) (Relations.relationsS (cmRelations cm))
+      -- constraints extracted from relations between Slices
+      sliceConstraints = SliceRelations.toConstraints (cmOccurrenceU cm) (sliceShouldBeKept env) (Relations.relationsS (cmRelations cm))
       -- constraints extracted from addative constraints
       fromAddativeConstraints = fmap CAddL (cmAddL cm)
       -- constraints extracted from multiplicative constraints
@@ -319,11 +281,11 @@ data Env = Env
     -- for determining which relations should be extracted as constraints
     envOccurF :: !IntSet,
     envOccurB :: !IntSet,
-    envOccurU :: !(Either (IntMap IntSet) (IntMap IntervalTable)),
+    envOccurU :: !(IntMap IntervalTable),
     -- for variable reindexing
     envIndexTableF :: !IntervalTable,
     envIndexTableB :: !IntervalTable,
-    envIndexTableU :: !(Either (IntervalTable, IntMap IntervalTable) (IntMap (Int, IntervalTable))),
+    envIndexTableU :: !(IntMap (Int, IntervalTable)),
     -- field related
     envFieldInfo :: !FieldInfo,
     envFieldWidth :: !Width
@@ -335,16 +297,12 @@ constructEnv :: ConstraintModule n -> Env
 constructEnv cm =
   let indexTableF = OccurF.toIntervalTable (cmCounters cm) (cmOccurrenceF cm)
       indexTableB = OccurB.toIntervalTable (cmCounters cm) (cmOccurrenceB cm)
-      indexTableU = case cmOccurrenceU cm of
-        Left occurU -> Left (OccurU.toIntervalTable (cmCounters cm) occurU, OccurU.toIntervalTables (cmCounters cm) occurU)
-        Right occurUB -> Right (OccurUB.toIntervalTablesWithOffsets occurUB)
+      indexTableU = OccurU.toIntervalTablesWithOffsets (cmOccurrenceU cm)
    in Env
         { envCounters = updateCounters indexTableF indexTableB indexTableU cm,
           envOccurF = OccurF.occuredSet (cmOccurrenceF cm),
           envOccurB = OccurB.occuredSet (cmOccurrenceB cm),
-          envOccurU = case cmOccurrenceU cm of
-            Left occurU -> Left (OccurU.occuredSet occurU)
-            Right occurUB -> Right (OccurUB.toIntervalTables occurUB),
+          envOccurU = OccurU.toIntervalTables (cmOccurrenceU cm),
           envIndexTableF = indexTableF,
           envIndexTableB = indexTableB,
           envIndexTableU = indexTableU,

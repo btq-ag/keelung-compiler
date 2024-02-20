@@ -114,7 +114,7 @@ tests = describe "UInt" $ do
     -- 8 for carry bit
     -- 1 for multiplication
 
-    it "2 variables / byte / GF181 (new linker)" $ do
+    it "2 variables / byte / GF181" $ do
       (cs, cs') <- executeGF181 $ do
         x <- input Public :: Comp (UInt 8)
         y <- input Public
@@ -154,7 +154,7 @@ tests = describe "UInt" $ do
       cs `shouldHaveSize` 55
       cs' `shouldHaveSize` 50
 
-    it "variable / constant (new linker)" $ do
+    it "variable / constant" $ do
       (cs, cs') <- executeGF181 $ do
         x <- input Public :: Comp (UInt 4)
         return $ x * 4

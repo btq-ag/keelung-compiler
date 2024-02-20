@@ -34,7 +34,7 @@ tests = describe "Experiment" $ do
   -- 4 for output
   -- 1 for multiplication
   -- 8 - 2 for multiplication output
-  it "keelung Issue #17 (new linker)" $ do
+  it "keelung Issue #17" $ do
     (cs, cs') <- executeGF181 $ do
       a <- input Private :: Comp (UInt 4)
       b <- input Private

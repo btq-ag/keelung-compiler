@@ -12,7 +12,6 @@ module Keelung.Compiler.Relations.Slice
     size,
     lookup,
     toConstraints,
-    toConstraintsWithNewLinker,
     -- Testing
     isValid,
     Failure (..),
@@ -32,8 +31,8 @@ import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung (widthOf)
-import Keelung.Compiler.Optimize.OccurUB (OccurUB)
-import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
+import Keelung.Compiler.Optimize.OccurU (OccurU)
+import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Util (indent)
 import Keelung.Data.Constraint
 import Keelung.Data.Reference
@@ -148,28 +147,8 @@ lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
               Just lookups -> SliceLookup.splice (start, end) lookups
 
 -- | Convert relations to specialized constraints
-toConstraints :: (RefU -> Bool) -> SliceRelations -> Seq (Constraint n)
-toConstraints refUShouldBeKept = fold step mempty
-  where
-    step :: Seq (Constraint n) -> Slice -> Segment -> Seq (Constraint n)
-    step acc slice segment =
-      if refUShouldBeKept (sliceRefU slice)
-        then acc <> convert slice segment
-        else acc
-
-    -- see if a Segment should be converted to a Constraint
-    convert :: Slice -> Segment -> Seq (Constraint n)
-    convert slice segment = case segment of
-      SliceLookup.Constant val -> Seq.singleton (CSliceVal slice (toInteger val))
-      SliceLookup.ChildOf root ->
-        if refUShouldBeKept (sliceRefU root)
-          then Seq.singleton (CSliceEq slice root)
-          else mempty
-      SliceLookup.Parent _ _ -> mempty
-      SliceLookup.Empty _ -> mempty
-
-toConstraintsWithNewLinker :: OccurUB -> (Slice -> Bool) -> SliceRelations -> Seq (Constraint n)
-toConstraintsWithNewLinker occurrence sliceShouldBeKept = fold step mempty
+toConstraints :: OccurU -> (Slice -> Bool) -> SliceRelations -> Seq (Constraint n)
+toConstraints occurrence sliceShouldBeKept = fold step mempty
   where
     step :: Seq (Constraint n) -> Slice -> Segment -> Seq (Constraint n)
     step acc slice segment = acc <> convert slice segment
@@ -179,11 +158,14 @@ toConstraintsWithNewLinker occurrence sliceShouldBeKept = fold step mempty
     convert slice segment =
       case segment of
         SliceLookup.Constant val ->
-          -- only export part of slice that is used
+          -- only export part of slice that is used, TODO: optimize this
           case sliceRefU slice of
             RefUX width var ->
               Seq.fromList
-                [CSliceVal (slice {sliceStart = sliceStart slice + i, sliceEnd = sliceStart slice + i + 1}) (if Data.Bits.testBit val i then 1 else 0) | i <- [0 .. widthOf slice - 1], OccurUB.member occurrence width var (sliceStart slice + i)]
+                [ CSliceVal (slice {sliceStart = sliceStart slice + i, sliceEnd = sliceStart slice + i + 1}) (if Data.Bits.testBit val i then 1 else 0)
+                  | i <- [0 .. widthOf slice - 1],
+                    OccurU.member occurrence width var (sliceStart slice + i)
+                ]
             _ ->
               -- pinned reference, all bits needs to be exported
               Seq.singleton (CSliceVal slice (toInteger val))

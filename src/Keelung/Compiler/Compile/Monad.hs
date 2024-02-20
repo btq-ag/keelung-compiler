@@ -13,7 +13,6 @@ import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Optimize.OccurB qualified as OccurB
 import Keelung.Compiler.Optimize.OccurF qualified as OccurF
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
-import Keelung.Compiler.Optimize.OccurUB qualified as OccurUB
 import Keelung.Compiler.Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
@@ -48,7 +47,7 @@ runM options compilers counters program =
             (tempSetFlag counters True)
             OccurF.new
             (OccurB.new False)
-            (Right OccurUB.new)
+            OccurU.new
             (Relations.new options)
             mempty
             mempty
@@ -170,11 +169,7 @@ addC = mapM_ addOne
         Just relations -> put cs {cmRelations = relations}
 
     countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
-    countBitTestAsOccurU (B (RefUBit (RefUX width var) i)) = do
-      result <- gets cmOccurrenceU
-      case result of
-        Left occurU -> modify' (\cs -> cs {cmOccurrenceU = Left $ OccurU.increase width var occurU})
-        Right occurUB -> modify' (\cs -> cs {cmOccurrenceU = Right $ OccurUB.increase width var (i, i + 1) occurUB})
+    countBitTestAsOccurU (B (RefUBit (RefUX width var) i)) = modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (i, i + 1) (cmOccurrenceU cs)})
     countBitTestAsOccurU _ = return ()
 
     addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
