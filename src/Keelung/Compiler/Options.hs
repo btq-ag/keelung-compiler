@@ -21,9 +21,7 @@ data Options = Options
     -- | Whether to perform constant propagation
     optConstProp :: Bool,
     -- | Whether to perform optimization
-    optOptimize :: Bool,
-    -- | Whether to disable testing on unoptimized program
-    optDisableTestingOnO0 :: Bool
+    optOptimize :: Bool
   }
   deriving (Eq, Generic, NFData)
 
@@ -33,8 +31,7 @@ defaultOptions =
   Options
     { optFieldInfo = gf181Info,
       optConstProp = True,
-      optOptimize = True,
-      optDisableTestingOnO0 = False
+      optOptimize = True
     }
 
 buildOptionsWithFieldType :: FieldType -> IO Options

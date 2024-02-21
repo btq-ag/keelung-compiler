@@ -6,7 +6,6 @@ import Control.Monad
 import Data.Field.Galois (Binary, Prime)
 import Keelung hiding (compile)
 import Keelung.Compiler.Error (Error (..))
-import Keelung.Compiler.Options
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver.Monad qualified as Solver
 import Test.Compilation.Util
@@ -69,10 +68,7 @@ tests =
 
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
-          forM_ [gf181, Prime 17] $ \field -> do
-            let options = defaultOptions {optDisableTestingOnO0 = True}
-            testCompilerWithOpts options field (program (fromIntegral divisor)) [dividend] [] expected
-          forM_ [Binary 7] $ \field -> do
+          forM_ [gf181, Prime 17, Binary 7] $ \field -> do
             testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
 
       it "constant dividend / constant divisor" $ do
@@ -83,10 +79,7 @@ tests =
               return (dividend, divisor)
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
-          forM_ [gf181, Prime 17] $ \field -> do
-            let options = defaultOptions {optDisableTestingOnO0 = True}
-            testCompilerWithOpts options field (program dividend divisor) [] [] expected
-          forM_ [Binary 7] $ \field -> do
+          forM_ [gf181, Prime 17, Binary 7] $ \field -> do
             testCompiler field (program dividend divisor) [] [] expected
 
       describe "statements" $ do
