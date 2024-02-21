@@ -35,39 +35,43 @@ import Prelude hiding (lookup)
 -- | Key: start of an interval
 --   Value: (end of the interval, count of the interval)
 --    invariant: no two intervals overlap
-newtype IntervalSet = IntervalSet (IntMap (Int, Int)) deriving (Eq, Generic)
+newtype IntervalSet n = IntervalSet (IntMap (Int, n)) deriving (Eq, Generic)
 
-instance Show IntervalSet where
+instance (Eq n, Show n, Num n) => Show (IntervalSet n) where
   show (IntervalSet xs) =
     showList'
       $ map
         ( \(start, (end, count)) ->
-            if end - start == 1 && count > 0
-              then show start <> "(" <> show count <> ")"
-              else show start <> " ~ " <> show (end - 1) <> "(" <> show count <> ")"
+            if end - start == 1 && count /= 0
+              then (if count == 1 then "" else show count) <> "$" <> show start
+              else
+                ( if count == 1
+                    then "$" <> show start <> " ~ $" <> show (end - 1)
+                    else show count <> "($" <> show start <> " ~ $" <> show (end - 1) <> ")"
+                )
         )
       $ IntMap.toList xs
 
-instance NFData IntervalSet
+instance (NFData n) => NFData (IntervalSet n)
 
 type Interval = (Int, Int) -- (start, end)
 
 -- | O(1): Create an empty interval set
-new :: IntervalSet
+new :: IntervalSet n
 new = IntervalSet mempty
 
 -- | O(min(n, W)): Adjust the count of an interval.
-adjust :: Interval -> Int -> IntervalSet -> IntervalSet
+adjust :: (Num n, Eq n) => Interval -> n -> IntervalSet n -> IntervalSet n
 adjust interval count (IntervalSet xs) =
   let actions = calculateAction interval count (IntervalSet xs)
    in executeActions actions (IntervalSet xs)
 
 -- | O(n): Compute the total count of all intervals (for testing purposes)
-totalCount :: IntervalSet -> Int
-totalCount (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, count) -> acc + count * (end - start)) 0 xs
+totalCount :: (Num n) => IntervalSet n -> n
+totalCount (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, count) -> acc + count * fromIntegral (end - start)) 0 xs
 
 -- | O(n). To an IntervalTable
-toIntervalTable :: Int -> IntervalSet -> IntervalTable
+toIntervalTable :: Int -> IntervalSet Int -> IntervalTable
 toIntervalTable domainSize (IntervalSet intervals) =
   let FoldState table occupiedSize = IntMap.foldlWithKey' step (FoldState mempty 0) intervals
    in IntervalTable domainSize occupiedSize table
@@ -79,26 +83,26 @@ toIntervalTable domainSize (IntervalSet intervals) =
         (occupiedSize + end - start)
 
 -- | O(min(n, W)): Look up the count of a variable in the interval set
-lookup :: IntervalSet -> Int -> Maybe Int
+lookup :: IntervalSet n -> Int -> Maybe n
 lookup (IntervalSet xs) x = case IntMap.lookupLE x xs of
   Nothing -> Nothing
   Just (_, (end, count)) -> if x < end then Just count else Nothing
 
 -- | O(min(n, W)): Check if a variable occurred (i.e. count /= 0) in the interval set
-member :: IntervalSet -> Int -> Bool
+member :: (Eq n, Num n) => IntervalSet n -> Int -> Bool
 member (IntervalSet xs) x = case IntMap.lookupLE x xs of
   Nothing -> False
   Just (_, (end, count)) -> x < end && count /= 0
 
 -- | Given an interval, return a list of intervals that occurred (i.e. count /= 0) in this interval
-intervalsWithin :: IntervalSet -> (Int, Int) -> Seq (Int, Int)
+intervalsWithin :: (Eq n, Num n) => IntervalSet n -> (Int, Int) -> Seq (Int, Int)
 intervalsWithin (IntervalSet xs) (start, end) =
   let (_, rest) = split (IntervalSet xs) start
       (IntervalSet middle, _) = split rest end
    in Seq.fromList $ map (\(start', (end', _)) -> (start', end')) $ IntMap.toList middle
 
 -- | Split an IntervalSet into two at a given point
-split :: IntervalSet -> Int -> (IntervalSet, IntervalSet)
+split :: (Eq n, Num n) => IntervalSet n -> Int -> (IntervalSet n, IntervalSet n)
 split (IntervalSet xs) pos =
   let -- split the map into three parts: before "pos", at "pos", after "pos"
       (before, middle, after) = IntMap.splitLookup pos xs
@@ -121,10 +125,10 @@ split (IntervalSet xs) pos =
 --      1. no two intervals overlap
 --      2. no interval has zero length
 --      3. no interval has 0 count
-isValid :: IntervalSet -> Bool
+isValid :: (Eq n, Num n) => IntervalSet n -> Bool
 isValid (IntervalSet xs) = fst $ IntMap.foldlWithKey' step (True, 0) xs
   where
-    step :: (Bool, Int) -> Int -> (Int, Int) -> (Bool, Int)
+    step :: (Eq n, Num n) => (Bool, Int) -> Int -> (Int, n) -> (Bool, Int)
     step (valid, previousEnd) start (end, count) =
       ( valid && start < end && previousEnd <= start && count /= 0,
         end
@@ -133,16 +137,16 @@ isValid (IntervalSet xs) = fst $ IntMap.foldlWithKey' step (True, 0) xs
 --------------------------------------------------------------------------------
 
 -- | Actions to be executed on an interval set
-data Action
+data Action n
   = InsertNew
       Interval -- interval to be inserted
-      Int -- count
+      n -- count
   | RemoveExisting
       (Int, Int) -- interval of existing interval to be removed
   deriving (Eq, Show)
 
 -- | Calculate the actions needed to insert an interval into an interval set
-calculateAction :: Interval -> Int -> IntervalSet -> [Action]
+calculateAction :: (Num n) => Interval -> n -> IntervalSet n -> [Action n]
 calculateAction inserted@(start, end) count (IntervalSet xs) = case IntMap.lookupLT start xs of
   Nothing ->
     --   inserted      ├─────────────────┤
@@ -184,7 +188,7 @@ calculateAction inserted@(start, end) count (IntervalSet xs) = case IntMap.looku
              in [removeExisting, insertPart1, insertPart2, insertPart3]
 
 -- | Calculate the actions needed to insert an interval into an interval set with existing intervals after it
-calculateActionAfter :: Interval -> Int -> IntervalSet -> [Action]
+calculateActionAfter :: (Num n) => Interval -> n -> IntervalSet n -> [Action n]
 calculateActionAfter inserted@(start, end) count (IntervalSet xs) = case IntMap.lookupGE start xs of
   Nothing ->
     -- inserted          ├─────────────────┤
@@ -221,10 +225,10 @@ calculateActionAfter inserted@(start, end) count (IntervalSet xs) = case IntMap.
          in removeExisting : insertPart1 : insertPart2 : restActions
 
 -- | Execute a list of actions on an interval set
-executeActions :: [Action] -> IntervalSet -> IntervalSet
+executeActions :: (Eq n, Num n) => [Action n] -> IntervalSet n -> IntervalSet n
 executeActions actions (IntervalSet set) = IntervalSet $ List.foldl' step set actions
   where
-    step :: IntMap Interval -> Action -> IntMap Interval
+    step :: (Eq n, Num n) => IntMap (Int, n) -> Action n -> IntMap (Int, n)
     step xs (InsertNew (start, end) count) =
       if start == end || count == 0
         then xs

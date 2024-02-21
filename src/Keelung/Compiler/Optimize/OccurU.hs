@@ -31,7 +31,7 @@ import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (null)
 
-newtype OccurU = OccurU (IntMap IntervalSet) -- IntMap of (width, IntervalSet) pairs
+newtype OccurU = OccurU (IntMap (IntervalSet Int)) -- IntMap of (width, IntervalSet) pairs
   deriving (Eq, Generic)
 
 instance NFData OccurU
@@ -90,7 +90,7 @@ toIntervalTables (OccurU xs) = IntMap.mapWithKey IntervalSet.toIntervalTable xs
 toIntervalTablesWithOffsets :: OccurU -> IntMap (Int, IntervalTable)
 toIntervalTablesWithOffsets (OccurU xs) = snd $ IntMap.foldlWithKey' step (0, mempty) xs
   where
-    step :: (Int, IntMap (Int, IntervalTable)) -> Width -> IntervalSet -> (Int, IntMap (Int, IntervalTable))
+    step :: (Int, IntMap (Int, IntervalTable)) -> Width -> IntervalSet Int -> (Int, IntMap (Int, IntervalTable))
     step (offset, acc) width intervalSet =
       let table = IntervalSet.toIntervalTable width intervalSet
        in (offset + IntervalTable.size table, IntMap.insert width (offset, table) acc)
@@ -120,7 +120,7 @@ adjust amount width var (start, end) (OccurU xs) = OccurU $ IntMap.alter increas
     interval' :: (Int, Int)
     interval' = (width * var + start, width * var + end)
 
-    increase' :: Maybe IntervalSet -> Maybe IntervalSet
+    increase' :: Maybe (IntervalSet Int) -> Maybe (IntervalSet Int)
     increase' Nothing = Just $ IntervalSet.adjust interval' amount IntervalSet.new
     increase' (Just intervalSet) = Just $ IntervalSet.adjust interval' amount intervalSet
 

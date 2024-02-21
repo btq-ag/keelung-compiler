@@ -17,7 +17,7 @@ tests = describe "Interval Sets" $ do
   describe "IntervalSet.adjust" $ do
     it "should preserve invariants after applying randomized adjustments" $ do
       property $ \operations -> do
-        let intervals = foldr applyOperation IntervalSet.new operations
+        let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
         IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
         IntervalSet.isValid intervals `shouldBe` True
 
@@ -33,7 +33,7 @@ tests = describe "Interval Sets" $ do
   describe "IntervalSet.intervalsWithin" $ do
     it "should result in correct intervals" $ do
       property $ \(operations, Interval interval) -> do
-        let xs = foldr applyOperation IntervalSet.new (operations :: [Operation])
+        let xs = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
         let intervals = IntervalSet.intervalsWithin xs interval
         let withinIntervals x = any (\(start, end) -> x >= start && x < end) intervals
         -- all points within the computed intervals should be members of the interval set
@@ -55,34 +55,34 @@ instance Arbitrary Interval where
 --------------------------------------------------------------------------------
 
 -- | Datatype for testing operations on interval sets
-data Operation = Adjust (Int, Int) Int deriving (Eq, Show)
+data Operation n = Adjust (Int, Int) n deriving (Eq, Show)
 
 -- | Generate a random operation
-instance Arbitrary Operation where
+instance (Num n) => Arbitrary (Operation n) where
   arbitrary = do
     Interval interval <- arbitrary
     amount <- chooseInt (-100, 100)
-    pure $ Adjust interval amount
+    pure $ Adjust interval (fromIntegral amount)
 
 -- | Apply an operation to an interval set
-applyOperation :: Operation -> IntervalSet -> IntervalSet
+applyOperation :: (Num n, Eq n) => Operation n -> IntervalSet n -> IntervalSet n
 applyOperation (Adjust interval amount) = IntervalSet.adjust interval amount
 
 -- | Calculate the total count of an operation
-countOfOperation :: Operation -> Int
-countOfOperation (Adjust (start, end) amount) = amount * (end - start)
+countOfOperation :: (Num n) => Operation n -> n
+countOfOperation (Adjust (start, end) amount) = amount * fromIntegral (end - start)
 
 -- | Calculate the total size of an operation
-sizeOfOperation :: Operation -> Int
+sizeOfOperation :: (Eq n, Num n) => Operation n -> Int
 sizeOfOperation (Adjust (start, end) amount) = if amount == 0 then 0 else end - start
 
 --------------------------------------------------------------------------------
 
 -- | Datatype for testing operations on non-overlapping interval sets
-data NonOverlappingOperations = NonOverlappingOperations [Operation] [Int] deriving (Eq, Show)
+data NonOverlappingOperations n = NonOverlappingOperations [Operation n] [Int] deriving (Eq, Show)
 
 -- | Generate a random operation
-instance Arbitrary NonOverlappingOperations where
+instance (Num n) => Arbitrary (NonOverlappingOperations n) where
   arbitrary = do
     numberOfEntries <- chooseInt (0, 20)
     entries <-
@@ -105,8 +105,8 @@ instance Arbitrary NonOverlappingOperations where
         len <- chooseInt (0, 10)
         let end = start + len
         amount <- chooseInt (0, 10)
-        pure (Adjust (start, end) amount)
+        pure (Adjust (start, end) (fromIntegral amount))
 
-memberOfNonOverlappingOperations :: NonOverlappingOperations -> Int -> Bool
+memberOfNonOverlappingOperations :: (Eq n, Num n) => NonOverlappingOperations n -> Int -> Bool
 memberOfNonOverlappingOperations (NonOverlappingOperations operations _) point =
   any (\(Adjust (start, end) amount) -> amount /= 0 && start <= point && point < end) operations
