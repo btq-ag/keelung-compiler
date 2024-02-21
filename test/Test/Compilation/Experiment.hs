@@ -3,12 +3,9 @@
 
 module Test.Compilation.Experiment where
 
-import Control.Monad (forM_)
 import Keelung
-import Keelung.Data.U qualified as U
 import Test.Compilation.Util
 import Test.Hspec
-import Test.QuickCheck
 
 -- import Test.QuickCheck
 
@@ -32,16 +29,10 @@ tests = describe "Experiment" $ do
   --       testCompiler (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
   --       testCompiler (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
 
-  describe "Carry-less Multiplication" $ do
-    it "1 variable / 1 constant" $ do
-      let program y = do
-            x <- input Public
-            return $ x .*. fromInteger y :: Comp (UInt 8)
-      let genPair = do
-            x <- choose (0, 255)
-            return (x, 0)
-      forAll genPair $ \(x, y) -> do
-        let expected = [toInteger (U.clMul (U.new 8 x) (U.new 8 y))]
-        forM_ [gf181, Prime 17] $ \field -> do
-          debug field (program (fromIntegral y))
-          testCompiler field (program (fromIntegral y)) [toInteger x] [] expected
+  it "constant dividend / constant divisor" $ do
+    let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
+    let dividend = 49
+    let divisor = 2
+    let expected = [dividend `div` divisor, dividend `mod` divisor]
+    debug (Binary 7) (program dividend divisor)
+    testCompiler (Binary 7) (program dividend divisor) [] [] expected

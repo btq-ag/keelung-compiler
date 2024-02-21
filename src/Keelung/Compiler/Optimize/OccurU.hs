@@ -10,6 +10,7 @@ module Keelung.Compiler.Optimize.OccurU
     -- fromIntervalSet,
     toIntervalTables,
     toIntervalTablesWithOffsets,
+    maskSlice,
     increase,
     decrease,
   )
@@ -18,6 +19,7 @@ where
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Sequence (Seq)
 import GHC.Generics (Generic)
 import Keelung (Var, Width)
 import Keelung.Compiler.Util
@@ -25,6 +27,8 @@ import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.IntervalTable (IntervalTable)
 import Keelung.Data.IntervalTable qualified as IntervalTable
+import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (null)
 
 newtype OccurU = OccurU (IntMap IntervalSet) -- IntMap of (width, IntervalSet) pairs
@@ -61,19 +65,19 @@ new = OccurU mempty
 member :: OccurU -> Width -> Var -> Int -> Bool
 member (OccurU xs) width var index = case IntMap.lookup width xs of
   Nothing -> False
-  Just intervals -> case IntervalSet.lookup intervals (width * var + index) of 
+  Just intervals -> case IntervalSet.lookup intervals (width * var + index) of
     Nothing -> False
     Just count -> count > 0
 
--- -- | Given a Slice, return a list of Slices that are used in this OccurU
--- maskSlice :: OccurU -> Slice -> [Slice]
--- maskSlice (OccurU xs) slice = case IntMap.lookup (widthOf (Slice.sliceRefU slice)) xs of
---   Nothing -> []
---   Just intervals -> _
-
--- | O(min(n, W)): Get the total number of bits used in this OccurU
--- size :: OccurU -> Int
--- size (OccurU xs) = IntMap.foldl' (\acc varMap -> acc + IntMap.foldl' (\acc' (n, _) -> acc' + n) 0 varMap) 0 xs
+-- | Given a Slice, return a list of Slices that are used in this OccurU
+maskSlice :: OccurU -> Width -> Var -> Slice -> Seq Slice
+maskSlice (OccurU xs) width var slice =
+  case IntMap.lookup width xs of
+    Nothing -> mempty
+    Just intervalSet ->
+      let interval = ((width * var) + Slice.sliceStart slice, (width * var) + Slice.sliceEnd slice)
+          intervals = IntervalSet.intervalsWithin intervalSet interval
+       in fmap (\(start, end) -> slice {Slice.sliceStart = start - (width * var), Slice.sliceEnd = end - (width * var)}) intervals
 
 -- | O(min(n, W)). Test whether a OccurU is empty
 null :: OccurU -> Bool

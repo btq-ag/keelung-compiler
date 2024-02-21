@@ -21,7 +21,6 @@ where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.State
-import Data.Bits qualified
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict (Map)
@@ -158,14 +157,10 @@ toConstraints occurrence sliceShouldBeKept = fold step mempty
     convert slice segment =
       case segment of
         SliceLookup.Constant val ->
-          -- only export part of slice that is used, TODO: optimize this
           case sliceRefU slice of
             RefUX width var ->
-              Seq.fromList
-                [ CSliceVal (slice {sliceStart = sliceStart slice + i, sliceEnd = sliceStart slice + i + 1}) (if Data.Bits.testBit val i then 1 else 0)
-                  | i <- [0 .. widthOf slice - 1],
-                    OccurU.member occurrence width var (sliceStart slice + i)
-                ]
+              -- only export part of slice that is used
+              fmap (\subSlice -> CSliceVal subSlice (toInteger val)) (OccurU.maskSlice occurrence width var slice)
             _ ->
               -- pinned reference, all bits needs to be exported
               Seq.singleton (CSliceVal slice (toInteger val))
