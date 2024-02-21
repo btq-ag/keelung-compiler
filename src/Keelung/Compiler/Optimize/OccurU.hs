@@ -63,6 +63,12 @@ member (OccurU xs) width var index = case IntMap.lookup width xs of
   Nothing -> False
   Just intervals -> IntervalSet.member intervals (width * var + index)
 
+-- -- | Given a Slice, return a list of Slices that are used in this OccurU
+-- maskSlice :: OccurU -> Slice -> [Slice]
+-- maskSlice (OccurU xs) slice = case IntMap.lookup (widthOf (Slice.sliceRefU slice)) xs of
+--   Nothing -> []
+--   Just intervals -> _
+
 -- | O(min(n, W)): Get the total number of bits used in this OccurU
 -- size :: OccurU -> Int
 -- size (OccurU xs) = IntMap.foldl' (\acc varMap -> acc + IntMap.foldl' (\acc' (n, _) -> acc' + n) 0 varMap) 0 xs

@@ -1,12 +1,25 @@
 -- For RefU Limb segement reference counting
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Data.IntervalSet (IntervalSet, new, adjust, toIntervalTable, count, member, isValid) where
+module Keelung.Data.IntervalSet
+  ( IntervalSet,
+    new,
+    adjust,
+    toIntervalTable,
+    totalCount,
+    intervalsWithin,
+    split,
+    member,
+    isValid,
+  )
+where
 
 import Control.DeepSeq (NFData)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.List qualified as List
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Compiler.Util (showList')
 import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
@@ -20,8 +33,8 @@ instance Show IntervalSet where
   show (IntervalSet xs) =
     showList'
       $ map
-        ( \(start, (end, _count)) ->
-            if end - start == 1
+        ( \(start, (end, count)) ->
+            if end - start == 1 && count > 0
               then show start
               else show start <> " ~ " <> show (end - 1)
         )
@@ -42,8 +55,8 @@ adjust interval amount (IntervalSet xs) =
    in executeActions actions (IntervalSet xs)
 
 -- | O(n): Compute the total count of all intervals (for testing purposes)
-count :: IntervalSet -> Int
-count (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
+totalCount :: IntervalSet -> Int
+totalCount (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, amount) -> acc + amount * (end - start)) 0 xs
 
 -- | O(n). To an IntervalTable
 toIntervalTable :: Int -> IntervalSet -> IntervalTable
@@ -61,7 +74,33 @@ toIntervalTable domainSize (IntervalSet intervals) =
 member :: IntervalSet -> Int -> Bool
 member (IntervalSet xs) x = case IntMap.lookupLE x xs of
   Nothing -> False
-  Just (_, (end, _)) -> x < end
+  Just (_, (end, count)) -> x < end && count > 0
+
+-- | Given an interval, return a list of intervals that occurred (i.e. count > 0) in this interval
+intervalsWithin :: IntervalSet -> (Int, Int) -> Seq (Int, Int)
+intervalsWithin (IntervalSet xs) (start, end) =
+  let (_, rest) = split (IntervalSet xs) start
+      (IntervalSet middle, _) = split rest end
+   in Seq.fromList $ map (\(start', (end', _)) -> (start', end')) $ IntMap.toList middle
+
+-- | Split an IntervalSet into two at a given point
+split :: IntervalSet -> Int -> (IntervalSet, IntervalSet)
+split (IntervalSet xs) pos =
+  let -- split the map into three parts: before "pos", at "pos", after "pos"
+      (before, middle, after) = IntMap.splitLookup pos xs
+   in case middle of
+        Just (moddleEnd, middleCount) ->
+          -- there happens to be an interval at "pos"
+          (IntervalSet before, IntervalSet $ IntMap.insert pos (moddleEnd, middleCount) after)
+        Nothing ->
+          -- see if there is an interval in the "before" part that overlaps with "pos"
+          case IntMap.maxViewWithKey before of
+            Just ((start, (end, count)), beforeBefore) ->
+              if end > pos && count > 0
+                then (IntervalSet (IntMap.insert start (pos, count) beforeBefore), IntervalSet (IntMap.insert pos (end, count) after))
+                else (IntervalSet before, IntervalSet after)
+            Nothing ->
+              (IntervalSet mempty, IntervalSet xs) -- no interval before "pos"
 
 -- | O(n): Check if these intervals are valid (for testing purposes)
 --   Invariants:
