@@ -61,7 +61,9 @@ new = OccurU mempty
 member :: OccurU -> Width -> Var -> Int -> Bool
 member (OccurU xs) width var index = case IntMap.lookup width xs of
   Nothing -> False
-  Just intervals -> IntervalSet.member intervals (width * var + index)
+  Just intervals -> case IntervalSet.lookup intervals (width * var + index) of 
+    Nothing -> False
+    Just count -> count > 0
 
 -- -- | Given a Slice, return a list of Slices that are used in this OccurU
 -- maskSlice :: OccurU -> Slice -> [Slice]

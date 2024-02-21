@@ -30,29 +30,17 @@ tests = describe "Interval Sets" $ do
         forM_ points $ \point -> do
           IntervalTable.member (point, point + 1) table `shouldBe` memberOfNonOverlappingOperations (NonOverlappingOperations operations points) point
 
-  -- describe "IntervalSet.intervalsWithin" $ do
-  --   it "should result in correct intervals" $ do
-  --     property $ \(operations, Interval interval) -> do
-  --       let xs = foldr applyOperation IntervalSet.new (operations :: [Operation])
-  --       let intervals = IntervalSet.intervalsWithin xs interval
-  --       let withinIntervals x = any (\(start, end) -> x >= start && x < end) intervals
-  --       let (left, rest) = IntervalSet.split xs (fst interval)
-  --       let (middle, right) = IntervalSet.split rest (snd interval)
-  --       putStrLn ""
-  --       putStrLn $ "interval: " <> show interval
-  --       putStrLn $ "set:      " <> show xs
-  --       putStrLn $ "left:     " <> show left
-  --       putStrLn $ "middle    " <> show middle
-  --       putStrLn $ "right:    " <> show right
-  --       putStrLn $ "result:   " <> show intervals
-  --       -- all points within the computed intervals should be members of the interval set
-  --       forM_ [fst interval .. snd interval - 1] $ \point -> do
-  --         let expected = IntervalSet.member xs point
-  --         let actual = withinIntervals point
-  --         putStrLn $ "  at       @" <> show point
-  --         putStrLn $ "  expected  " <> show expected
-  --         putStrLn $ "  actual    " <> show actual
-  --         expected `shouldBe` actual
+  describe "IntervalSet.intervalsWithin" $ do
+    it "should result in correct intervals" $ do
+      property $ \(operations, Interval interval) -> do
+        let xs = foldr applyOperation IntervalSet.new (operations :: [Operation])
+        let intervals = IntervalSet.intervalsWithin xs interval
+        let withinIntervals x = any (\(start, end) -> x >= start && x < end) intervals
+        -- all points within the computed intervals should be members of the interval set
+        forM_ [fst interval .. snd interval - 1] $ \point -> do
+          let expected = IntervalSet.member xs point
+          let actual = withinIntervals point
+          expected `shouldBe` actual
 
 --------------------------------------------------------------------------------
 
