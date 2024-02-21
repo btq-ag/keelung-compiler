@@ -158,8 +158,8 @@ tests = describe "UInt" $ do
       (cs, cs') <- executeGF181 $ do
         x <- input Public :: Comp (UInt 4)
         return $ x * 4
-      cs `shouldHaveSize` 18
-      cs' `shouldHaveSize` 13
+      cs `shouldHaveSize` 16
+      cs' `shouldHaveSize` 11
 
     -- TODO: should've been just 4
     it "constant / constant" $ do

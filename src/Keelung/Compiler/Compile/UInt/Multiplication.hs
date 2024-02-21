@@ -89,7 +89,9 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       -- if the constant is 1, then the resulting limbs should be the same as the input
       return (LimbColumn.new 0 [x], mempty)
     Left constant -> do
-      upperLimb <- allocLimb currentLimbWidth
+      -- the total amount of bits to represent the product = currentLimbWidth * (1 + ceil(lg(constant)))
+      let upperLimbWidth = ceiling (logBase 2 (fromIntegral constant :: Double)) :: Int
+      upperLimb <- allocLimb upperLimbWidth
       lowerLimb <- allocLimb currentLimbWidth
       writeAddWithLimbs
         (a * constant)

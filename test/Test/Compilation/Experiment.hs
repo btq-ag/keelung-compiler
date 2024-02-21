@@ -30,9 +30,9 @@ tests = describe "Experiment" $ do
   --       testCompiler (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
 
   it "constant dividend / constant divisor" $ do
-    let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
-    let dividend = 49
-    let divisor = 2
-    let expected = [dividend `div` divisor, dividend `mod` divisor]
-    debug (Binary 7) (program dividend divisor)
-    testCompiler (Binary 7) (program dividend divisor) [] [] expected
+    let program = do 
+          x <- input Public :: Comp (UInt 8)
+          -- y <- input Public :: Comp (UInt 8)
+          -- assert (x `eq` 3)
+          return (x + 3)
+    debug gf181 program
