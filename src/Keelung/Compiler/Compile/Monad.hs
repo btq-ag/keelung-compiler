@@ -4,6 +4,7 @@ import Control.Arrow (right)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
@@ -213,6 +214,9 @@ writeMulWithLimbs as bs cs = case (uncurry PolyL.fromLimbs as, uncurry PolyL.fro
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyL (PolyL.fromRefs c as)
+
+writeAddWithSlices :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> M n ()
+writeAddWithSlices constant refs slices = writeAddWithLimbs constant refs (map (first Slice.toLimb) slices)
 
 writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> M n ()
 writeAddWithLimbs constant refs limbs = case PolyL.fromLimbs constant limbs of

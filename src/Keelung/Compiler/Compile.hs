@@ -24,6 +24,7 @@ import Keelung.Data.LC
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Syntax (widthOf)
 
 --------------------------------------------------------------------------------
@@ -68,25 +69,19 @@ compileSideEffect (AssignmentF var val) = do
 compileSideEffect (AssignmentU width var val) = compileExprU (RefUX width var) val
 compileSideEffect (ToField width varU varF) = do
   fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
-  -- convert the RefU to a bunch of Limbs
-  let limbs = Limb.refUToLimbs fieldWidth (RefUX width varU)
-  -- only convert the first Limb to a RefF because that's the maximum width of a RefF allowed
-  case limbs of
-    [] -> writeRefFVal (RefFX varF) 0
-    (limb : _) -> writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 1)]
+  -- only convert the Slice of length "width `min` fieldWidth" to a RefF because that's the maximum width allowed by a RefF
+  let slice = Slice.Slice (RefUX width varU) 0 (width `min` fieldWidth)
+  writeAddWithSlices 0 [(F (RefFX varF), -1)] [(slice, 1)]
 compileSideEffect (ToUInt width varU varF) = do
   fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
-
-  -- convert the RefU into `width` number of width-1 Limbs (for performance reasons of the optimizer)
-  let limbs = [Limb.new (RefUX width varU) 1 i (Left True) | i <- [0 .. width - 1]]
-
-  -- split the Limbs into two groups: the first `min width fieldWidth` Limbs and the rest
-  let (toF, rest) = splitAt (width `min` fieldWidth) limbs
-
-  -- only matching the first `width` Limbs with the RefF
-  writeAddWithLimbs 0 [(F (RefFX varF), -1)] [(limb, 2 ^ Limb.lmbOffset limb) | limb <- toF]
-  -- assing the rest of the Limbs as 0
-  forM_ rest $ \lmb -> writeLimbVal lmb 0
+  -- represent "varU" as the sum of 2 Slices
+  let actualWidth = width `min` fieldWidth
+  let toF = Slice.Slice (RefUX width varU) 0 actualWidth
+  let rest = Slice.Slice (RefUX width varU) actualWidth width
+  -- varF = toF + 2^actualWidth * rest
+  writeAddWithSlices 0 [(F (RefFX varF), -1)] [(toF, 1), (rest, 2 ^ actualWidth)]
+  -- rest = 0
+  writeSliceVal rest 0
 compileSideEffect (BitsToUInt width varU bits) = do
   let refU = RefUX width varU
   forM_ (zip [0 .. width - 1] bits) $ \(i, bit) -> do

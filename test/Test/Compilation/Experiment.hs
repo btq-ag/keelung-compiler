@@ -6,6 +6,7 @@ module Test.Compilation.Experiment where
 import Keelung
 import Test.Compilation.Util
 import Test.Hspec
+import Test.QuickCheck
 
 -- import Test.QuickCheck
 
@@ -29,10 +30,29 @@ tests = describe "Experiment" $ do
   --       testCompiler (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
   --       testCompiler (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
 
-  it "constant dividend / constant divisor" $ do
-    let program = do 
-          x <- input Public :: Comp (UInt 8)
-          -- y <- input Public :: Comp (UInt 8)
-          -- assert (x `eq` 3)
-          return (x + 3)
-    debug gf181 program
+  describe "toField" $ do
+    describe "from variable" $ do
+      let program = do
+            x <- input Public :: Comp (UInt 8)
+            toField x
+      it "GF181" $ do
+        debug gf181 program
+        -- forAll (chooseInteger (-100, 511)) $ \n -> do
+        --   testCompiler gf181 program [n] [] [n `mod` 256]
+      it "Prime 2" $ do
+        forAll (chooseInteger (-10, 4)) $ \n -> do
+          testCompiler (Prime 2) program [n] [] [n `mod` 2]
+      it "Binary 7" $ do
+        forAll (chooseInteger (-10, 8)) $ \n -> do
+          testCompiler (Binary 7) program [n] [] [n `mod` 4]
+    describe "from constant" $ do
+      let program n = toField (n :: UInt 8)
+      it "GF181" $ do
+        forAll (chooseInteger (-100, 511)) $ \n -> do
+          testCompiler gf181 (program (fromInteger n)) [] [] [n `mod` 256]
+      it "Prime 2" $ do
+        forAll (chooseInteger (-10, 4)) $ \n -> do
+          testCompiler (Prime 2) (program (fromInteger n)) [] [] [n `mod` 2]
+      it "Binary 7" $ do
+        forAll (chooseInteger (-10, 8)) $ \n -> do
+          testCompiler (Binary 7) (program (fromInteger n)) [] [] [n `mod` 4]
