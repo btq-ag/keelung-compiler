@@ -67,7 +67,7 @@ tests = describe "Statement" $ do
         forAll (chooseInteger (0, 3)) $ \n -> do
           testCompiler (Binary 7) (program (fromInteger n)) [] [] [n `mod` 4]
 
-  describe "pack" $ do
+  describe "fromBools" $ do
     it "from variables" $ do
       let program = do
             xs <- inputList Public 8
@@ -92,8 +92,8 @@ tests = describe "Statement" $ do
       property $ \(x :: Word) -> do
         let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
             expected = foldr set (0 :: Word) $ [ (i, Data.Bits.testBit x i) | i <- [0 .. 1] ]
-        forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-          testCompiler field program [fromIntegral x] [] [fromIntegral expected]
+        forM_ [gf181, Prime 5, Binary 7] $ \field -> do
+          testCompiler field program [fromIntegral (x `mod` 4)] [] [fromIntegral expected]
 
       -- let x = 2 :: Word
       -- let set (i, b) x' = if b then Data.Bits.setBit x' i else x'

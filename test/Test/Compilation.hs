@@ -3,6 +3,7 @@ module Test.Compilation (tests, run) where
 import Test.Compilation.Boolean qualified
 import Test.Compilation.Field qualified
 import Test.Compilation.Misc qualified
+import Test.Compilation.Statement qualified
 import Test.Compilation.UInt qualified
 import Test.Hspec
 
@@ -16,3 +17,4 @@ tests = do
     Test.Compilation.Boolean.tests
     Test.Compilation.UInt.tests
     Test.Compilation.Misc.tests
+    Test.Compilation.Statement.tests

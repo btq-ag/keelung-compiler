@@ -3,12 +3,10 @@
 
 module Test.Compilation.Experiment where
 
+import Data.Bits qualified
 import Keelung
 import Test.Compilation.Util
 import Test.Hspec
-import Test.QuickCheck
-
--- import Test.QuickCheck
 
 run :: IO ()
 run = hspec tests
@@ -30,29 +28,32 @@ tests = describe "Experiment" $ do
   --       testCompiler (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral (x `mod` 4)]
   --       testCompiler (Binary 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral (x `mod` 2)]
 
-  describe "toField" $ do
-    describe "from variable" $ do
+  describe "fromBools" $ do
+    -- it "from variables" $ do
+    --   let program = do
+    --         xs <- inputList Public 8
+    --         pack xs :: Comp (UInt 8)
+    --   property $ \(x :: Word) -> do
+    --     let bits = map (\b -> if b then 1 else 0) $ Data.Bits.testBit x <$> [0 .. 7]
+    --     testCompiler gf181 program bits [] [fromIntegral x]
+    --     testCompiler (Prime 2) program bits [] [fromIntegral x]
+    --     testCompiler (Binary 7) program bits [] [fromIntegral x]
+    -- it "from constants" $ do
+    --   let program xs = do
+    --         pack xs :: Comp (UInt 8)
+    --   property $ \(x :: Word) -> do
+    --     let bits = map (\b -> if b then true else false) $ Data.Bits.testBit x <$> [0 .. 7]
+    --     testCompiler gf181 (program bits) [] [] [fromIntegral x]
+    --     testCompiler (Prime 2) (program bits) [] [] [fromIntegral x]
+    --     testCompiler (Binary 7) (program bits) [] [] [fromIntegral x]
+
+    it "from Field element" $ do
       let program = do
-            x <- input Public :: Comp (UInt 8)
-            toField x
-      it "GF181" $ do
-        debug gf181 program
-        -- forAll (chooseInteger (-100, 511)) $ \n -> do
-        --   testCompiler gf181 program [n] [] [n `mod` 256]
-      it "Prime 2" $ do
-        forAll (chooseInteger (-10, 4)) $ \n -> do
-          testCompiler (Prime 2) program [n] [] [n `mod` 2]
-      it "Binary 7" $ do
-        forAll (chooseInteger (-10, 8)) $ \n -> do
-          testCompiler (Binary 7) program [n] [] [n `mod` 4]
-    describe "from constant" $ do
-      let program n = toField (n :: UInt 8)
-      it "GF181" $ do
-        forAll (chooseInteger (-100, 511)) $ \n -> do
-          testCompiler gf181 (program (fromInteger n)) [] [] [n `mod` 256]
-      it "Prime 2" $ do
-        forAll (chooseInteger (-10, 4)) $ \n -> do
-          testCompiler (Prime 2) (program (fromInteger n)) [] [] [n `mod` 2]
-      it "Binary 7" $ do
-        forAll (chooseInteger (-10, 8)) $ \n -> do
-          testCompiler (Binary 7) (program (fromInteger n)) [] [] [n `mod` 4]
+            x' <- input Public
+            x <- toUInt 2 x' :: Comp (UInt 2)
+            pack [x !!! 0, x !!! 1] :: Comp (UInt 2)
+      let x = 2 :: Word
+      -- property $ \(x :: Word) -> do
+      let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
+          expected = foldr set (0 :: Word) $ [(i, Data.Bits.testBit x i) | i <- [0 .. 0]]
+      testCompiler (Prime 2) program [fromIntegral (x `mod` 2)] [] [fromIntegral expected]

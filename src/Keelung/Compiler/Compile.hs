@@ -21,7 +21,6 @@ import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
@@ -87,11 +86,7 @@ compileSideEffect (BitsToUInt width varU bits) = do
   forM_ (zip [0 .. width - 1] bits) $ \(i, bit) -> do
     result <- compileExprB bit
     case result of
-      Left (RefUBit refU2 j) -> do
-        let limb1 = Limb.new refU 1 i (Left True)
-        let limb2 = Limb.new refU2 1 j (Left True)
-        writeLimbEq limb1 limb2
-      -- writeAdd 0 [(B (RefUBit refU i), -1), (B var, 1)]
+      Left (RefUBit refU2 j) -> writeSliceEq (Slice.Slice refU i (i + 1)) (Slice.Slice refU2 j (j + 1))
       Left var -> writeAdd 0 [(B (RefUBit refU i), -1), (B var, 1)]
       Right True -> writeAdd 1 [(B (RefUBit refU i), -1)]
       Right False -> writeAdd 0 [(B (RefUBit refU i), 1)]
