@@ -5,8 +5,7 @@ module Keelung.Compiler.Compile.UInt
     assertLT,
     assertGTE,
     assertGT,
-    assertDivModUOld,
-    assertDivModUNew,
+    assertDivModU,
     assertCLDivModU,
   )
 where
@@ -151,8 +150,8 @@ _allocDoubleWidth (Right val) = return $ Right (U.mapWidth (* 2) val)
 --    1. dividend = divisor * quotient + remainder
 --    2. 0 ≤ remainder < divisor
 --    3. 0 < divisor
-assertDivModUNew :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
-assertDivModUNew width dividend divisor quotient remainder = do
+assertDivModU :: (GaloisField n, Integral n) => Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
+assertDivModU width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder
@@ -204,51 +203,23 @@ assertDivModUNew width dividend divisor quotient remainder = do
 --   assertLTE width a (c - 1)
 
 -- | Division with remainder on UInts
---    1. dividend = divisor * quotient + remainder
---    2. 0 ≤ remainder < divisor
---    3. 0 < divisor
-assertDivModUOld :: (GaloisField n, Integral n) => (Expr n -> M n ()) -> Width -> ExprU n -> ExprU n -> ExprU n -> ExprU n -> M n ()
-assertDivModUOld compileAssertion width dividend divisor quotient remainder = do
-  --    dividend = divisor * quotient + remainder
-  --  =>
-  --    divisor * quotient = dividend - remainder
-  dividendRef <- wireU dividend
-  divisorRef <- wireU divisor
-  quotientRef <- wireU quotient
-  remainderRef <- wireU remainder
+-- assertDivModUCC :: (GaloisField n, Integral n) => Width -> U -> U -> Either RefU U -> Either RefU U -> M n ()
+-- assertDivModUCC width dividend divisor quotient remainder = do
+--   -- 0 < divisor
+--   when (divisor == 0) $
+--     throwError $
+--       Error.AssertComparisonError (toInteger dividend) GT 0
 
-  case (dividendRef, divisorRef) of
-    (Right dividendVal, Right divisorVal) -> assertDivModUCC width dividendVal divisorVal quotientRef remainderRef
-    _ -> do
-      productDQ <- freshRefU width
-      compileMulU width productDQ divisorRef quotientRef
-      compileSub width productDQ dividendRef remainderRef
-
-      -- 0 ≤ remainder < divisor
-      compileAssertion $ ExprB (LTU remainder divisor)
-      -- 0 < divisor
-      assertGT width divisorRef 0
-      -- add hint for DivMod
-      addDivModHint dividendRef divisorRef quotientRef remainderRef
-
--- | Division with remainder on UInts
-assertDivModUCC :: (GaloisField n, Integral n) => Width -> U -> U -> Either RefU U -> Either RefU U -> M n ()
-assertDivModUCC width dividend divisor quotient remainder = do
-  -- 0 < divisor
-  when (divisor == 0) $
-    throwError $
-      Error.AssertComparisonError (toInteger dividend) GT 0
-
-  --    dividend = divisor * quotient + remainder
-  --  =>
-  --    divisor * quotient = dividend - remainder
-  productDQ <- freshRefU width
-  compileMulU width productDQ (Right divisor) quotient
-  compileSub width productDQ (Right dividend) remainder
-  -- 0 ≤ remainder < divisor
-  assertLT width remainder (toInteger divisor)
-  -- add hint for DivMod
-  addDivModHint (Right dividend) (Right divisor) quotient remainder
+--   --    dividend = divisor * quotient + remainder
+--   --  =>
+--   --    divisor * quotient = dividend - remainder
+--   productDQ <- freshRefU width
+--   compileMulU width productDQ (Right divisor) quotient
+--   compileSub width productDQ (Right dividend) remainder
+--   -- 0 ≤ remainder < divisor
+--   assertLT width remainder (toInteger divisor)
+--   -- add hint for DivMod
+--   addDivModHint (Right dividend) (Right divisor) quotient remainder
 
 -- | Carry-less division with remainder on UInts
 --    1. dividend = divisor .*. quotient .^. remainder
