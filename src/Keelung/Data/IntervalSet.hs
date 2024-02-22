@@ -224,16 +224,39 @@ normalize = IntervalSet . IntMap.fromDistinctAscList . normalizeList . IntMap.to
 -- | O(n): Check if these intervals are valid (for testing purposes)
 --   Invariants:
 --      1. no two intervals overlap
---      2. no interval has zero length
+--      2. no interval has 0 length
 --      3. no interval has 0 count
+--      4. adjacent intervals with the same count are be merged
 isValid :: (Eq n, Num n) => IntervalSet n -> Bool
-isValid (IntervalSet xs) = fst $ IntMap.foldlWithKey' step (True, 0) xs
+isValid (IntervalSet xs) = case IntMap.foldlWithKey' step NotStarted xs of
+  NotStarted -> True -- vacously true
+  Invalid -> False
+  Valid _ _ -> True
   where
-    step :: (Eq n, Num n) => (Bool, Int) -> Int -> (Int, n) -> (Bool, Int)
-    step (valid, previousEnd) start (end, count) =
-      ( valid && start < end && previousEnd <= start && count /= 0,
-        end
-      )
+    step :: (Eq n, Num n) => Validity n -> Int -> (Int, n) -> Validity n
+    step _ _ (_, 0) = Invalid -- no interval has 0 count
+    step NotStarted start (end, count) =
+      if start < end
+        then Valid end count
+        else Invalid -- no interval has 0 length
+    step Invalid _ _ = Invalid
+    step (Valid prevEnd prevCount) start (end, count) = case prevEnd `compare` start of
+      LT ->
+        if start < end
+          then Valid end count
+          else Invalid -- no interval has 0 length
+      EQ ->
+        if prevCount == count
+          then Valid end count
+          else Invalid -- adjacent intervals with the same count are be merged
+      GT -> Invalid -- no two intervals overlap
+
+data Validity n
+  = NotStarted
+  | Invalid
+  | Valid
+      Int -- previous ending
+      n -- previous count
 
 --------------------------------------------------------------------------------
 
