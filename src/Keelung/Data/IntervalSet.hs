@@ -240,15 +240,15 @@ isValid (IntervalSet xs) = case IntMap.foldlWithKey' step NotStarted xs of
         then Valid end count
         else Invalid -- no interval has 0 length
     step Invalid _ _ = Invalid
-    step (Valid prevEnd prevCount) start (end, count) = case prevEnd `compare` start of
+    step (Valid prevEnd _prevCount) start (end, count) = case prevEnd `compare` start of
       LT ->
         if start < end
           then Valid end count
           else Invalid -- no interval has 0 length
-      EQ ->
-        if prevCount == count
-          then Valid end count
-          else Invalid -- adjacent intervals with the same count are be merged
+      EQ -> Valid end count
+      -- if prevCount == count
+      --   then Valid end count
+      --   else Invalid -- adjacent intervals with the same count are be merged
       GT -> Invalid -- no two intervals overlap
 
 data Validity n
@@ -258,6 +258,93 @@ data Validity n
       Int -- previous ending
       n -- previous count
 
+-- -- | Relationship between two intervals
+-- --   The first letter represents "inserted.start `compare` existing.start"
+-- --   The second word represents the position of "inserted.end" relative to "existing"
+-- data Case
+--   = --  inserted      ├──┤
+--     --  existing            ├───────────┤
+--     LBefore
+--   | --  inserted      ├─────┤
+--     --  existing            ├───────────┤
+--     LStart
+--   | --  inserted      ├─────┼─────┤
+--     --  existing            ├─────┼─────┤
+--     LBetween
+--   | --  inserted      ├─────┼───────────┤
+--     --  existing            ├───────────┤
+--     LEnd
+--   | --  inserted      ├─────┼───────────┼─────┤
+--     --  existing            ├───────────┤
+--     LAfter
+--   | --  inserted            ├─────┤
+--     --  existing            ├─────┼─────┤
+--     EBefore
+--   | --  inserted            ├───────────┤
+--     --  existing            ├───────────┤
+--     EEnd
+--   | --  inserted            ├───────────┼────┤
+--     --  existing            ├───────────┤
+--     EAfter
+--   | --  inserted                  ├──┤
+--     --  existing            ├─────┼──┼──┤
+--     GBefore
+--   | --  inserted                  ├─────┤
+--     --  existing            ├─────┼─────┤
+--     GEnd
+--   | --  inserted                  ├─────┼─────┤
+--     --  existing            ├─────┼─────┤
+--     GAfter
+
+-- -- | Insert an interval of a given count into an IntMap set
+-- insertIntMap :: (Num n, Eq n) => Interval -> n -> IntMap (Int, n) -> IntMap (Int, n)
+-- insertIntMap (start, end) count xs = case (IntMap.lookupLT start xs, IntMap.lookupGE start xs) of
+--   (Nothing, Nothing) ->
+--     --  inserted      ├─────────────────┤
+--     --  existing
+--     IntMap.insert start (end, count) xs
+--   (Nothing, Just (startE, (endEx, countEx))) -> case end `compare` startE of
+--     LT -> _
+--     EQ ->
+--       --       --  inserted      ├─────┼─────┼─────┤
+--       --       --  existing            ├─────┤
+
+--       _
+--     GT -> _
+--   -- if end1 <= end
+--   --   then
+--   --     if count == -count1
+--   --       then --
+--   --       --  inserted      ├─────┤     ├─────┤
+--   --       --  existing
+
+--   --         IntMap.insert start (start1, count) $
+--   --           insertIntMap (end1, end) count xs
+--   --       else --
+--   --       --  inserted      ├─────┼─────┼─────┤
+--   --       --  existing            ├─────┤
+
+--   --         IntMap.insert start (start1, count) $
+--   --           IntMap.insert start1 (end1, count + count1) $
+--   --             insertIntMap (end1, end) count xs
+--   --   else
+--   --     if count == -count1
+--   --       then --
+--   --       --  inserted      ├─────┤
+--   --       --  existing                  ├─────┤
+
+--   --         IntMap.insert start (start1, count) $
+--   --           insertIntMap (end, end1) count1 xs
+--   --       else --
+--   --       --  inserted      ├─────┼─────┤
+--   --       --  existing            ├─────┼─────┤
+
+--   --         IntMap.insert start (start1, count) $
+--   --           IntMap.insert start1 (end, count + count1) $
+--   --             insertIntMap (end, end1) count1 xs
+--   (Just _, Nothing) -> _
+--   (Just _, Just _) -> _
+
 --------------------------------------------------------------------------------
 
 -- | Actions to be executed on an interval set
@@ -265,8 +352,6 @@ data Action n
   = InsertNew
       Interval -- interval to be inserted
       n -- count
-  | RemoveExisting
-      (Int, Int) -- interval of existing interval to be removed
   deriving (Eq, Show)
 
 -- | Calculate the actions needed to insert an interval into an interval set
@@ -276,7 +361,7 @@ calculateAction inserted@(start, end) count (IntervalSet xs) = case IntMap.looku
     --   inserted      ├─────────────────┤
     --   existing
     calculateActionAfter inserted count (IntervalSet xs)
-  Just (existingStart, (existingEnd, existingAmount)) ->
+  Just (existingStart, (existingEnd, existingCount)) ->
     if start >= existingEnd
       then --
       -- inserted                  ├─────┤
@@ -292,11 +377,10 @@ calculateAction inserted@(start, end) count (IntervalSet xs) = case IntMap.looku
           -- existing      ├─────╠═════╣
           --    parts         1     2
 
-            let removeExisting = RemoveExisting (existingStart, existingEnd)
-                insertPart1 = InsertNew (existingStart, start) existingAmount
-                insertPart2 = InsertNew (start, existingEnd) (existingAmount + count)
+            let insertPart1 = InsertNew (existingStart, start) existingCount
+                insertPart2 = InsertNew (start, existingEnd) (existingCount + count)
                 restActions = calculateActionAfter (existingEnd, end) count (IntervalSet xs)
-             in removeExisting : insertPart1 : insertPart2 : restActions
+             in insertPart1 : insertPart2 : restActions
           else --
           -- inserted            ├─────┤
           -- existing      ├─────────────────┤
@@ -305,11 +389,10 @@ calculateAction inserted@(start, end) count (IntervalSet xs) = case IntMap.looku
           -- existing      ├─────╠═════╣─────┤
           --    parts         1     2     3
 
-            let removeExisting = RemoveExisting (existingStart, existingEnd)
-                insertPart1 = InsertNew (existingStart, start) existingAmount
-                insertPart2 = InsertNew (start, end) (existingAmount + count)
-                insertPart3 = InsertNew (end, existingEnd) existingAmount
-             in [removeExisting, insertPart1, insertPart2, insertPart3]
+            let insertPart1 = InsertNew (existingStart, start) existingCount
+                insertPart2 = InsertNew (start, end) (existingCount + count)
+                insertPart3 = InsertNew (end, existingEnd) existingCount
+             in [insertPart1, insertPart2, insertPart3]
 
 -- | Calculate the actions needed to insert an interval into an interval set with existing intervals after it
 calculateActionAfter :: (Num n) => Interval -> n -> IntervalSet n -> [Action n]
@@ -318,7 +401,7 @@ calculateActionAfter inserted@(start, end) count (IntervalSet xs) = case IntMap.
     -- inserted          ├─────────────────┤
     -- existing
     [InsertNew inserted count]
-  Just (existingStart, (existingEnd, existingAmount))
+  Just (existingStart, (existingEnd, existingCount))
     | end <= existingStart ->
         -- inserted      ├─────┤
         -- existing                  ├─────┤
@@ -330,11 +413,10 @@ calculateActionAfter inserted@(start, end) count (IntervalSet xs) = case IntMap.
         -- inserted      ├─────╠═════╣
         -- existing            ╠═════╣─────┤
         --    parts         1     2     3
-        let removeExisting = RemoveExisting (existingStart, existingEnd)
-            insertPart1 = InsertNew (start, existingStart) count
-            insertPart2 = InsertNew (existingStart, end) (existingAmount + count)
-            insertPart3 = InsertNew (end, existingEnd) existingAmount
-         in [removeExisting, insertPart1, insertPart2, insertPart3]
+        let insertPart1 = InsertNew (start, existingStart) count
+            insertPart2 = InsertNew (existingStart, end) (existingCount + count)
+            insertPart3 = InsertNew (end, existingEnd) existingCount
+         in [insertPart1, insertPart2, insertPart3]
     | otherwise -> -- end > existingEnd
     --     inserted      ├─────────────────┤
     --     existing            ├─────┤
@@ -342,11 +424,10 @@ calculateActionAfter inserted@(start, end) count (IntervalSet xs) = case IntMap.
     --     inserted      ├─────╠═════╣─────┤
     --     existing            ╠═════╣
     --        parts         1     2     3
-        let removeExisting = RemoveExisting (existingStart, existingEnd)
-            insertPart1 = InsertNew (start, existingStart) count
-            insertPart2 = InsertNew (existingStart, existingEnd) (existingAmount + count)
+        let insertPart1 = InsertNew (start, existingStart) count
+            insertPart2 = InsertNew (existingStart, existingEnd) (existingCount + count)
             restActions = calculateActionAfter (existingEnd, end) count (IntervalSet xs)
-         in removeExisting : insertPart1 : insertPart2 : restActions
+         in insertPart1 : insertPart2 : restActions
 
 -- | Execute a list of actions on an interval set
 executeActions :: (Eq n, Num n) => [Action n] -> IntervalSet n -> IntervalSet n
@@ -354,15 +435,12 @@ executeActions actions (IntervalSet set) = IntervalSet $ List.foldl' step set ac
   where
     step :: (Eq n, Num n) => IntMap (Int, n) -> Action n -> IntMap (Int, n)
     step xs (InsertNew (start, end) count) =
-      if start == end || count == 0
+      if start == end
         then xs
-        else IntMap.insert start (end, count) xs
-    step xs (RemoveExisting (start, end)) = case IntMap.lookup start xs of
-      Nothing -> error "[ panic ] IntervalSet: trying to remove non-existing interval"
-      Just (existingEnd, existingAmount) ->
-        if existingEnd <= end
-          then IntMap.delete start xs
-          else IntMap.insert end (existingEnd, existingAmount) (IntMap.delete start xs)
+        else
+          if count == 0
+            then IntMap.delete start xs
+            else IntMap.insert start (end, count) xs
 
 --------------------------------------------------------------------------------
 
