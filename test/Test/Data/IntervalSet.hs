@@ -14,14 +14,14 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Interval Sets" $ do
-  describe "IntervalSet.adjust" $ do
+  describe "adjust" $ do
     it "should preserve invariants after applying randomized adjustments" $ do
       property $ \operations -> do
         let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
         IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
         IntervalSet.isValid intervals `shouldBe` True
 
-  describe "IntervalSet.toIntervalTable" $ do
+  describe "toIntervalTable" $ do
     it "should generate well-behaved IntervalTable" $ do
       property $ \(NonOverlappingOperations operations points) -> do
         let intervals = foldr applyOperation IntervalSet.new operations
@@ -30,7 +30,7 @@ tests = describe "Interval Sets" $ do
         forM_ points $ \point -> do
           IntervalTable.member (point, point + 1) table `shouldBe` memberOfNonOverlappingOperations (NonOverlappingOperations operations points) point
 
-  describe "IntervalSet.intervalsWithin" $ do
+  describe "intervalsWithin" $ do
     it "should result in correct intervals" $ do
       property $ \(operations, Interval interval) -> do
         let xs = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
@@ -40,7 +40,23 @@ tests = describe "Interval Sets" $ do
         forM_ [fst interval .. snd interval - 1] $ \point -> do
           let expected = IntervalSet.member xs point
           let actual = withinIntervals point
-          expected `shouldBe` actual
+          actual `shouldBe` expected
+
+  describe "split" $ do
+    it "should be the inverse of merge after nomalization" $ do
+      property $ \(xs, i) -> do
+        let (as, bs) = IntervalSet.split xs i
+        let expected = xs :: IntervalSet Int
+        let actual = IntervalSet.normalize (as <> bs)
+        actual `shouldBe` expected
+
+--------------------------------------------------------------------------------
+
+instance (Arbitrary n, Eq n, Num n) => Arbitrary (IntervalSet n) where
+  arbitrary = do
+    -- create a new IntervalSet by inserting a random number of random intervals with IntervalSet.adjust
+    intervals <- arbitrary :: (Arbitrary n, Num n) => Gen [(Interval, n)]
+    pure $ foldl (\xs (Interval interval, count) -> IntervalSet.normalize $ IntervalSet.adjust interval count xs) IntervalSet.new intervals
 
 --------------------------------------------------------------------------------
 

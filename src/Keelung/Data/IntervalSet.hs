@@ -1,6 +1,9 @@
 {-# LANGUAGE DeriveFunctor #-}
 -- For RefU Limb segement reference counting
 {-# LANGUAGE DeriveGeneric #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use guards" #-}
 
 module Keelung.Data.IntervalSet
   ( -- * Construction
@@ -8,7 +11,10 @@ module Keelung.Data.IntervalSet
     new,
 
     -- * Operations
+    normalize,
     adjust,
+    split,
+    merge,
 
     -- * Conversion
     toIntervalTable,
@@ -54,6 +60,12 @@ instance (Eq n, Show n, Num n) => Show (IntervalSet n) where
       $ IntMap.toList xs
 
 instance (NFData n) => NFData (IntervalSet n)
+
+instance (Num n) => Semigroup (IntervalSet n) where
+  (<>) = merge
+
+instance (Num n) => Monoid (IntervalSet n) where
+  mempty = new
 
 type Interval = (Int, Int) -- (start, end)
 
@@ -122,20 +134,26 @@ split (IntervalSet xs) pos =
               (IntervalSet mempty, IntervalSet xs) -- no interval before "pos"
 
 -- | O(n): Merge two interval maps
-merge :: (Eq n, Num n) => IntervalSet n -> IntervalSet n -> IntervalSet n
-merge (IntervalSet xs) (IntervalSet ys) = IntervalSet $ IntMap.fromAscList $ mergeIntervalList (IntMap.toAscList xs) (IntMap.toAscList ys)
+merge :: (Num n) => IntervalSet n -> IntervalSet n -> IntervalSet n
+merge (IntervalSet xs) (IntervalSet ys) = IntervalSet $ IntMap.fromDistinctAscList $ mergeIntervalList (IntMap.toAscList xs) (IntMap.toAscList ys)
 
 -- | O(n): Merge two interval lists
-mergeIntervalList :: (Eq n, Num n) => [(Int, (Int, n))] -> [(Int, (Int, n))] -> [(Int, (Int, n))]
+mergeIntervalList :: (Num n) => [(Int, (Int, n))] -> [(Int, (Int, n))] -> [(Int, (Int, n))]
 mergeIntervalList [] [] = []
 mergeIntervalList [] ys = ys
 mergeIntervalList xs [] = xs
 mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : yss) = case start1 `compare` start2 of
-  LT -> case end1 `compare` start2 of
+  LT -> case end1 `compare` end2 of
     LT ->
-      --  xs  ├───┼───┤
-      --  ys      ├───┼───┤
-      (start1, (start2, count1)) : (start2, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
+      if end1 <= start2
+        then --
+        --  xs  ├───┤
+        --  ys          ├───┤
+          (start1, (end1, count1)) : mergeIntervalList xss ((start2, (end2, count2)) : yss)
+        else --
+        --  xs  ├───┼───┤
+        --  ys      ├───┼───┤
+          (start1, (start2, count1)) : (start2, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
     EQ ->
       --  xs  ├───┼───┤
       --  ys      ├───┤
@@ -157,11 +175,17 @@ mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : y
       --  xs  ├───┼───┤
       --  ys  ├───┤
       (start2, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
-  GT -> case end1 `compare` start2 of
+  GT -> case end1 `compare` end2 of
     LT ->
-      --  xs      ├───┼───┤
-      --  ys  ├───┼───┤
-      (start2, (start1, count2)) : (start1, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
+      if end2 <= start1
+        then --
+        --  xs          ├───┤
+        --  ys  ├───┤
+          (start2, (end2, count2)) : mergeIntervalList ((start1, (end1, count1)) : xss) yss
+        else --
+        --  xs      ├───┼───┤
+        --  ys  ├───┼───┤
+          (start1, (start2, count1)) : (start2, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
     EQ ->
       --  xs      ├───┤
       --  ys  ├───┼───┤
@@ -170,6 +194,32 @@ mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : y
       --  xs      ├───┤
       --  ys  ├───┼───┼───┤
       (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
+
+-- | O(n): Normalizes an interval set by:
+--      1. concatenating adjacent intervals with the same count
+--      2. removing intervals with zero count
+--      3. removing intervals with zero length
+normalize :: (Eq n, Num n) => IntervalSet n -> IntervalSet n
+normalize = IntervalSet . IntMap.fromDistinctAscList . normalizeList . IntMap.toDescList . unIntervalSet
+  where
+    -- input: reversed (descending) list
+    -- output: ascending list
+    normalizeList :: (Eq n, Num n) => [(Int, (Int, n))] -> [(Int, (Int, n))]
+    normalizeList = step []
+
+    step :: (Eq n, Num n) => [(Int, (Int, n))] -> [(Int, (Int, n))] -> [(Int, (Int, n))]
+    step acc [] = acc
+    step [] ((start, (end, count)) : xs) =
+      if start == end || count == 0 -- see if the coming interval is empty
+        then step [] xs
+        else step [(start, (end, count))] xs
+    step ((start2, (end2, count2)) : acc) ((start1, (end1, count1)) : xs) =
+      if start1 == end1 || count1 == 0 -- see if the coming interval is empty
+        then step ((start2, (end2, count2)) : acc) xs
+        else
+          if end1 == start2 && count1 == count2
+            then step ((start1, (end2, count1)) : acc) xs
+            else step ((start1, (end1, count1)) : (start2, (end2, count2)) : acc) xs
 
 -- | O(n): Check if these intervals are valid (for testing purposes)
 --   Invariants:
