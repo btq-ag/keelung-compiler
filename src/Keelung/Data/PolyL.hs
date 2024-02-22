@@ -52,12 +52,14 @@ data PolyL n = PolyL
     -- | (Limb, multiplier)
     polyLimbs :: Map Limb n,
     -- | (Ref, coefficient)
-    polyRefs :: Map Ref n
+    polyRefs :: Map Ref n,
+    -- | (Slice, coefficient)
+    polySlices :: Map Ref n
   }
   deriving (Eq, Functor, Ord, Generic, NFData)
 
 instance (Integral n, GaloisField n) => Show (PolyL n) where
-  show (PolyL constant limbs vars)
+  show (PolyL constant limbs refs _)
     | constant == 0 =
         if firstSign == " + "
           then concat restOfTerms
@@ -65,7 +67,7 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
     | otherwise = concat (show constant : firstSign : toList restOfTerms)
     where
       limbTerms = mconcat $ fmap printLimb (Map.toList limbs)
-      varTerms = mconcat $ fmap printTerm (Map.toList vars)
+      varTerms = mconcat $ fmap printTerm (Map.toList refs)
       (firstSign, restOfTerms) = case varTerms <> limbTerms of
         Seq.Empty -> error "[ panic ] Empty PolyL"
         (x Seq.:<| xs) -> (x, xs)
@@ -94,64 +96,65 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
 new :: (Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> Either n (PolyL n)
 new constant refs limbs = case (toMap refs, toMap limbs) of
   (Nothing, Nothing) -> Left constant
-  (Nothing, Just limbs') -> Right (PolyL constant limbs' mempty)
-  (Just refs', Nothing) -> Right (PolyL constant mempty refs')
-  (Just refs', Just limbs') -> Right (PolyL constant limbs' refs')
+  (Nothing, Just limbs') -> Right (PolyL constant limbs' mempty mempty)
+  (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
+  (Just refs', Just limbs') -> Right (PolyL constant limbs' refs' mempty)
 
 -- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
 fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
 fromLimbs constant xs =
   case toMap xs of
     Nothing -> Left constant
-    Just limbs -> Right (PolyL constant limbs mempty)
+    Just limbs -> Right (PolyL constant limbs mempty mempty)
 
 -- | Construct a PolyL from a constant and a single Limb
 fromLimb :: (Integral n) => n -> Limb -> PolyL n
-fromLimb constant limb = PolyL constant (Map.singleton limb 1) mempty
+fromLimb constant limb = PolyL constant (Map.singleton limb 1) mempty mempty
 
 -- | Construct a PolyL from a constant and a list of (Ref, coefficient) pairs
 fromRefs :: (Integral n) => n -> [(Ref, n)] -> Either n (PolyL n)
 fromRefs constant xs = case toMap xs of
   Nothing -> Left constant
-  Just refs -> Right (PolyL constant mempty refs)
+  Just refs -> Right (PolyL constant mempty refs mempty)
 
 --------------------------------------------------------------------------------
 
 -- | Insert a list of (Limb, coefficient) pairs into a PolyL
 insertLimbs :: (Integral n) => n -> [(Limb, n)] -> PolyL n -> Either n (PolyL n)
-insertLimbs c' limbs (PolyL c ls refs) =
-  let limbs' = mergeListAndClean ls limbs
-   in if null limbs' && null refs
+insertLimbs c' ls' (PolyL c ls rs ss) =
+  let limbs = mergeListAndClean ls ls'
+   in if null limbs && null rs
         then Left (c + c')
-        else Right (PolyL (c + c') limbs' refs)
+        else Right (PolyL (c + c') limbs rs ss)
 
 insertRefs :: (Integral n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
-insertRefs c' xs (PolyL c limbs vars) =
-  let vars' = mergeListAndClean vars xs
-   in if null vars' && null limbs
+insertRefs c' rs' (PolyL c ls rs ss) =
+  let refs = mergeListAndClean rs rs'
+   in if null rs' && null ls
         then Left (c + c')
-        else Right $ PolyL (c + c') limbs vars'
+        else Right $ PolyL (c + c') ls refs ss
 
 addConstant :: (Integral n) => n -> PolyL n -> PolyL n
-addConstant c' (PolyL c ls vars) = PolyL (c + c') ls vars
+addConstant c' (PolyL c ls rs ss) = PolyL (c + c') ls rs ss
 
 -- | Multiply all coefficients and the constant by some non-zero number
 multiplyBy :: (Integral n) => n -> PolyL n -> Either n (PolyL n)
 multiplyBy 0 _ = Left 0
-multiplyBy m (PolyL c ls vars) = Right $ PolyL (m * c) (fmap (m *) ls) (fmap (m *) vars)
+multiplyBy m (PolyL c ls rs ss) = Right $ PolyL (m * c) (fmap (m *) ls) (fmap (m *) rs) (fmap (m *) ss)
 
 -- | Merge two PolyLs
 merge :: (Integral n) => PolyL n -> PolyL n -> Either n (PolyL n)
-merge (PolyL c1 ls1 vars1) (PolyL c2 ls2 vars2) =
+merge (PolyL c1 ls1 rs1 ss1) (PolyL c2 ls2 rs2 ss2) =
   let limbs = mergeAndClean ls1 ls2
-      vars = mergeAndClean vars1 vars2
-   in if null limbs && null vars
+      refs = mergeAndClean rs1 rs2
+      slices = mergeAndClean ss1 ss2
+   in if null limbs && null refs
         then Left (c1 + c2)
-        else Right (PolyL (c1 + c2) limbs vars)
+        else Right (PolyL (c1 + c2) limbs refs slices)
 
 -- | Negate a polynomial
 negate :: (Num n, Eq n) => PolyL n -> PolyL n
-negate (PolyL c ls vars) = PolyL (-c) (fmap Prelude.negate ls) (fmap Prelude.negate vars)
+negate (PolyL c ls rs ss) = PolyL (-c) (fmap Prelude.negate ls) (fmap Prelude.negate rs) (fmap Prelude.negate ss)
 
 --------------------------------------------------------------------------------
 
@@ -168,26 +171,26 @@ data View n
 
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 view :: PolyL n -> View n
-view (PolyL constant limbs vars) =
-  case (Map.toList vars, Map.toList limbs) of
+view (PolyL constant limbs refs _) =
+  case (Map.toList refs, Map.toList limbs) of
     ([], []) -> error "[ panic ] Empty PolyL"
     ([], [term]) -> LimbMonomial constant term
     ([], [term1, term2]) -> LimbBinomial constant term1 term2
     ([], _) -> LimbPolynomial constant (Map.toList limbs)
     ([term], []) -> RefMonomial constant term
     ([term1, term2], []) -> RefBinomial constant term1 term2
-    (_, []) -> RefPolynomial constant vars
-    _ -> MixedPolynomial constant vars (Map.toList limbs)
+    (_, []) -> RefPolynomial constant refs
+    _ -> MixedPolynomial constant refs (Map.toList limbs)
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int
-size (PolyL c ls vars) = (if c == 0 then 0 else 1) + sum (fmap lmbWidth (Map.keys ls)) + Map.size vars
+size (PolyL c limbs refs _) = (if c == 0 then 0 else 1) + sum (fmap lmbWidth (Map.keys limbs)) + Map.size refs
 
 --------------------------------------------------------------------------------
 
 -- | See if a PolyL is valid
 isValid :: (Integral n) => PolyL n -> Bool
-isValid (PolyL _ ls vars) = not (null (Map.filter (/= 0) ls)) || not (Map.null (Map.filter (/= 0) vars)) && all ((> 0) . widthOf) (Map.keys ls)
+isValid (PolyL _ limbs refs _) = not (null (Map.filter (/= 0) limbs)) || not (Map.null (Map.filter (/= 0) refs)) && all ((> 0) . widthOf) (Map.keys limbs)
 
 -- | Helper function for converting a list of (a, n) pairs to a Map
 toMap :: (Integral n, Ord a) => [(a, n)] -> Maybe (Map a n)
