@@ -19,7 +19,7 @@ tests = describe "Interval Sets" $ do
       property $ \operations -> do
         let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
         IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
-        IntervalSet.isValid intervals `shouldBe` True
+        IntervalSet.validate intervals `shouldBe` Nothing
 
   describe "toIntervalTable" $ do
     it "should generate well-behaved IntervalTable" $ do
@@ -49,6 +49,7 @@ tests = describe "Interval Sets" $ do
         let expected = xs :: IntervalSet Int
         let actual = IntervalSet.normalize (as <> bs)
         actual `shouldBe` expected
+        IntervalSet.validate actual `shouldBe` Nothing
 
 --------------------------------------------------------------------------------
 
