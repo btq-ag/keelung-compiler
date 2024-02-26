@@ -20,10 +20,12 @@ module Keelung.Data.IntervalSet
 
     -- * Conversion
     toIntervalTable,
+    fromLimb,
 
     -- * Query
     intervalsWithin,
     totalCount,
+    allZero,
     lookup,
     member,
     validate,
@@ -40,6 +42,8 @@ import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Compiler.Util (showList')
 import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
+import Keelung.Data.Limb (Limb)
+import Keelung.Data.Limb qualified as Limb
 import Prelude hiding (lookup)
 
 -- | Key: start of an interval
@@ -72,9 +76,29 @@ instance (Num n) => Monoid (IntervalSet n) where
 
 type Interval = (Int, Int) -- (start, end)
 
+--------------------------------------------------------------------------------
+
 -- | O(1): Create an empty interval set
 new :: IntervalSet n
 new = IntervalSet mempty
+
+-- | O(n). To an IntervalTable
+toIntervalTable :: Int -> IntervalSet Int -> IntervalTable
+toIntervalTable domainSize (IntervalSet intervals) =
+  let FoldState table occupiedSize = IntMap.foldlWithKey' step (FoldState mempty 0) intervals
+   in IntervalTable domainSize occupiedSize table
+  where
+    step :: FoldState -> Int -> (Int, Int) -> FoldState
+    step (FoldState acc occupiedSize) start (end, _) =
+      FoldState
+        (IntMap.insert start (end, start - occupiedSize) acc) -- insert the total size of "holes" before this interval
+        (occupiedSize + end - start)
+
+-- | O(1): Create an interval set from a limb
+fromLimb :: (Limb, n) -> IntervalSet n
+fromLimb (limb, n) = IntervalSet $ IntMap.singleton (Limb.lmbOffset limb) (Limb.lmbOffset limb + Limb.lmbWidth limb, n)
+
+--------------------------------------------------------------------------------
 
 -- | Whether to normalize after adjusting
 normalizeAfterAdjust :: Bool
@@ -96,17 +120,9 @@ adjust (start, end) count (IntervalSet xs) =
 totalCount :: (Num n) => IntervalSet n -> n
 totalCount (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, count) -> acc + count * fromIntegral (end - start)) 0 xs
 
--- | O(n). To an IntervalTable
-toIntervalTable :: Int -> IntervalSet Int -> IntervalTable
-toIntervalTable domainSize (IntervalSet intervals) =
-  let FoldState table occupiedSize = IntMap.foldlWithKey' step (FoldState mempty 0) intervals
-   in IntervalTable domainSize occupiedSize table
-  where
-    step :: FoldState -> Int -> (Int, Int) -> FoldState
-    step (FoldState acc occupiedSize) start (end, _) =
-      FoldState
-        (IntMap.insert start (end, start - occupiedSize) acc) -- insert the total size of "holes" before this interval
-        (occupiedSize + end - start)
+-- | O(n): Compute the total count of all intervals (for testing purposes)
+allZero :: (Num n, Eq n) => IntervalSet n -> Bool
+allZero (IntervalSet xs) = all ((== 0) . snd) xs
 
 -- | O(min(n, W)): Look up the count of a variable in the interval set
 lookup :: IntervalSet n -> Int -> Maybe n
