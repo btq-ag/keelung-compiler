@@ -30,6 +30,7 @@ module Keelung.Data.IntervalSet
     allZero,
     lookup,
     member,
+    Error (..),
     validate,
     isValid,
   )
@@ -56,7 +57,7 @@ import Prelude hiding (lookup)
 --    invariant: no two intervals overlap
 newtype IntervalSet n = IntervalSet {unIntervalSet :: IntMap (Int, n)} deriving (Eq, Ord, Functor, Generic)
 
-instance (Eq n, Show n, Num n) => Show (IntervalSet n) where
+instance (Eq n, Num n, Show n) => Show (IntervalSet n) where
   show (IntervalSet xs) =
     showList'
       $ map
@@ -73,10 +74,10 @@ instance (Eq n, Show n, Num n) => Show (IntervalSet n) where
 
 instance (NFData n) => NFData (IntervalSet n)
 
-instance (Num n) => Semigroup (IntervalSet n) where
+instance (Num n, Eq n) => Semigroup (IntervalSet n) where
   (<>) = merge
 
-instance (Num n) => Monoid (IntervalSet n) where
+instance (Num n, Eq n) => Monoid (IntervalSet n) where
   mempty = new
 
 type Interval = (Int, Int) -- (start, end)
@@ -176,8 +177,8 @@ split (IntervalSet xs) pos =
               (IntervalSet mempty, IntervalSet xs) -- no interval before "pos"
 
 -- | O(n): Merge two interval maps
-merge :: (Num n) => IntervalSet n -> IntervalSet n -> IntervalSet n
-merge (IntervalSet xs) (IntervalSet ys) = IntervalSet $ IntMap.fromDistinctAscList $ mergeIntervalList (IntMap.toAscList xs) (IntMap.toAscList ys)
+merge :: (Num n, Eq n) => IntervalSet n -> IntervalSet n -> IntervalSet n
+merge (IntervalSet xs) (IntervalSet ys) = normalize $ IntervalSet $ IntMap.fromDistinctAscList $ mergeIntervalList (IntMap.toAscList xs) (IntMap.toAscList ys)
 
 -- | O(n): Merge two interval lists
 mergeIntervalList :: (Num n) => [(Int, (Int, n))] -> [(Int, (Int, n))] -> [(Int, (Int, n))]
@@ -219,6 +220,14 @@ mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : y
       (start2, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
   GT -> case end1 `compare` end2 of
     LT ->
+      --  xs      ├───┤
+      --  ys  ├───┼───┼───┤
+      (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
+    EQ ->
+      --  xs      ├───┤
+      --  ys  ├───┼───┤
+      (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
+    GT ->
       if end2 <= start1
         then --
         --  xs          ├───┤
@@ -227,15 +236,7 @@ mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : y
         else --
         --  xs      ├───┼───┤
         --  ys  ├───┼───┤
-          (start1, (start2, count1)) : (start2, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
-    EQ ->
-      --  xs      ├───┤
-      --  ys  ├───┼───┤
-      (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
-    GT ->
-      --  xs      ├───┤
-      --  ys  ├───┼───┼───┤
-      (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
+          (start2, (start1, count2)) : (start1, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
 
 -- | O(n): Normalizes an interval set by:
 --      1. concatenating adjacent intervals with the same count

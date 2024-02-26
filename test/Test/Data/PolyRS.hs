@@ -1,11 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 
 -- | Polynomial of References and Slices
-module Test.Data.PolyRS
-  ( tests,
-    run,
-  )
-where
+module Test.Data.PolyRS (tests, run) where
 
 import Data.Field.Galois (Prime)
 import Data.Map (Map)
@@ -31,7 +27,15 @@ tests :: SpecWith ()
 tests = describe "PolyRS" $ do
   it "should be valid" $ do
     property $ \poly -> do
-      PolyL.isValid (poly :: PolyL (Prime 17)) `shouldBe` True
+      PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
+
+  describe "fromLimb" $ do
+    it "should result in valid PolyL" $ do
+      property $ \(constant, limb) -> do
+        let poly = PolyL.fromLimb constant limb
+        PolyL.polyConstant poly `shouldBe` constant
+        PolyL.polyLimbs poly `shouldBe` Map.singleton limb 1
+        PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
   describe "fromLimbs" $ do
     it "should result in valid PolyL" $ do
@@ -43,15 +47,7 @@ tests = describe "PolyRS" $ do
           Right poly -> do
             PolyL.polyConstant poly `shouldBe` constant
             PolyL.polyLimbs poly `shouldBe` toMap limbs
-            PolyL.isValid (poly :: PolyL (Prime 17)) `shouldBe` True
-
-  describe "fromLimb" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(constant, limb) -> do
-        let poly = PolyL.fromLimb constant limb
-        PolyL.polyConstant poly `shouldBe` constant
-        PolyL.polyLimbs poly `shouldBe` Map.singleton limb 1
-        PolyL.isValid (poly :: PolyL (Prime 17)) `shouldBe` True
+            PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
   describe "fromRefs" $ do
     it "should result in valid PolyL" $ do
@@ -63,7 +59,7 @@ tests = describe "PolyRS" $ do
           Right poly -> do
             PolyL.polyConstant poly `shouldBe` constant
             PolyL.polyRefs poly `shouldBe` toMap refs
-            PolyL.isValid (poly :: PolyL (Prime 17)) `shouldBe` True
+            PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
   describe "insertLimbs" $ do
     it "should result in valid PolyL" $ do
@@ -76,7 +72,7 @@ tests = describe "PolyRS" $ do
             PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` constant + PolyL.polyConstant poly
             PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
             PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly `merge` toMap limbs
-            PolyL.isValid polynomial `shouldBe` True
+            PolyL.validate polynomial `shouldBe` Nothing
 
   describe "insertRefs" $ do
     it "should result in valid PolyL" $ do
@@ -89,7 +85,7 @@ tests = describe "PolyRS" $ do
             PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` constant + PolyL.polyConstant poly
             PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly
             PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly `merge` toMap refs
-            PolyL.isValid polynomial `shouldBe` True
+            PolyL.validate polynomial `shouldBe` Nothing
 
   describe "addConstant" $ do
     it "should result in valid PolyL" $ do
@@ -98,7 +94,7 @@ tests = describe "PolyRS" $ do
         PolyL.polyConstant polynomial `shouldBe` constant + PolyL.polyConstant poly
         PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly
         PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
-        PolyL.isValid polynomial `shouldBe` True
+        PolyL.validate polynomial `shouldBe` Nothing
 
   describe "multiplyBy" $ do
     it "should result in valid PolyL" $ do
@@ -110,7 +106,7 @@ tests = describe "PolyRS" $ do
             PolyL.polyConstant polynomial `shouldBe` PolyL.polyConstant poly * m
             PolyL.polyLimbs polynomial `shouldBe` fmap (m *) (PolyL.polyLimbs poly)
             PolyL.polyRefs polynomial `shouldBe` fmap (m *) (PolyL.polyRefs poly)
-            PolyL.isValid polynomial `shouldBe` True
+            PolyL.validate polynomial `shouldBe` Nothing
 
   describe "merge" $ do
     it "should result in valid PolyL" $ do
@@ -122,7 +118,7 @@ tests = describe "PolyRS" $ do
             PolyL.polyConstant polynomial `shouldBe` PolyL.polyConstant poly1 + PolyL.polyConstant poly2
             PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly1 `merge` PolyL.polyLimbs poly2
             PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly1 `merge` PolyL.polyRefs poly2
-            PolyL.isValid polynomial `shouldBe` True
+            PolyL.validate polynomial `shouldBe` Nothing
 
   describe "negate" $ do
     it "should result in valid PolyL" $ do
@@ -131,4 +127,4 @@ tests = describe "PolyRS" $ do
         PolyL.polyConstant polynomial `shouldBe` -PolyL.polyConstant poly
         PolyL.polyLimbs polynomial `shouldBe` fmap negate (PolyL.polyLimbs poly)
         PolyL.polyRefs polynomial `shouldBe` fmap negate (PolyL.polyRefs poly)
-        PolyL.isValid polynomial `shouldBe` True
+        PolyL.validate polynomial `shouldBe` Nothing

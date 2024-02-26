@@ -26,7 +26,10 @@ module Keelung.Data.PolyL
     view,
     View (..),
     size,
-    isValid,
+
+    -- * Testing
+    Error (..),
+    validate,
   )
 where
 
@@ -212,19 +215,31 @@ size (PolyL c limbs refs _) = (if c == 0 then 0 else 1) + sum (fmap lmbWidth (Ma
 
 --------------------------------------------------------------------------------
 
--- | A PolyL is valid if:
---    1. it has at least one non-zero term
---    2. all Limbs have non-zero width
---    3. all Slices are valid
-isValid :: (Integral n) => PolyL n -> Bool
-isValid (PolyL _ limbs refs slices) =
+data Error n
+  = ConstantOnly -- The polynomial does not have any non-contant terms
+  | LimbsWithZeroWidth [Limb] -- The polynomial has Limbs with zero width
+  | InvalidSlices [IntervalSet.Error n] -- The polynomial has invalid Slices
+  deriving (Eq, Show)
+
+-- | Validate a PolyL
+validate :: (Integral n) => PolyL n -> Maybe (Error n)
+validate (PolyL _ limbs refs slices) =
   let limbsNonZero = not (Map.null (Map.filter (/= 0) limbs))
       refsNonZero = not (Map.null (Map.filter (/= 0) refs))
       slicesNonZero = not (Map.null (Map.filter (not . IntervalSet.allZero) slices))
-      limbsHavePositiveWidth = all ((> 0) . widthOf) (Map.keys limbs)
-      -- slicesAllValid = all IntervalSet.isValid slices
-      nonZero = limbsNonZero || refsNonZero || slicesNonZero
-   in nonZero && limbsHavePositiveWidth -- && slicesAllValid
+      notConstantOnly = limbsNonZero || refsNonZero || slicesNonZero
+      limbsWithZeroWidth = filter ((== 0) . widthOf) (Map.keys limbs)
+      invalidSlices = toList $ Map.mapMaybe IntervalSet.validate slices
+   in -- invalidSlices = map fst $ fromIntervalSets $ Map.filter (not . IntervalSet.isValid) slices
+      if notConstantOnly
+        then
+          if null limbsWithZeroWidth
+            then
+              if null invalidSlices
+                then Nothing
+                else Just (InvalidSlices invalidSlices)
+            else Just (LimbsWithZeroWidth limbsWithZeroWidth)
+        else Just ConstantOnly
 
 -- | Helper function for converting a list of (a, n) pairs to a Map
 toMap :: (Integral n, Ord a) => [(a, n)] -> Maybe (Map a n)
