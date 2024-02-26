@@ -1,4 +1,6 @@
 {-# LANGUAGE DataKinds #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Test.Data.IntervalSet (tests, run) where
 
@@ -15,6 +17,37 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Interval Sets" $ do
   describe "adjust" $ do
+    it "should merge adjecent intervals with the count" $ do
+      let operations = [Adjust (0, 10) 1, Adjust (10, 20) 1]
+      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
+      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
+      IntervalSet.validate intervals `shouldBe` Nothing
+
+    it "should merge adjecent intervals with the count" $ do
+      let operations = [Adjust (10, 20) 1, Adjust (0, 10) 1]
+      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
+      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
+      IntervalSet.validate intervals `shouldBe` Nothing
+
+    it "should merge adjecent intervals with the count" $ do
+      let operations = [Adjust (10, 20) 10, Adjust (0, 30) (-5), Adjust (20, 30) 10]
+      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
+      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
+      IntervalSet.validate intervals `shouldBe` Nothing
+
+    it "should merge adjecent intervals with the count" $ do
+      let operations = [Adjust (40, 60) 10, Adjust (60, 100) 30, Adjust (50, 60) 20]
+      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
+      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
+      IntervalSet.validate intervals `shouldBe` Nothing
+
+    it "should merge adjecent intervals with the count" $ do
+      let operations = [Adjust (20, 30) 20, Adjust (0, 20) 20, Adjust (10, 40) 40]
+      -- 20 60 60 40
+      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
+      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
+      IntervalSet.validate intervals `shouldBe` Nothing
+
     it "should preserve invariants after applying randomized adjustments" $ do
       property $ \operations -> do
         let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
@@ -53,7 +86,7 @@ tests = describe "Interval Sets" $ do
 
 --------------------------------------------------------------------------------
 
-instance (Arbitrary n, Eq n, Num n) => Arbitrary (IntervalSet n) where
+instance (Arbitrary n, Eq n, Num n, Show n) => Arbitrary (IntervalSet n) where
   arbitrary = do
     -- create a new IntervalSet by inserting a random number of random intervals with IntervalSet.adjust
     intervals <- arbitrary :: (Arbitrary n, Num n) => Gen [(Interval, n)]
