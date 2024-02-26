@@ -76,6 +76,10 @@ type Interval = (Int, Int) -- (start, end)
 new :: IntervalSet n
 new = IntervalSet mempty
 
+-- | Whether to normalize after adjusting
+normalizeAfterAdjust :: Bool
+normalizeAfterAdjust = True
+
 -- | O(min(n, W)): Adjust the count of an interval.
 adjust :: (Num n, Eq n) => Interval -> n -> IntervalSet n -> IntervalSet n
 adjust _ 0 (IntervalSet xs) = IntervalSet xs
@@ -84,7 +88,9 @@ adjust (start, end) count (IntervalSet xs) =
     then IntervalSet xs
     else
       let actions = calculateActionInit (start, end) count (IntervalSet xs)
-       in executeActions actions (IntervalSet xs)
+       in if normalizeAfterAdjust
+            then normalize $ executeActions actions (IntervalSet xs)
+            else executeActions actions (IntervalSet xs)
 
 -- | O(n): Compute the total count of all intervals (for testing purposes)
 totalCount :: (Num n) => IntervalSet n -> n
@@ -237,10 +243,6 @@ data Error n
   | UnmergedIntervals Interval Interval n -- adjacent intervals with the same count are not merged
   deriving (Eq, Show)
 
--- | Disabled at the moment
-checkUnmergedIntervals :: Bool
-checkUnmergedIntervals = False
-
 -- | O(n): Check if a IntervalSet is valid
 validate :: (Eq n, Num n) => IntervalSet n -> Maybe (Error n)
 validate (IntervalSet xs) = case IntMap.foldlWithKey' step NotStarted xs of
@@ -261,12 +263,9 @@ validate (IntervalSet xs) = case IntMap.foldlWithKey' step NotStarted xs of
           then Valid (start, end) count
           else Invalid WidthlessInterval -- no interval has 0 length
       EQ ->
-        if checkUnmergedIntervals
-          then
-            if prevCount /= count
-              then Valid (start, end) count
-              else Invalid (UnmergedIntervals (prevStart, prevEnd) (start, end) count) -- adjacent intervals with the same count are not merged
-          else Valid (prevStart, end) count
+        if prevCount /= count
+          then Valid (start, end) count
+          else Invalid (UnmergedIntervals (prevStart, prevEnd) (start, end) count) -- adjacent intervals with the same count are not merged
       GT -> Invalid (OverlappingIntervals (prevStart, prevEnd) (start, end)) -- no two intervals overlap
 
 -- | O(n): Check if these intervals are valid (for testing purposes)
