@@ -21,6 +21,8 @@ module Keelung.Data.IntervalSet
     -- * Conversion
     toIntervalTable,
     fromLimb,
+    toSlices,
+    fromSlices,
 
     -- * Query
     intervalsWithin,
@@ -44,6 +46,9 @@ import Keelung.Compiler.Util (showList')
 import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
+import Keelung.Data.Reference (RefU)
+import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (lookup)
 
 -- | Key: start of an interval
@@ -97,6 +102,14 @@ toIntervalTable domainSize (IntervalSet intervals) =
 -- | O(1): Create an interval set from a limb
 fromLimb :: (Limb, n) -> IntervalSet n
 fromLimb (limb, n) = IntervalSet $ IntMap.singleton (Limb.lmbOffset limb) (Limb.lmbOffset limb + Limb.lmbWidth limb, n)
+
+-- | O(n): Convert an interval set to a list of Slices
+toSlices :: RefU -> IntervalSet n -> [(Slice, n)]
+toSlices ref (IntervalSet xs) = map (\(start, (end, count)) -> (Slice.Slice ref start end, count)) $ IntMap.toList xs
+
+-- | O(n): Create an interval set from a list of Slices
+fromSlices :: (Num n, Eq n) => [(Slice, n)] -> IntervalSet n
+fromSlices = List.foldl' (\acc (slice, count) -> adjust (Slice.sliceStart slice, Slice.sliceEnd slice) count acc) new
 
 --------------------------------------------------------------------------------
 

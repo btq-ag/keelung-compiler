@@ -138,14 +138,14 @@ instance (Arbitrary n, Integral n) => Arbitrary (PolyL n) where
     result <- arbitrary
     (refs, slices) <- case result of
       EmptyRefs -> do
-        slices <- arbitrary `suchThat` valid
+        slices <- arbitrary `suchThat` validSlices
         pure (mempty, Map.toList slices)
       EmptyLimbs -> do
-        refs <- arbitrary `suchThat` valid
+        refs <- arbitrary `suchThat` validRefs
         pure (Map.toList refs, mempty)
       BothNonEmpty -> do
-        refs <- arbitrary `suchThat` valid
-        slices <- arbitrary `suchThat` valid
+        refs <- arbitrary `suchThat` validRefs
+        slices <- arbitrary `suchThat` validSlices
         pure (Map.toList refs, Map.toList slices)
     let limbs = fmap (first Slice.toLimb) slices
     constant <- arbitrary
@@ -153,5 +153,9 @@ instance (Arbitrary n, Integral n) => Arbitrary (PolyL n) where
       Left _ -> error "impossible"
       Right poly -> pure poly
     where
-      valid :: (Arbitrary n, Integral n) => Map a n -> Bool
-      valid = not . Map.null . Map.filter (/= 0)
+      validSlices :: (Arbitrary n, Integral n) => Map Slice n -> Bool
+      validSlices xs = 
+        and (Map.mapWithKey (\slice count -> count /= 0 && widthOf slice /= 0) xs) && not (null xs)
+
+      validRefs :: (Arbitrary n, Integral n) => Map Ref n -> Bool
+      validRefs = not . Map.null . Map.filter (/= 0)

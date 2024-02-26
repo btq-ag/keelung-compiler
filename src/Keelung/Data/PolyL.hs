@@ -44,6 +44,7 @@ import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice)
 import Prelude hiding (negate, null)
 import Prelude qualified
 
@@ -174,24 +175,36 @@ data View n
   = RefMonomial n (Ref, n)
   | RefBinomial n (Ref, n) (Ref, n)
   | RefPolynomial n (Map Ref n)
-  | LimbMonomial n (Limb, n)
-  | LimbBinomial n (Limb, n) (Limb, n)
-  | LimbPolynomial n [(Limb, n)]
-  | MixedPolynomial n (Map Ref n) [(Limb, n)]
+  | LimbMonomial n (Limb, n) (Slice, n)
+  | LimbBinomial n (Limb, n) (Limb, n) (Slice, n) (Slice, n)
+  | LimbPolynomial n [(Limb, n)] [(Slice, n)]
+  | MixedPolynomial n (Map Ref n) [(Limb, n)] [(Slice, n)]
   deriving (Eq, Show)
 
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 view :: PolyL n -> View n
-view (PolyL constant limbs refs _) =
-  case (Map.toList refs, Map.toList limbs) of
-    ([], []) -> error "[ panic ] Empty PolyL"
-    ([], [term]) -> LimbMonomial constant term
-    ([], [term1, term2]) -> LimbBinomial constant term1 term2
-    ([], _) -> LimbPolynomial constant (Map.toList limbs)
-    ([term], []) -> RefMonomial constant term
-    ([term1, term2], []) -> RefBinomial constant term1 term2
-    (_, []) -> RefPolynomial constant refs
-    _ -> MixedPolynomial constant refs (Map.toList limbs)
+view (PolyL constant limbs refs intervals) =
+  let limbs' = Map.toList limbs
+      slices = fromIntervalSets intervals
+   in case (Map.toList refs, limbs', slices) of
+        ([], [term], [slice]) -> LimbMonomial constant term slice
+        ([], [], []) -> error "[ panic ] PolyL.view: empty"
+        ([], [], _) -> error "[ panic ] PolyL.view: impossible 1"
+        ([], _, []) -> error "[ panic ] PolyL.view: impossible 2"
+        ([], [term1, term2], [slice1, slice2]) -> LimbBinomial constant term1 term2 slice1 slice2
+        ([], [_, _], [_]) -> error "[ panic ] PolyL.view: impossible 3"
+        ([], [_], [_, _]) -> error "[ panic ] PolyL.view: impossible 4"
+        ([], _, _) -> LimbPolynomial constant limbs' slices
+        ([term], [], []) -> RefMonomial constant term
+        ([_], [], _) -> error "[ panic ] PolyL.view: impossible 5"
+        ([_], _, []) -> error "[ panic ] PolyL.view: impossible 6"
+        ([term1, term2], [], []) -> RefBinomial constant term1 term2
+        ([_, _], [], _) -> error "[ panic ] PolyL.view: impossible 7"
+        -- ([_, _], _, _) -> error "[ panic ] PolyL.view: impossible 8"
+        (_, [], []) -> RefPolynomial constant refs
+        (_, [], _) -> error "[ panic ] PolyL.view: impossible 9"
+        (_, _, []) -> error "[ panic ] PolyL.view: impossible 10"
+        _ -> MixedPolynomial constant refs limbs' slices
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int
@@ -199,9 +212,19 @@ size (PolyL c limbs refs _) = (if c == 0 then 0 else 1) + sum (fmap lmbWidth (Ma
 
 --------------------------------------------------------------------------------
 
--- | See if a PolyL is valid
+-- | A PolyL is valid if:
+--    1. it has at least one non-zero term
+--    2. all Limbs have non-zero width
+--    3. all Slices are valid
 isValid :: (Integral n) => PolyL n -> Bool
-isValid (PolyL _ limbs refs _) = not (null (Map.filter (/= 0) limbs)) || not (Map.null (Map.filter (/= 0) refs)) && all ((> 0) . widthOf) (Map.keys limbs)
+isValid (PolyL _ limbs refs slices) =
+  let limbsNonZero = not (Map.null (Map.filter (/= 0) limbs))
+      refsNonZero = not (Map.null (Map.filter (/= 0) refs))
+      slicesNonZero = not (Map.null (Map.filter (not . IntervalSet.allZero) slices))
+      limbsHavePositiveWidth = all ((> 0) . widthOf) (Map.keys limbs)
+      -- slicesAllValid = all IntervalSet.isValid slices
+      nonZero = limbsNonZero || refsNonZero || slicesNonZero
+   in nonZero && limbsHavePositiveWidth -- && slicesAllValid
 
 -- | Helper function for converting a list of (a, n) pairs to a Map
 toMap :: (Integral n, Ord a) => [(a, n)] -> Maybe (Map a n)
@@ -220,6 +243,9 @@ toIntervalSets pairs =
    in if Map.null result
         then Nothing
         else Just result
+
+fromIntervalSets :: Map RefU (IntervalSet n) -> [(Slice, n)]
+fromIntervalSets = concatMap (uncurry IntervalSet.toSlices) . Map.toList
 
 mergeAndClean :: (Integral n, Ord a) => Map a n -> Map a n -> Map a n
 mergeAndClean xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)

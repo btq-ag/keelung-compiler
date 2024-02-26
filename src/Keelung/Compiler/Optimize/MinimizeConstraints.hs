@@ -340,20 +340,20 @@ learnFromAddL poly = case PolyL.view poly of
     --    var1 = - slope2 * var2 / slope1 - intercept / slope1
     relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyL.RefPolynomial _ _ -> return False
-  PolyL.LimbMonomial constant (var1, multiplier1) -> do
-    --  constant + var1 * multiplier1  = 0
+  PolyL.LimbMonomial constant (limb1, multiplier1) _ -> do
+    --  constant + limb1 * multiplier1  = 0
     --    =>
-    --  var1 = - constant / multiplier1
-    let pairs = Slice.fromLimbWithValue var1 (toInteger (-constant / multiplier1))
+    --  limb1 = - constant / multiplier1
+    let pairs = Slice.fromLimbWithValue limb1 (toInteger (-constant / multiplier1))
     mapM_ (uncurry assignS) pairs
     return True
-  PolyL.LimbBinomial constant (var1, multiplier1) (var2, multiplier2) -> do
+  PolyL.LimbBinomial constant (limb1, multiplier1) (limb2, multiplier2) _ _ -> do
     if constant == 0 && multiplier1 == -multiplier2
       then do
-        --  var1 * multiplier1 = var2 * multiplier2
-        relateL var1 var2
+        --  limb1 * multiplier1 = limb2 * multiplier2
+        relateL limb1 limb2
       else return False
-  PolyL.LimbPolynomial _ _ -> return False
+  PolyL.LimbPolynomial {} -> return False
   PolyL.MixedPolynomial {} -> return False
 
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
@@ -444,21 +444,21 @@ addAddL poly = case PolyL.view poly of
   PolyL.RefPolynomial _ _ -> do
     markChanged AdditiveFieldConstraintChanged
     modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
-  PolyL.LimbMonomial constant (var1, multiplier1) -> do
-    --  constant + var1 * multiplier1  = 0
+  PolyL.LimbMonomial constant (limb1, multiplier1) _ -> do
+    --  constant + limb1 * multiplier1  = 0
     --    =>
-    --  var1 = - constant / multiplier1
-    let pairs = Slice.fromLimbWithValue var1 (toInteger (-constant / multiplier1))
+    --  limb1 = - constant / multiplier1
+    let pairs = Slice.fromLimbWithValue limb1 (toInteger (-constant / multiplier1))
     mapM_ (uncurry assignS) pairs
-  PolyL.LimbBinomial constant (var1, multiplier1) (var2, multiplier2) -> do
+  PolyL.LimbBinomial constant (limb1, multiplier1) (limb2, multiplier2) _ _ -> do
     if constant == 0 && multiplier1 == -multiplier2
       then do
-        --  var1 * multiplier1 = var2 * multiplier2
-        void $ relateL var1 var2
+        --  limb1 * multiplier1 = limb2 * multiplier2
+        void $ relateL limb1 limb2
       else do
         markChanged AdditiveLimbConstraintChanged
         modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
-  PolyL.LimbPolynomial _ _ -> do
+  PolyL.LimbPolynomial {} -> do
     markChanged AdditiveLimbConstraintChanged
     modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
   PolyL.MixedPolynomial {} -> do
