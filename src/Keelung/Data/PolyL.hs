@@ -178,36 +178,25 @@ data View n
   = RefMonomial n (Ref, n)
   | RefBinomial n (Ref, n) (Ref, n)
   | RefPolynomial n (Map Ref n)
-  | LimbMonomial n (Limb, n) (Slice, n)
-  | LimbBinomial n (Limb, n) (Limb, n) (Slice, n) (Slice, n)
-  | LimbPolynomial n [(Limb, n)] [(Slice, n)]
-  | MixedPolynomial n (Map Ref n) [(Limb, n)] [(Slice, n)]
+  | SliceMonomial n (Slice, n)
+  | SliceBinomial n (Slice, n) (Slice, n)
+  | SlicePolynomial n [(Slice, n)]
+  | MixedPolynomial n (Map Ref n) [(Slice, n)]
   deriving (Eq, Show)
 
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 view :: PolyL n -> View n
-view (PolyL constant limbs refs intervals) =
-  let limbs' = Map.toList limbs
-      slices = fromIntervalSets intervals
-   in case (Map.toList refs, limbs', slices) of
-        ([], [term], [slice]) -> LimbMonomial constant term slice
-        ([], [], []) -> error "[ panic ] PolyL.view: empty"
-        ([], [], _) -> error "[ panic ] PolyL.view: impossible 1"
-        ([], _, []) -> error "[ panic ] PolyL.view: impossible 2"
-        ([], [term1, term2], [slice1, slice2]) -> LimbBinomial constant term1 term2 slice1 slice2
-        ([], [_, _], [_]) -> error "[ panic ] PolyL.view: impossible 3"
-        ([], [_], [_, _]) -> error "[ panic ] PolyL.view: impossible 4"
-        ([], _, _) -> LimbPolynomial constant limbs' slices
-        ([term], [], []) -> RefMonomial constant term
-        ([_], [], _) -> error "[ panic ] PolyL.view: impossible 5"
-        ([_], _, []) -> error "[ panic ] PolyL.view: impossible 6"
-        ([term1, term2], [], []) -> RefBinomial constant term1 term2
-        ([_, _], [], _) -> error "[ panic ] PolyL.view: impossible 7"
-        -- ([_, _], _, _) -> error "[ panic ] PolyL.view: impossible 8"
-        (_, [], []) -> RefPolynomial constant refs
-        (_, [], _) -> error "[ panic ] PolyL.view: impossible 9"
-        (_, _, []) -> error "[ panic ] PolyL.view: impossible 10"
-        _ -> MixedPolynomial constant refs limbs' slices
+view (PolyL constant _ refs intervals) =
+  let slices = fromIntervalSets intervals
+   in case (Map.toList refs, slices) of
+        ([], [slice]) -> SliceMonomial constant slice
+        ([], []) -> error "[ panic ] PolyL.view: empty"
+        ([], [slice1, slice2]) -> SliceBinomial constant slice1 slice2
+        ([], _) -> SlicePolynomial constant slices
+        ([term], []) -> RefMonomial constant term
+        ([term1, term2], []) -> RefBinomial constant term1 term2
+        (_, []) -> RefPolynomial constant refs
+        _ -> MixedPolynomial constant refs slices
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int

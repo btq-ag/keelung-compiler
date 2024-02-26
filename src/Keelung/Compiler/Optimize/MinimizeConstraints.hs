@@ -340,20 +340,20 @@ learnFromAddL poly = case PolyL.view poly of
     --    var1 = - slope2 * var2 / slope1 - intercept / slope1
     relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyL.RefPolynomial _ _ -> return False
-  PolyL.LimbMonomial constant (limb1, multiplier1) _ -> do
-    --  constant + limb1 * multiplier1  = 0
+  PolyL.SliceMonomial constant (slice1, multiplier1) -> do
+    --  constant + slice1 * multiplier1  = 0
     --    =>
-    --  limb1 = - constant / multiplier1
-    let pairs = Slice.fromLimbWithValue limb1 (toInteger (-constant / multiplier1))
-    mapM_ (uncurry assignS) pairs
+    --  slice1 = - constant / multiplier1
+    -- let pairs = Slice.fromLimbWithValue limb1 (toInteger (-constant / multiplier1))
+    assignS slice1 (toInteger (-constant / multiplier1))
     return True
-  PolyL.LimbBinomial constant (limb1, multiplier1) (limb2, multiplier2) _ _ -> do
+  PolyL.SliceBinomial constant (slice1, multiplier1) (slice2, multiplier2) -> do
     if constant == 0 && multiplier1 == -multiplier2
       then do
-        --  limb1 * multiplier1 = limb2 * multiplier2
-        relateL limb1 limb2
+        --  slice1 * multiplier1 = slice2 * multiplier2
+        relateS slice1 slice2
       else return False
-  PolyL.LimbPolynomial {} -> return False
+  PolyL.SlicePolynomial {} -> return False
   PolyL.MixedPolynomial {} -> return False
 
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
@@ -416,14 +416,6 @@ relateS slice1 slice2 = do
       modify' $ \cm' -> removeOccurrences (Set.fromList [Slice.toLimb slice1, Slice.toLimb slice2]) $ cm' {cmRelations = relations}
       return True
 
-relateL :: (GaloisField n, Integral n) => Limb -> Limb -> RoundM n Bool
-relateL limb1 limb2 = case (Slice.fromLimb limb1, Slice.fromLimb limb2) of
-  ([(coeff1, slice1)], [(coeff2, slice2)]) ->
-    if coeff1 == coeff2
-      then relateS slice1 slice2
-      else error "[ panic ] relateL: coefficients do not match"
-  _ -> error "[ panic ] relateL: not a single slice"
-
 --------------------------------------------------------------------------------
 
 -- | Add learned additive constraints to the pool
@@ -444,21 +436,20 @@ addAddL poly = case PolyL.view poly of
   PolyL.RefPolynomial _ _ -> do
     markChanged AdditiveFieldConstraintChanged
     modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
-  PolyL.LimbMonomial constant (limb1, multiplier1) _ -> do
-    --  constant + limb1 * multiplier1  = 0
+  PolyL.SliceMonomial constant (slice1, multiplier1) -> do
+    --  constant + slice1 * multiplier1  = 0
     --    =>
-    --  limb1 = - constant / multiplier1
-    let pairs = Slice.fromLimbWithValue limb1 (toInteger (-constant / multiplier1))
-    mapM_ (uncurry assignS) pairs
-  PolyL.LimbBinomial constant (limb1, multiplier1) (limb2, multiplier2) _ _ -> do
+    --  slice1 = - constant / multiplier1
+    assignS slice1 (toInteger (-constant / multiplier1))
+  PolyL.SliceBinomial constant (slice1, multiplier1) (slice2, multiplier2) -> do
     if constant == 0 && multiplier1 == -multiplier2
       then do
-        --  limb1 * multiplier1 = limb2 * multiplier2
-        void $ relateL limb1 limb2
+        --  slice1 * multiplier1 = slice2 * multiplier2
+        void $ relateS slice1 slice2
       else do
         markChanged AdditiveLimbConstraintChanged
         modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
-  PolyL.LimbPolynomial {} -> do
+  PolyL.SlicePolynomial {} -> do
     markChanged AdditiveLimbConstraintChanged
     modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
   PolyL.MixedPolynomial {} -> do
