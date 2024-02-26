@@ -5,9 +5,12 @@
 module Test.Data.IntervalSet (tests, run) where
 
 import Control.Monad (foldM, forM_)
+import Data.Field.Galois (Prime)
 import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.IntervalTable qualified as IntervalTable
+import Keelung.Data.Slice (Slice)
+import Test.Arbitrary ()
 import Test.Hspec
 import Test.QuickCheck
 
@@ -53,6 +56,13 @@ tests = describe "Interval Sets" $ do
         let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
         IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
         IntervalSet.validate intervals `shouldBe` Nothing
+
+  describe "fromSlice" $ do
+    it "should result in a valid IntervalSet" $ do
+      property $ \xs -> do
+        case IntervalSet.fromSlice (xs :: (Slice, Prime 17)) of
+          Nothing -> return ()
+          Just intervals -> IntervalSet.validate intervals `shouldBe` Nothing
 
   describe "toIntervalTable" $ do
     it "should generate well-behaved IntervalTable" $ do

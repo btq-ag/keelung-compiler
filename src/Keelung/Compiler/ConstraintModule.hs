@@ -19,9 +19,9 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet qualified as IntSet
+import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Sequence (Seq)
-import Data.Set (Set)
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung.Compiler.Optimize.OccurB (OccurB)
@@ -35,10 +35,14 @@ import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
+import Keelung.Data.IntervalSet (IntervalSet)
+import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
 
@@ -192,11 +196,11 @@ class UpdateOccurrences ref where
   removeOccurrence :: ref -> ConstraintModule n -> ConstraintModule n
 
 -- | `addOccurrence` on a set of references
-addOccurrences :: (UpdateOccurrences ref) => Set ref -> ConstraintModule n -> ConstraintModule n
+addOccurrences :: (UpdateOccurrences ref, Foldable t) => t ref -> ConstraintModule n -> ConstraintModule n
 addOccurrences xs cm = foldl (flip addOccurrence) cm xs
 
 -- | `removeOccurrence` on a set of references
-removeOccurrences :: (UpdateOccurrences ref) => Set ref -> ConstraintModule n -> ConstraintModule n
+removeOccurrences :: (UpdateOccurrences ref, Foldable t) => t ref -> ConstraintModule n -> ConstraintModule n
 removeOccurrences xs cm = foldl (flip removeOccurrence) cm xs
 
 instance UpdateOccurrences (PolyL n) where
@@ -264,3 +268,31 @@ instance UpdateOccurrences Limb where
     case lmbRef limb of
       RefUX width var -> cm {cmOccurrenceU = OccurU.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceU cm)}
       _ -> cm
+
+instance UpdateOccurrences (Slice, n) where
+  addOccurrence (slice, _) cm =
+    case Slice.sliceRefU slice of
+      RefUX width var -> cm {cmOccurrenceU = OccurU.increase width var (Slice.sliceStart slice, Slice.sliceEnd slice) (cmOccurrenceU cm)}
+      _ -> cm
+  removeOccurrence (slice, _) cm =
+    case Slice.sliceRefU slice of
+      RefUX width var -> cm {cmOccurrenceU = OccurU.decrease width var (Slice.sliceStart slice, Slice.sliceEnd slice) (cmOccurrenceU cm)}
+      _ -> cm
+
+instance UpdateOccurrences (RefU, IntervalSet n) where
+  addOccurrence (ref, intervals) cm =
+    case ref of
+      RefUX _ _ ->
+        let slices = IntervalSet.toSlices ref intervals
+         in addOccurrences slices cm
+      _ -> cm
+  removeOccurrence (ref, intervals) cm =
+    case ref of
+      RefUX _ _ ->
+        let slices = IntervalSet.toSlices ref intervals
+         in removeOccurrences slices cm
+      _ -> cm
+
+instance UpdateOccurrences (Map RefU (IntervalSet n)) where
+  addOccurrence = addOccurrences . Map.toList
+  removeOccurrence = removeOccurrences . Map.toList

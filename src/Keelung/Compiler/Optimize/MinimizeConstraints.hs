@@ -475,10 +475,20 @@ addLimb :: Limb -> Maybe Changes -> Maybe Changes
 addLimb limb (Just changes) = Just (changes {addedLimbs = Set.insert limb (addedLimbs changes)})
 addLimb limb Nothing = Just (Changes (Set.singleton limb) mempty mempty mempty)
 
+-- | Mark a Slice as added
+-- addSlice :: Slice -> Maybe Changes -> Maybe Changes
+-- addSlice slice (Just changes) = Just (changes {addedLimbs = Set.insert (Slice.toLimb slice) (addedLimbs changes)})
+-- addSlice slice Nothing = Just (Changes (Set.singleton (Slice.toLimb slice)) mempty mempty mempty)
+
 -- | Mark a Limb as removed
 removeLimb :: Limb -> Maybe Changes -> Maybe Changes
 removeLimb limb (Just changes) = Just (changes {removedLimbs = Set.insert limb (removedLimbs changes)})
 removeLimb limb Nothing = Just (Changes mempty (Set.singleton limb) mempty mempty)
+
+-- | Mark a Slice as removed
+-- removeSlice :: Slice -> Maybe Changes -> Maybe Changes
+-- removeSlice slice (Just changes) = Just (changes {removedLimbs = Set.insert (Slice.toLimb slice) (removedLimbs changes)})
+-- removeSlice slice Nothing = Just (Changes mempty (Set.singleton (Slice.toLimb slice)) mempty mempty)
 
 -- | Mark a Ref as added
 addRef :: Ref -> Maybe Changes -> Maybe Changes

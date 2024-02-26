@@ -22,7 +22,7 @@ module Keelung.Data.IntervalSet
     toIntervalTable,
     fromLimb,
     toSlices,
-    fromSlices,
+    fromSlice,
 
     -- * Query
     intervalsWithin,
@@ -108,9 +108,12 @@ fromLimb (limb, n) = IntervalSet $ IntMap.singleton (Limb.lmbOffset limb) (Limb.
 toSlices :: RefU -> IntervalSet n -> [(Slice, n)]
 toSlices ref (IntervalSet xs) = map (\(start, (end, count)) -> (Slice.Slice ref start end, count)) $ IntMap.toList xs
 
--- | O(n): Create an interval set from a list of Slices
-fromSlices :: (Num n, Eq n) => [(Slice, n)] -> IntervalSet n
-fromSlices = List.foldl' (\acc (slice, count) -> adjust (Slice.sliceStart slice, Slice.sliceEnd slice) count acc) new
+-- | O(1): Create an interval set from a Slice and a multiplier
+fromSlice :: (Num n, Eq n) => (Slice, n) -> Maybe (IntervalSet n)
+fromSlice (Slice.Slice _ start end, n) =
+  if start == end || n == 0
+    then Nothing
+    else Just $ IntervalSet $ IntMap.singleton start (end, n)
 
 --------------------------------------------------------------------------------
 

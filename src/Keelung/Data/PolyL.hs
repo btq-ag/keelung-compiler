@@ -48,6 +48,7 @@ import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (negate, null)
 import Prelude qualified
 
@@ -99,16 +100,12 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
 --------------------------------------------------------------------------------
 
 -- | Construct a PolyL from a constant, Refs, and Limbs
-new :: (Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> Either n (PolyL n)
-new constant refs limbs = case (toMap refs, toMap limbs, toIntervalSets limbs) of
-  (Nothing, Nothing, Nothing) -> Left constant
-  (Nothing, Nothing, Just _) -> error "[ panic ] PolyL.new: impossible"
-  (Nothing, Just _, Nothing) -> error "[ panic ] PolyL.new: impossible"
-  (Nothing, Just limbs', Just slices') -> Right (PolyL constant limbs' mempty slices')
-  (Just refs', Nothing, Nothing) -> Right (PolyL constant mempty refs' mempty)
-  (Just _, Nothing, Just _) -> error "[ panic ] PolyL.new: impossible"
-  (Just _, Just _, Nothing) -> error "[ panic ] PolyL.new: impossible"
-  (Just refs', Just limbs', Just slices') -> Right (PolyL constant limbs' refs' slices')
+new :: (Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> Either n (PolyL n)
+new constant refs slices = case (toMap refs, fromSlices slices) of
+  (Nothing, Nothing) -> Left constant
+  (Nothing, Just slices') -> Right (PolyL constant mempty mempty slices')
+  (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
+  (Just refs', Just slices') -> Right (PolyL constant mempty refs' slices')
 
 -- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
 fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
@@ -187,7 +184,7 @@ data View n
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 view :: PolyL n -> View n
 view (PolyL constant _ refs intervals) =
-  let slices = fromIntervalSets intervals
+  let slices = toSlices intervals
    in case (Map.toList refs, slices) of
         ([], [slice]) -> SliceMonomial constant slice
         ([], []) -> error "[ panic ] PolyL.view: empty"
@@ -200,7 +197,7 @@ view (PolyL constant _ refs intervals) =
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int
-size (PolyL c limbs refs _) = (if c == 0 then 0 else 1) + sum (fmap lmbWidth (Map.keys limbs)) + Map.size refs
+size (PolyL c _ refs intervals) = (if c == 0 then 0 else 1) + Map.size refs + length (concatMap (uncurry IntervalSet.toSlices) (Map.toList intervals))
 
 --------------------------------------------------------------------------------
 
@@ -219,7 +216,7 @@ validate (PolyL _ limbs refs slices) =
       notConstantOnly = limbsNonZero || refsNonZero || slicesNonZero
       limbsWithZeroWidth = filter ((== 0) . widthOf) (Map.keys limbs)
       invalidSlices = toList $ Map.mapMaybe IntervalSet.validate slices
-   in -- invalidSlices = map fst $ fromIntervalSets $ Map.filter (not . IntervalSet.isValid) slices
+   in -- invalidSlices = map fst $ toSlices $ Map.filter (not . IntervalSet.isValid) slices
       if notConstantOnly
         then
           if null limbsWithZeroWidth
@@ -248,8 +245,21 @@ toIntervalSets pairs =
         then Nothing
         else Just result
 
-fromIntervalSets :: Map RefU (IntervalSet n) -> [(Slice, n)]
-fromIntervalSets = concatMap (uncurry IntervalSet.toSlices) . Map.toList
+toSlices :: Map RefU (IntervalSet n) -> [(Slice, n)]
+toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList
+
+-- | From a list of (Slice, n) pairs to a Map of valid IntervalSets
+fromSlices :: (Num n, Eq n) => [(Slice, n)] -> Maybe (Map RefU (IntervalSet n))
+fromSlices pairs =
+  let raw = Map.mapMaybe id $ Map.fromListWith mergeEntry (map (\(slice, n) -> (Slice.sliceRefU slice, IntervalSet.fromSlice (slice, n))) pairs)
+      result = Map.filter (not . IntervalSet.allZero) raw
+   in if Map.null result
+        then Nothing
+        else Just result
+  where
+    mergeEntry Nothing xs = xs
+    mergeEntry xs Nothing = xs
+    mergeEntry (Just xs) (Just ys) = Just (xs <> ys)
 
 mergeAndClean :: (Integral n, Ord a) => Map a n -> Map a n -> Map a n
 mergeAndClean xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)

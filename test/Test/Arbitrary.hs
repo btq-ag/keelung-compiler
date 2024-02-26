@@ -130,11 +130,7 @@ instance Arbitrary Limb where
 
 --------------------------------------------------------------------------------
 
--- data Case = EmptyRefs | EmptyLimbs | BothNonEmpty
-
--- instance Arbitrary Case where
---   arbitrary = elements [EmptyRefs, EmptyLimbs, BothNonEmpty]
-
+-- | Generates valid PolyL
 instance (Arbitrary n, Integral n) => Arbitrary (PolyL n) where
   arbitrary =
     fst
@@ -147,28 +143,3 @@ instance (Arbitrary n, Integral n) => Arbitrary (PolyL n) where
                 Right poly -> return (poly, True)
           )
         `suchThat` (\(poly, successful) -> successful && PolyL.validate poly == Nothing)
-
--- result <- arbitrary
--- (refs, slices) <- case result of
---   EmptyRefs -> do
---     slices <- arbitrary `suchThat` validSlices
---     pure (mempty, Map.toList slices)
---   EmptyLimbs -> do
---     refs <- arbitrary `suchThat` validRefs
---     pure (Map.toList refs, mempty)
---   BothNonEmpty -> do
---     refs <- arbitrary `suchThat` validRefs
---     slices <- arbitrary `suchThat` validSlices
---     pure (Map.toList refs, Map.toList slices)
--- let limbs = fmap (first Slice.toLimb) slices
--- constant <- arbitrary
--- case PolyL.new constant refs limbs of
---   Left _ -> error "impossible"
---   Right poly -> pure poly
--- where
---   validSlices :: (Arbitrary n, Integral n) => Map Slice n -> Bool
---   validSlices xs =
---     and (Map.mapWithKey (\slice count -> count /= 0 && widthOf slice /= 0) xs) && not (null xs)
-
---   validRefs :: (Arbitrary n, Integral n) => Map Ref n -> Bool
---   validRefs = not . Map.null . Map.filter (/= 0)
