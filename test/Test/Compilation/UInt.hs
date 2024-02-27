@@ -53,44 +53,82 @@ tests = do
         testCompiler (Prime 257) program [300] [] [300]
 
     describe "Conditionals" $ do
-      it "with inputs" $ do
+      it "variable / variable / variable" $ do
         let program = do
+              p <- input Public
               x <- input Public :: Comp (UInt 4)
               y <- input Public
-              return $ cond true x y
-        testCompiler gf181 program [5, 6] [] [5]
+              return $ cond p x y
+        let genParam = do
+              p <- arbitrary
+              x <- chooseInt (0, 15)
+              y <- chooseInt (0, 15)
+              return (p, x, y)
+        forAll genParam $ \(p, x, y) -> do
+          let expected = [fromIntegral $ if p then x else y]
+          testCompiler gf181 program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
 
-      it "with literals" $ do
+      it "variable / variable / constant" $ do
+        let program y = do
+              p <- input Public
+              x <- input Public :: Comp (UInt 4)
+              return $ cond p x y
+        let genParam = do
+              p <- arbitrary
+              x <- chooseInt (0, 15)
+              y <- chooseInt (0, 15)
+              return (p, x, y)
+        forAll genParam $ \(p, x, y) -> do
+          let expected = [fromIntegral $ if p then x else y]
+          testCompiler gf181 (program (fromIntegral y)) [if p then 1 else 0, fromIntegral x] [] expected
+
+      it "variable / constant / variable" $ do
+        let program x = do
+              p <- input Public
+              y <- input Public :: Comp (UInt 4)
+              return $ cond p x y
+        let genParam = do
+              p <- arbitrary
+              x <- chooseInt (0, 15)
+              y <- chooseInt (0, 15)
+              return (p, x, y)
+        forAll genParam $ \(p, x, y) -> do
+          let expected = [fromIntegral $ if p then x else y]
+          testCompiler gf181 (program (fromIntegral x)) [if p then 1 else 0, fromIntegral y] [] expected
+
+      it "variable / constant / constant" $ do
+        let program x y = do
+              p <- input Public
+              return $ cond p x y
+        let genParam = do
+              p <- arbitrary
+              x <- chooseInt (0, 15)
+              y <- chooseInt (0, 15)
+              return (p, x, y)
+        forAll genParam $ \(p, x, y) -> do
+          let expected = [fromIntegral $ if p then x else y]
+          testCompiler gf181 (program (fromIntegral x :: UInt 4) (fromIntegral y)) [if p then 1 else 0] [] expected
+
+      it "constant predicate" $ do
         let program = do
               return $ cond true (3 :: UInt 2) 2
         testCompiler gf181 program [] [] [3]
 
     describe "Equalities" $ do
-      it "eq: variable / constant" $ do
+      it "variable / constant" $ do
         let program = do
-              x <- inputUInt @4 Public
+              x <- input Public :: Comp (UInt 4)
               return (x `eq` 13)
         forAll (choose (0, 15)) $ \x -> do
           let expected = [if x == 13 then 1 else 0]
-          testCompiler (Prime 13) program [x `mod` 16] [] expected
+          testCompiler gf181 program [x] [] expected
+          testCompiler (Prime 13) program [x] [] expected
+          testCompiler (Binary 7) program [x] [] expected
 
-      it "eq: variables (Prime 13)" $ do
+      it "variables (Prime 13)" $ do
         let program = do
-              x <- inputUInt @4 Public
-              y <- inputUInt @4 Public
-              return (x `eq` y)
-        let genPair = do
-              x <- choose (0, 15)
-              y <- choose (0, 15)
-              return (x, y)
-        forAll genPair $ \(x, y) -> do
-          let expected = [if x == y then 1 else 0]
-          testCompiler (Prime 13) program [x, y] [] expected
-
-      it "eq: variables (GF181)" $ do
-        let program = do
-              x <- inputUInt @4 Public
-              y <- inputUInt @4 Public
+              x <- input Public :: Comp (UInt 4)
+              y <- input Public
               return (x `eq` y)
         let genPair = do
               x <- choose (0, 15)
@@ -99,14 +137,14 @@ tests = do
         forAll genPair $ \(x, y) -> do
           let expected = [if x == y then 1 else 0]
           testCompiler gf181 program [x, y] [] expected
+          testCompiler (Prime 13) program [x, y] [] expected
+          testCompiler (Binary 7) program [x, y] [] expected
 
       it "neq: variable / constant" $ do
         let program = do
               x <- inputUInt @4 Public
               return (x `neq` 13)
 
-        -- testCompiler (Prime 13) program [0] [] [0]
-        -- testCompiler (Prime 13) program [4, 4] [] [1]
         forAll (choose (0, 15)) $ \x -> do
           let expected = [if x == 13 then 0 else 1]
           testCompiler (Prime 13) program [x `mod` 16] [] expected

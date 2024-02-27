@@ -306,11 +306,6 @@ compileIfU width (Left p) x y = do
         )
         outLCs
         xyLCs
-      -- let xLimbs = Limb.refUToLimbs fieldWidth (RefUVal width x)
-
-      -- let bits = [(B (RefUBit out i), -(2 ^ i)) | i <- [0 .. width - 1]]
-      -- -- (x - y) * p - out + y = 0
-      -- writeAdd (fromInteger y) $ (B p, fromInteger (x - y)) : bits
       return $ Left out
 
 --------------------------------------------------------------------------------

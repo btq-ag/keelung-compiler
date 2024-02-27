@@ -18,6 +18,7 @@ import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
+-- import qualified Keelung.Data.Slice as Slice
 
 -- | Linear combination of variables and constants.
 data LC n
@@ -38,7 +39,10 @@ fromRefU fieldInfo (Right val) =
         let range = [0 .. (fieldWidth fieldInfo `min` width) - 1]
         Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val (limbStart + i)]
    in map go [0, fieldWidth fieldInfo .. width - 1]
-fromRefU fieldInfo (Left var) =
+fromRefU fieldInfo (Left var) = 
+  -- case PolyL.new 0 [] [(Slice.fromRefU var, 1)] of 
+  -- Left constant -> [Constant constant]
+  -- Right poly -> [Polynomial poly]
   let limbs = Limb.refUToLimbs (fieldWidth fieldInfo) var
    in map (Polynomial . PolyL.fromLimb 0) limbs
 
