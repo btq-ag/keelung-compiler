@@ -12,6 +12,7 @@ module Keelung.Data.PolyL
     -- * Constructors
     fromLimbs,
     fromLimb,
+    fromRef,
     fromRefs,
     toSlices,
 
@@ -107,6 +108,10 @@ new constant refs slices = case (toMap refs, fromSlices slices) of
   (Nothing, Just slices') -> Right (PolyL constant mempty mempty slices')
   (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
   (Just refs', Just slices') -> Right (PolyL constant mempty refs' slices')
+
+-- | Construct a PolyL from a single Ref
+fromRef :: (Integral n) => Ref -> PolyL n
+fromRef ref = PolyL 0 mempty (Map.singleton ref 1) mempty
 
 -- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
 fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
