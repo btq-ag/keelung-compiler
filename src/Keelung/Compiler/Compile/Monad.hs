@@ -19,7 +19,6 @@ import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Data.Constraint
 import Keelung.Data.LC
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
@@ -83,6 +82,19 @@ freshRefU width = do
   modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ RefUX width index
 
+execRelations :: (Relations n -> EquivClass.M (Error n) (Relations n)) -> M n ()
+execRelations f = do
+  cs <- get
+  result <- lift $ lift $ (EquivClass.runM . f) (cmRelations cs)
+  case result of
+    Nothing -> return ()
+    Just relations -> put cs {cmRelations = relations}
+
+-- | When a RefUBit is detected, we want to count it as an occurrence
+addOccurrenceOnRefUBit :: (GaloisField n, Integral n) => Ref -> M n ()
+addOccurrenceOnRefUBit (B (RefUBit (RefUX width var) i)) = modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (i, i + 1) (cmOccurrenceU cs)})
+addOccurrenceOnRefUBit _ = return ()
+
 --------------------------------------------------------------------------------
 
 -- | We want to break the compilation module into smaller modules,
@@ -115,102 +127,20 @@ compileExprU out expr = do
 
 --------------------------------------------------------------------------------
 
-writeMulWithLC :: (GaloisField n, Integral n) => LC n -> LC n -> LC n -> M n ()
-writeMulWithLC as bs cs = case (as, bs, cs) of
-  (Constant _, Constant _, Constant _) -> return ()
-  (Constant x, Constant y, Polynomial zs) ->
-    -- z - x * y = 0
-    addC [CAddL $ PolyL.addConstant (-x * y) zs]
-  (Constant x, Polynomial ys, Constant z) ->
-    -- x * ys = z
-    -- x * ys - z = 0
-    case PolyL.multiplyBy x ys of
-      Left _ -> return ()
-      Right poly -> addC [CAddL $ PolyL.addConstant (-z) poly]
-  (Constant x, Polynomial ys, Polynomial zs) -> do
-    -- x * ys = zs
-    -- x * ys - zs = 0
-    case PolyL.multiplyBy x ys of
-      Left c ->
-        -- c - zs = 0
-        addC [CAddL $ PolyL.addConstant (-c) zs]
-      Right ys' -> case PolyL.merge ys' (PolyL.negate zs) of
-        Left _ -> return ()
-        Right poly -> addC [CAddL poly]
-  (Polynomial xs, Constant y, Constant z) -> writeMulWithLC (Constant y) (Polynomial xs) (Constant z)
-  (Polynomial xs, Constant y, Polynomial zs) -> writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
-  (Polynomial xs, Polynomial ys, _) -> addC [CMulL xs ys (toPolyL cs)]
-
 writeAddWithPolyL :: (GaloisField n, Integral n) => Either n (PolyL n) -> M n ()
 writeAddWithPolyL xs = case xs of
   Left _ -> return ()
-  Right poly -> addC [CAddL poly]
+  Right poly -> modify' (\cs -> addOccurrence poly $ cs {cmAddL = poly Seq.<| cmAddL cs})
 
 writeAddWithLC :: (GaloisField n, Integral n) => LC n -> M n ()
 writeAddWithLC xs = case xs of
   Constant _ -> return ()
-  Polynomial poly -> addC [CAddL poly]
+  Polynomial poly -> writeAddWithPolyL (Right poly)
 
 writeAddWithLCAndLimbs :: (GaloisField n, Integral n) => LC n -> n -> [(Limb, n)] -> M n ()
 writeAddWithLCAndLimbs lc constant limbs = case lc of
   Constant _ -> return ()
-  Polynomial poly -> case PolyL.insertLimbs constant limbs poly of
-    Left _ -> return ()
-    Right poly' -> addC [CAddL poly']
-
-addC :: (GaloisField n, Integral n) => [Constraint n] -> M n ()
-addC = mapM_ addOne
-  where
-    execRelations :: (Relations n -> EquivClass.M (Error n) (Relations n)) -> M n ()
-    execRelations f = do
-      cs <- get
-      result <- lift $ lift $ (EquivClass.runM . f) (cmRelations cs)
-      case result of
-        Nothing -> return ()
-        Just relations -> put cs {cmRelations = relations}
-
-    countBitTestAsOccurU :: (GaloisField n, Integral n) => Ref -> M n ()
-    countBitTestAsOccurU (B (RefUBit (RefUX width var) i)) = modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (i, i + 1) (cmOccurrenceU cs)})
-    countBitTestAsOccurU _ = return ()
-
-    addOne :: (GaloisField n, Integral n) => Constraint n -> M n ()
-    addOne (CAddL xs) = do
-      modify' (\cs -> addOccurrence xs $ cs {cmAddL = xs Seq.<| cmAddL cs})
-    addOne (CRefFVal x c) = do
-      execRelations $ Relations.assignR x c
-    addOne (CSliceVal x c) = do
-      execRelations $ Relations.assignS x c
-    addOne (CRefEq x y) = do
-      countBitTestAsOccurU x
-      countBitTestAsOccurU y
-      execRelations $ Relations.relateR x 1 y 0
-    addOne (CSliceEq x y) = do
-      execRelations $ Relations.relateS x y
-    addOne (CRefBNEq x y) = do
-      countBitTestAsOccurU (B x)
-      countBitTestAsOccurU (B y)
-      execRelations $ Relations.relateB x (False, y)
-    addOne (CMulL x y (Left c)) = do
-      modify'
-        ( \cs -> addOccurrence x $ addOccurrence y $ cs {cmMulL = (x, y, Left c) Seq.<| cmMulL cs}
-        )
-    addOne (CMulL x y (Right z)) = do
-      modify
-        ( \cs -> addOccurrence x $ addOccurrence y $ addOccurrence z $ cs {cmMulL = (x, y, Right z) Seq.<| cmMulL cs}
-        )
-
---------------------------------------------------------------------------------
-
-writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
-writeMul as bs cs = writeMulWithLC (fromPolyL $ uncurry PolyL.fromRefs as) (fromPolyL $ uncurry PolyL.fromRefs bs) (fromPolyL $ uncurry PolyL.fromRefs cs)
-
-writeMulWithLimbs :: (GaloisField n, Integral n) => (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> M n ()
-writeMulWithLimbs as bs cs = case (uncurry PolyL.fromLimbs as, uncurry PolyL.fromLimbs bs) of
-  (Right as', Right bs') ->
-    addC
-      [ CMulL as' bs' (uncurry PolyL.fromLimbs cs)
-      ]
-  _ -> return ()
+  Polynomial poly -> writeAddWithPolyL $ PolyL.insertLimbs constant limbs poly
 
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyL (PolyL.fromRefs c as)
@@ -221,9 +151,51 @@ writeAddWithSlices constant refs slices = writeAddWithLimbs constant refs (map (
 writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> M n ()
 writeAddWithLimbs constant refs limbs = case PolyL.fromLimbs constant limbs of
   Left _ -> return ()
-  Right poly -> case PolyL.insertRefs 0 refs poly of
+  Right poly -> writeAddWithPolyL $ PolyL.insertRefs 0 refs poly
+
+--------------------------------------------------------------------------------
+
+writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
+writeMul as bs cs = writeMulWithPolyL (uncurry PolyL.fromRefs as) (uncurry PolyL.fromRefs bs) (uncurry PolyL.fromRefs cs)
+
+writeMulWithLC :: (GaloisField n, Integral n) => LC n -> LC n -> LC n -> M n ()
+writeMulWithLC as bs cs = writeMulWithPolyL (convert as) (convert bs) (convert cs)
+  where
+    convert :: LC n -> Either n (PolyL n)
+    convert (Constant x) = Left x
+    convert (Polynomial xs) = Right xs
+
+writeMulWithPolyL :: (GaloisField n, Integral n) => Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> M n ()
+writeMulWithPolyL (Left x) (Left y) (Left z) =
+  if x * y == z
+    then return ()
+    else error "[ panic ] writeMulWithPolyL: constant mismatch"
+writeMulWithPolyL (Left x) (Left y) (Right zs) =
+  -- zs - x * y = 0
+  writeAddWithPolyL $ Right $ PolyL.addConstant (-x * y) zs
+writeMulWithPolyL (Left x) (Right ys) (Left z) =
+  -- x * ys = z
+  -- x * ys - z = 0
+  case PolyL.multiplyBy x ys of
     Left _ -> return ()
-    Right poly' -> addC [CAddL poly']
+    Right poly -> writeAddWithPolyL $ Right $ PolyL.addConstant (-z) poly
+writeMulWithPolyL (Left x) (Right ys) (Right zs) = do
+  -- x * ys = zs
+  -- x * ys - zs = 0
+  case PolyL.multiplyBy x ys of
+    Left c ->
+      -- c - zs = 0
+      writeAddWithPolyL $ Right $ PolyL.addConstant (-c) zs
+    Right ys' -> writeAddWithPolyL $ PolyL.merge ys' (PolyL.negate zs)
+writeMulWithPolyL (Right xs) (Left y) (Left z) = writeMulWithPolyL (Left y) (Right xs) (Left z)
+writeMulWithPolyL (Right xs) (Left y) (Right zs) = writeMulWithPolyL (Left y) (Right xs) (Right zs)
+writeMulWithPolyL (Right xs) (Right ys) (Left z) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ cs {cmMulL = (xs, ys, Left z) Seq.<| cmMulL cs})
+writeMulWithPolyL (Right xs) (Right ys) (Right zs) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ addOccurrence zs $ cs {cmMulL = (xs, ys, Right zs) Seq.<| cmMulL cs})
+
+writeMulWithLimbs :: (GaloisField n, Integral n) => (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> M n ()
+writeMulWithLimbs as bs cs = writeMulWithPolyL (uncurry PolyL.fromLimbs as) (uncurry PolyL.fromLimbs bs) (uncurry PolyL.fromLimbs cs)
+
+--------------------------------------------------------------------------------
 
 -- | Assign a field element to a Ref
 writeRefVal :: (GaloisField n, Integral n) => Ref -> n -> M n ()
@@ -232,16 +204,19 @@ writeRefVal (B a) x = writeRefBVal a (x /= 0)
 
 -- | Assign a field element to a RefF
 writeRefFVal :: (GaloisField n, Integral n) => RefF -> n -> M n ()
-writeRefFVal a x = addC [CRefFVal (F a) x]
+writeRefFVal x c = execRelations $ Relations.assignR (F x) c
 
 -- | Assign a Bool to a RefB
 writeRefBVal :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
-writeRefBVal a True = addC [CRefFVal (B a) 1]
-writeRefBVal a False = addC [CRefFVal (B a) 0]
+writeRefBVal x True = execRelations $ Relations.assignR (B x) 1
+writeRefBVal x False = execRelations $ Relations.assignR (B x) 0
 
 -- | Assert that two RefBs are equal
 writeRefBEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
-writeRefBEq a b = addC [CRefEq (B a) (B b)]
+writeRefBEq x y = do
+  addOccurrenceOnRefUBit (B x)
+  addOccurrenceOnRefUBit (B y)
+  execRelations $ Relations.relateR (B x) 1 (B y) 0
 
 writeRefB :: (GaloisField n, Integral n) => RefB -> Either RefB Bool -> M n ()
 writeRefB a (Left b) = writeRefBEq a b
@@ -249,31 +224,40 @@ writeRefB a (Right b) = writeRefBVal a b
 
 -- | Assert that two Refs are equal
 writeRefEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
-writeRefEq a b = addC [CRefEq a b]
+writeRefEq x y = do
+  addOccurrenceOnRefUBit x
+  addOccurrenceOnRefUBit y
+  execRelations $ Relations.relateR x 1 y 0
 
 -- | Assert that two RefFs are equal
 writeRefFEq :: (GaloisField n, Integral n) => RefF -> RefF -> M n ()
-writeRefFEq a b = addC [CRefEq (F a) (F b)]
+writeRefFEq x y = do
+  addOccurrenceOnRefUBit (F x)
+  addOccurrenceOnRefUBit (F y)
+  execRelations $ Relations.relateR (F x) 1 (F y) 0
 
 -- | Assert that one RefB is the negation of another RefB
 writeRefBNEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
-writeRefBNEq a b = addC [CRefBNEq a b]
+writeRefBNEq x y = do
+  addOccurrenceOnRefUBit (B x)
+  addOccurrenceOnRefUBit (B y)
+  execRelations $ Relations.relateB x (False, y)
 
 -- | Assign a Integer to a RefU
 writeRefUVal :: (GaloisField n, Integral n) => RefU -> U -> M n ()
-writeRefUVal a x = addC [CSliceVal (Slice.fromRefU a) (toInteger x)]
+writeRefUVal x c = execRelations $ Relations.assignS (Slice.fromRefU x) (toInteger c)
 
 -- | Assign an Integer to a Limb
 writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
-writeLimbVal limb val = addC $ map (uncurry CSliceVal) (Slice.fromLimbWithValue limb val)
+writeLimbVal limb val = mapM_ (\(x, c) -> execRelations (Relations.assignS x (toInteger c))) (Slice.fromLimbWithValue limb val)
 
 -- | Assign an Integer to a Slice
 writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
-writeSliceVal a x = addC [CSliceVal a x]
+writeSliceVal x c = execRelations $ Relations.assignS x (toInteger c)
 
 -- | Assert that two RefUs are equal
 writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
-writeRefUEq a b = addC [CSliceEq (Slice.fromRefU a) (Slice.fromRefU b)]
+writeRefUEq x y = execRelations $ Relations.relateS (Slice.fromRefU x) (Slice.fromRefU y)
 
 -- | Assert that two Limbs are equal
 -- TODO: eliminate this function
@@ -290,13 +274,13 @@ writeLimbEq a b =
 
 -- | Assert that two Slices are equal
 writeSliceEq :: (GaloisField n, Integral n) => Slice -> Slice -> M n ()
-writeSliceEq a b =
-  if widthOf a == widthOf b
+writeSliceEq x y =
+  if widthOf x == widthOf y
     then
-      if widthOf a == 0
+      if widthOf x == 0
         then return () -- no need to add a constraint for slices of width 0
-        else addC [CSliceEq a b]
-    else error $ "[ panic ] writeSliceEq: width mismatch, " <> show (widthOf a) <> " /= " <> show (widthOf b)
+        else execRelations $ Relations.relateS x y
+    else error $ "[ panic ] writeSliceEq: width mismatch, " <> show (widthOf x) <> " /= " <> show (widthOf y)
 
 --------------------------------------------------------------------------------
 
