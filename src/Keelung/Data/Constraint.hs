@@ -39,14 +39,15 @@ pinnedRefU (RefUX _ _) = False
 --------------------------------------------------------------------------------
 
 -- | Specialized constraints
+--   NOTE: field width limit should be taken into consideration before constructing such constraints
 data Constraint n
   = CAddL !(PolyL n) -- additive constraint
   | CMulL !(PolyL n) !(PolyL n) !(Either n (PolyL n)) -- multiplicative constraint
   | CRefEq Ref Ref -- Ref equality
-  | CSliceEq Slice Slice -- Slice equality
   | CRefBNEq RefB RefB -- RefB negation
   | CRefFVal Ref n -- x = val
-  | CSliceVal Slice Integer -- x = val
+  | CSliceEq Slice Slice -- Slice equality
+  | CSliceVal Slice Integer -- slice = val
 
 instance (GaloisField n) => Eq (Constraint n) where
   xs == ys = case (xs, ys) of

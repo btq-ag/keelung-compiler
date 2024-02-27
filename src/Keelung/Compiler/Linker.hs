@@ -46,7 +46,6 @@ import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
-import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
 
 -------------------------------------------------------------------------------
@@ -122,41 +121,18 @@ linkConstraint env (CRefBNEq x y) =
     Left _ -> error "CRefBNEq: two variables are the same"
     Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CSliceEq x y) =
-  let widthX = Slice.sliceEnd x - Slice.sliceStart x
-      widthY = Slice.sliceEnd y - Slice.sliceStart y
-   in if widthX /= widthY
-        then error "[ panic ] CSliceEq: Slices are of different width"
-        else
-          let width = envFieldWidth env
-              -- split both Slices into smaller chunks of size `width`
-              pairs =
-                Seq.fromList $
-                  [ ( Slice (sliceRefU x) (sliceStart x + i) ((sliceStart x + i + width) `min` sliceEnd x),
-                      Slice (sliceRefU y) (sliceStart y + i) ((sliceStart y + i + width) `min` sliceEnd y)
-                    )
-                    | i <- [0, width .. widthOf x - 1]
-                  ]
-           in pairs >>= \(sliceX, sliceY) ->
-                let sliceX' = reindexSlice env sliceX True
-                    sliceY' = reindexSlice env sliceY False
-                 in case Poly.buildWithIntMap 0 (IntMap.unionWith (+) sliceX' sliceY') of
-                      Left _ -> error "CSliceEq: impossible"
-                      Right xs -> Seq.fromList [Linked.CAdd xs]
+  let x' = reindexSlice env x True
+      y' = reindexSlice env y False
+   in case Poly.buildWithIntMap 0 (IntMap.unionWith (+) x' y') of
+        Left _ -> error "CSliceEq: impossible"
+        Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef env x, 1)] of
   Left _ -> error "CRefFVal: impossible"
   Right xs -> Seq.fromList [Linked.CAdd xs]
-linkConstraint env (CSliceVal x n) =
-  let constant = case FieldInfo.fieldTypeData (envFieldInfo env) of
-        Binary _ -> fromInteger (if n < 0 then -n else n)
-        Prime _ -> fromInteger n
-      width = envFieldWidth env
-      -- split `n` into smaller chunks of size `width`
-      constantChunks = zip [0 ..] (U.chunks (envFieldWidth env) (U.new (widthOf x) constant))
-      pairs = Seq.fromList [(Slice (sliceRefU x) (sliceStart x + width * i) ((sliceStart x + width * (i + 1)) `min` sliceEnd x), chunk) | (i, chunk) <- constantChunks]
-   in pairs >>= \(slice, c) ->
-        case Poly.buildWithIntMap (fromIntegral c) (reindexSlice env slice False) of
-          Left _ -> error "CSliceVal: impossible"
-          Right xs -> Seq.fromList [Linked.CAdd xs]
+linkConstraint env (CSliceVal slice val) =
+  case Poly.buildWithIntMap (fromIntegral val) (reindexSlice env slice False) of
+    Left _ -> error "CSliceVal: impossible"
+    Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CMulL as bs cs) =
   Seq.fromList
     [ Linked.CMul
@@ -277,7 +253,7 @@ toConstraints cm env =
   let -- constraints extracted from relations between Refs
       refConstraints = RefRelations.toConstraints (shouldBeKept env) (Relations.relationsR (cmRelations cm))
       -- constraints extracted from relations between Slices
-      sliceConstraints = SliceRelations.toConstraints (cmOccurrenceU cm) (sliceShouldBeKept env) (Relations.relationsS (cmRelations cm))
+      sliceConstraints = SliceRelations.toConstraints (envFieldInfo env) (cmOccurrenceU cm) (sliceShouldBeKept env) (Relations.relationsS (cmRelations cm))
       -- constraints extracted from addative constraints
       fromAddativeConstraints = fmap CAddL (cmAddL cm)
       -- constraints extracted from multiplicative constraints

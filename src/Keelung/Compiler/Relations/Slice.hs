@@ -29,17 +29,21 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import GHC.Generics (Generic)
-import Keelung (widthOf)
+import Keelung (FieldType (..), widthOf)
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Util (indent)
 import Keelung.Data.Constraint
+import Keelung.Data.FieldInfo (FieldInfo)
+import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (Segment, SliceLookup (..))
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
+import Keelung.Syntax (Width)
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -146,9 +150,12 @@ lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
               Just lookups -> SliceLookup.splice (start, end) lookups
 
 -- | Convert relations to specialized constraints
-toConstraints :: OccurU -> (Slice -> Bool) -> SliceRelations -> Seq (Constraint n)
-toConstraints occurrence sliceShouldBeKept = fold step mempty
+toConstraints :: FieldInfo -> OccurU -> (Slice -> Bool) -> SliceRelations -> Seq (Constraint n)
+toConstraints fieldInfo occurrence sliceShouldBeKept = fold step mempty
   where
+    fieldWidth :: Width
+    fieldWidth = FieldInfo.fieldWidth fieldInfo
+
     step :: Seq (Constraint n) -> Slice -> Segment -> Seq (Constraint n)
     step acc slice segment = acc <> convert slice segment
 
@@ -160,16 +167,42 @@ toConstraints occurrence sliceShouldBeKept = fold step mempty
           case sliceRefU slice of
             RefUX width var ->
               -- only export part of slice that is used
-              fmap (\subSlice -> CSliceVal subSlice (toInteger val)) (OccurU.maskSlice occurrence width var slice)
+              OccurU.maskSlice occurrence width var slice >>= flip buildSliceVal val
             _ ->
               -- pinned reference, all bits needs to be exported
-              Seq.singleton (CSliceVal slice (toInteger val))
+              buildSliceVal slice val
         SliceLookup.ChildOf root ->
           if sliceShouldBeKept slice && sliceShouldBeKept root
-            then Seq.singleton (CSliceEq slice root)
+            then buildSliceEq slice root
             else mempty
         SliceLookup.Parent _ _ -> mempty
         SliceLookup.Empty _ -> mempty
+
+    -- Slices will be chopped into pieces no longer than `fieldWidth`
+    buildSliceEq :: Slice -> Slice -> Seq (Constraint n)
+    buildSliceEq x y =
+      let widthX = Slice.sliceEnd x - Slice.sliceStart x
+          widthY = Slice.sliceEnd y - Slice.sliceStart y
+       in if widthX /= widthY
+            then error "[ panic ] SliceRelations.toConstraints.buildSliceEq: Slices are of different width"
+            else
+              Seq.fromList $
+                [ CSliceEq
+                    (Slice (sliceRefU x) (sliceStart x + i) ((sliceStart x + i + fieldWidth) `min` sliceEnd x))
+                    ( Slice (sliceRefU y) (sliceStart y + i) ((sliceStart y + i + fieldWidth) `min` sliceEnd y)
+                    )
+                  | i <- [0, fieldWidth .. widthOf x - 1]
+                ]
+
+    -- Slices will be chopped into pieces no longer than `fieldWidth`
+    buildSliceVal :: Slice -> U -> Seq (Constraint n)
+    buildSliceVal slice val =
+      let constant = case FieldInfo.fieldTypeData fieldInfo of
+            Binary _ -> if val < 0 then -val else val
+            Prime _ -> val
+          -- split `n` into smaller chunks of size `width`
+          constantChunks = zip [0 ..] (U.chunks fieldWidth constant)
+       in Seq.fromList [CSliceVal (Slice (sliceRefU slice) (sliceStart slice + fieldWidth * i) ((sliceStart slice + fieldWidth * (i + 1)) `min` sliceEnd slice)) (toInteger chunk) | (i, chunk) <- constantChunks]
 
 -- | Fold over all Segments in a SliceRelations
 fold :: (a -> Slice -> Segment -> a) -> a -> SliceRelations -> a

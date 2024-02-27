@@ -218,10 +218,6 @@ writeRefBEq x y = do
   addOccurrenceOnRefUBit (B y)
   execRelations $ Relations.relateR (B x) 1 (B y) 0
 
-writeRefB :: (GaloisField n, Integral n) => RefB -> Either RefB Bool -> M n ()
-writeRefB a (Left b) = writeRefBEq a b
-writeRefB a (Right b) = writeRefBVal a b
-
 -- | Assert that two Refs are equal
 writeRefEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
 writeRefEq x y = do

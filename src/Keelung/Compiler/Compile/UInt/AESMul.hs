@@ -38,6 +38,11 @@ compileAESMulU out (Left a) (Left b) = compileAESMulCC out a b
 --      (0b10000000, 0b10000001, 0b00000010, 0b10000100, 0b10001000, 0b00010000, 0b00100000, 0b01000000)
 type XorCode = (Word8, Word8, Word8, Word8, Word8, Word8, Word8, Word8)
 
+-- | Helper function for associating a RefB with some Bool or another RefB
+writeRefB :: (GaloisField n, Integral n) => RefB -> Either RefB Bool -> M n ()
+writeRefB a (Left b) = writeRefBEq a b
+writeRefB a (Right b) = writeRefBVal a b
+
 compileAESMulCV :: (GaloisField n, Integral n) => RefU -> U -> RefU -> M n ()
 compileAESMulCV out c x = do
   let (code0, code1, code2, code3, code4, code5, code6, code7) = calculateXorCode (toInteger c)
