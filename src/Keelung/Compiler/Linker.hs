@@ -180,6 +180,7 @@ updateCounters tableF tableB tableU =
 linkPolyL :: (Integral n, GaloisField n) => Env -> PolyL n -> Either n (Poly n)
 linkPolyL env poly =
   let constant = PolyL.polyConstant poly
+      -- slicePolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexSlice2 env)) (PolyL.toSlices poly))
       limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb env)) (Map.toList (PolyL.polyLimbs poly)))
       varPolynomial = IntMap.fromList (map (first (reindexRef env)) (Map.toList (PolyL.polyRefs poly)))
    in Poly.buildWithIntMap constant (IntMap.unionWith (+) limbPolynomial varPolynomial)
@@ -229,6 +230,19 @@ reindexSlice env slice sign =
           (Slice.sliceRefU slice)
           (Slice.sliceStart slice + i),
         if sign then 2 ^ i else -(2 ^ i)
+      )
+      | i <- [0 .. Slice.sliceEnd slice - Slice.sliceStart slice - 1]
+    ]
+
+_reindexSlice2 :: (Integral n, GaloisField n) => Env -> Slice -> n -> IntMap n
+_reindexSlice2 env slice multiplier =
+  -- precondition of `fromDistinctAscList` is that the keys are in ascending order
+  IntMap.fromDistinctAscList
+    [ ( reindexRefU
+          env
+          (Slice.sliceRefU slice)
+          (Slice.sliceStart slice + i),
+        multiplier * (2 ^ i)
       )
       | i <- [0 .. Slice.sliceEnd slice - Slice.sliceStart slice - 1]
     ]

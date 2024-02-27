@@ -99,12 +99,12 @@ compile compileU expr = case expr of
 
 compileEqU :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> M n (Either RefB Bool)
 compileEqU x y = do
-  fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
+  fieldInfo <- gets (optFieldInfo . cmOptions)
   result <-
     zipWithM
       (\a b -> eqZero True (a <> neg b)) -- a - b ==? 0
-      (fromRefU fieldWidth x)
-      (fromRefU fieldWidth y)
+      (fromRefU fieldInfo x)
+      (fromRefU fieldInfo y)
   case result of
     [] -> return $ Right True
     [result'] -> return result'
@@ -450,7 +450,7 @@ computeLTEUVarConst x y = do
     0 -> do
       -- see if x is 0
       fieldInfo <- gets (optFieldInfo . cmOptions)
-      let chunks = LC.fromRefU2 fieldInfo (Left x)
+      let chunks = LC.fromRefU fieldInfo (Left x)
       mapM (eqZero True) chunks >>= andBs
     _ -> do
       -- starting from the least significant bit

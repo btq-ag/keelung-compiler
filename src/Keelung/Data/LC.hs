@@ -1,8 +1,17 @@
-module Keelung.Data.LC (LC (..), fromPolyL, toPolyL, fromRefU, fromRefU2, (@), neg, scale) where
+module Keelung.Data.LC
+  ( LC (..),
+    fromPolyL,
+    toPolyL,
+    fromRefU,
+    (@),
+    neg,
+    scale,
+  )
+where
 
 import Data.Bits qualified
 import Data.Field.Galois
-import Keelung (FieldType (..), HasWidth (widthOf), Width)
+import Keelung (HasWidth (widthOf))
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
@@ -21,37 +30,17 @@ fromPolyL :: Either n (PolyL n) -> LC n
 fromPolyL = either Constant Polynomial
 
 -- | Converting from a 'Either RefU U' to a list of 'LC n'.
-fromRefU :: (Integral n, GaloisField n) => Width -> Either RefU U -> [LC n]
-fromRefU desiredWidth (Right val) =
-  map go [0, desiredWidth .. width - 1]
-  where
-    width = widthOf val
-    go :: (Num n, Eq n) => Int -> LC n
-    go limbStart = do
-      let range = [0 .. (desiredWidth `min` width) - 1]
-      Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val (limbStart + i)]
-fromRefU desiredWidth (Left var) =
-  let limbs = Limb.refUToLimbs desiredWidth var
-   in map (Polynomial . PolyL.fromLimb 0) limbs
-
--- | Converting from a 'Either RefU U' to a list of 'LC n'.
-fromRefU2 :: (GaloisField n, Integral n) => FieldInfo -> Either RefU U -> [LC n]
-fromRefU2 fieldInfo (Right val) =
+fromRefU :: (GaloisField n, Integral n) => FieldInfo -> Either RefU U -> [LC n]
+fromRefU fieldInfo (Right val) =
   let width = widthOf val
       go :: (Num n, Eq n) => Int -> LC n
       go limbStart = do
         let range = [0 .. (fieldWidth fieldInfo `min` width) - 1]
         Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val (limbStart + i)]
-   in case fieldTypeData fieldInfo of
-        Binary _ -> [Constant (if Data.Bits.testBit val i then 1 else 0) | i <- [0 .. width - 1]]
-        Prime _ -> map go [0, fieldWidth fieldInfo .. width - 1]
-fromRefU2 fieldInfo (Left var) =
-  let width = widthOf var
-   in case fieldTypeData fieldInfo of
-        Binary _ -> [1 @ B (RefUBit var i) | i <- [0 .. width - 1]]
-        Prime _ ->
-          let limbs = Limb.refUToLimbs (fieldWidth fieldInfo) var
-           in map (Polynomial . PolyL.fromLimb 0) limbs
+   in map go [0, fieldWidth fieldInfo .. width - 1]
+fromRefU fieldInfo (Left var) =
+  let limbs = Limb.refUToLimbs (fieldWidth fieldInfo) var
+   in map (Polynomial . PolyL.fromLimb 0) limbs
 
 toPolyL :: (Num n, Eq n) => LC n -> Either n (PolyL n)
 toPolyL (Constant c) = Left c

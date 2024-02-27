@@ -19,7 +19,6 @@ import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet qualified as IntSet
-import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Sequence (Seq)
 import Data.Set qualified as Set
@@ -205,13 +204,13 @@ removeOccurrences xs cm = foldl (flip removeOccurrence) cm xs
 
 instance UpdateOccurrences (PolyL n) where
   addOccurrence poly cm =
-    let limbs = Map.keysSet $ PolyL.polyLimbs poly
+    let slices = PolyL.toSlices poly
         refs = Map.keysSet $ PolyL.polyRefs poly
-     in (addOccurrences limbs . addOccurrences refs) cm
+     in (addOccurrences slices . addOccurrences refs) cm
   removeOccurrence poly cm =
-    let limbs = Map.keysSet $ PolyL.polyLimbs poly
+    let slices = PolyL.toSlices poly
         refs = Map.keysSet $ PolyL.polyRefs poly
-     in (removeOccurrences limbs . removeOccurrences refs) cm
+     in (removeOccurrences slices . removeOccurrences refs) cm
 
 newtype Hint = Hint (Either RefU U)
   deriving (Show, Eq, Ord)
@@ -293,6 +292,6 @@ instance UpdateOccurrences (RefU, IntervalSet n) where
          in removeOccurrences slices cm
       _ -> cm
 
-instance UpdateOccurrences (Map RefU (IntervalSet n)) where
-  addOccurrence = addOccurrences . Map.toList
-  removeOccurrence = removeOccurrences . Map.toList
+-- instance UpdateOccurrences (Map RefU (IntervalSet n)) where
+--   addOccurrence = addOccurrences . Map.toList
+--   removeOccurrence = removeOccurrences . Map.toList

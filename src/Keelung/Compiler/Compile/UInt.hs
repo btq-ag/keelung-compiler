@@ -288,11 +288,11 @@ compileIfU width (Left p) x y = do
       out <- freshRefU width
       fieldType <- gets (optFieldInfo . CM.cmOptions)
       -- (x - y) * p - out + y = 0
-      let outLCs = LC.fromRefU2 fieldType (Left out)
+      let outLCs = LC.fromRefU fieldType (Left out)
       let xyLCs =
             zip
-              (LC.fromRefU2 fieldType x)
-              (LC.fromRefU2 fieldType y)
+              (LC.fromRefU fieldType x)
+              (LC.fromRefU fieldType y)
       zipWithM_
         ( \outLC (xLC, yLC) -> do
             case (xLC, yLC) of

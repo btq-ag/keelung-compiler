@@ -13,6 +13,7 @@ module Keelung.Data.PolyL
     fromLimbs,
     fromLimb,
     fromRefs,
+    toSlices,
 
     -- * Operations
     insertLimbs,
@@ -116,6 +117,10 @@ fromLimbs constant xs =
     (Just _, Nothing) -> error "[ panic ] PolyL.fromLimbs: impossible"
     (Just limbs, Just slices) -> Right (PolyL constant limbs mempty slices)
 
+-- | Convert a PolyL to a list of (Slice, coefficient) pairs
+toSlices :: PolyL n -> [(Slice, n)]
+toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList . polySlices
+
 -- | Construct a PolyL from a constant and a single Limb
 fromLimb :: (Integral n) => n -> Limb -> PolyL n
 fromLimb constant limb = PolyL constant (Map.singleton limb 1) mempty (Map.singleton (lmbRef limb) (IntervalSet.fromLimb (limb, 1)))
@@ -184,7 +189,7 @@ data View n
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 view :: PolyL n -> View n
 view (PolyL constant _ refs intervals) =
-  let slices = toSlices intervals
+  let slices = toSlices_ intervals
    in case (Map.toList refs, slices) of
         ([], [slice]) -> SliceMonomial constant slice
         ([], []) -> error "[ panic ] PolyL.view: empty"
@@ -245,8 +250,8 @@ toIntervalSets pairs =
         then Nothing
         else Just result
 
-toSlices :: Map RefU (IntervalSet n) -> [(Slice, n)]
-toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList
+toSlices_ :: Map RefU (IntervalSet n) -> [(Slice, n)]
+toSlices_ = concatMap (uncurry IntervalSet.toSlices) . Map.toList
 
 -- | From a list of (Slice, n) pairs to a Map of valid IntervalSets
 fromSlices :: (Num n, Eq n) => [(Slice, n)] -> Maybe (Map RefU (IntervalSet n))
