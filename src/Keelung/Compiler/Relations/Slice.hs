@@ -197,11 +197,14 @@ toConstraints fieldInfo occurrence sliceShouldBeKept = fold step mempty
     -- Slices will be chopped into pieces no longer than `fieldWidth`
     buildSliceVal :: Slice -> U -> Seq (Constraint n)
     buildSliceVal slice val =
-      let constant = case FieldInfo.fieldTypeData fieldInfo of
+      let -- flip Binary values to positive
+          flipped = case FieldInfo.fieldTypeData fieldInfo of
             Binary _ -> if val < 0 then -val else val
             Prime _ -> val
-          -- split `n` into smaller chunks of size `width`
-          constantChunks = zip [0 ..] (U.chunks fieldWidth constant)
+          -- resize the value to the width of the slice
+          resized = U.slice flipped 0 (widthOf slice)
+          -- split the constant into smaller chunks of size `fieldWidth`
+          constantChunks = zip [0 ..] (U.chunks fieldWidth resized)
        in Seq.fromList [CSliceVal (Slice (sliceRefU slice) (sliceStart slice + fieldWidth * i) ((sliceStart slice + fieldWidth * (i + 1)) `min` sliceEnd slice)) (toInteger chunk) | (i, chunk) <- constantChunks]
 
 -- | Fold over all Segments in a SliceRelations
