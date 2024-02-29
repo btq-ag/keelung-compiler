@@ -43,7 +43,7 @@ tests = describe "Statement" $ do
         forAll (chooseInteger (-10, 8)) $ \n -> do
           testCompiler (Binary 7) (program (fromInteger n)) [] [] [n `mod` 4]
 
-  describe "toUInt" $ do
+  describe "fromField" $ do
     describe "from variable" $ do
       let program = input Public >>= toUInt 8 :: Comp (UInt 8)
       it "GF181" $ do

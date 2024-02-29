@@ -8,6 +8,7 @@ import Test.Hspec
 import Test.Optimization.UInt.AESMul qualified as UInt.AESMul
 import Test.Optimization.UInt.CLDivMod qualified as UInt.CLDivMod
 import Test.Optimization.UInt.Misc qualified as Misc
+import Test.Optimization.UInt.Statement qualified as Statement
 import Test.Optimization.Util
 
 run :: IO ()
@@ -17,6 +18,8 @@ tests :: SpecWith ()
 tests = describe "UInt" $ do
   UInt.CLDivMod.tests
   UInt.AESMul.tests
+  Misc.tests
+  Statement.tests
 
   describe "Variable management" $ do
     -- 4 * 3 for input / output
@@ -404,5 +407,3 @@ tests = describe "UInt" $ do
           assert $ 0 `lte` (0 :: UInt 4)
         cs `shouldHaveSize` 0
         cs' `shouldHaveSize` 0
-
-  Misc.tests

@@ -68,7 +68,7 @@ data PolyL n = PolyL
   deriving (Eq, Functor, Ord, Generic, NFData)
 
 instance (Integral n, GaloisField n) => Show (PolyL n) where
-  show (PolyL constant limbs refs _)
+  show (PolyL constant limbs refs intervals)
     | constant == 0 =
         if firstSign == " + "
           then concat restOfTerms
@@ -76,8 +76,11 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
     | otherwise = concat (show constant : firstSign : toList restOfTerms)
     where
       limbTerms = mconcat $ fmap printLimb (Map.toList limbs)
-      varTerms = mconcat $ fmap printTerm (Map.toList refs)
-      (firstSign, restOfTerms) = case varTerms <> limbTerms of
+      refTerms = mconcat $ fmap printRefs (Map.toList refs)
+      slices = intervalMaptoSlices intervals
+      sliceTerms = mconcat $ fmap printSlice slices
+
+      (firstSign, restOfTerms) = case refTerms <> limbTerms <> sliceTerms of
         Seq.Empty -> error "[ panic ] Empty PolyL"
         (x Seq.:<| xs) -> (x, xs)
 
@@ -91,9 +94,17 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
               -1 -> Seq.fromList [if sign then " - " else " + ", terms]
               _ -> Seq.fromList [if sign then " + " else " - ", show c <> terms]
 
-      printTerm :: (Integral n, GaloisField n) => (Ref, n) -> Seq String
-      printTerm (x, c)
-        | c == 0 = error "printTerm: coefficient of 0"
+      printSlice :: (Integral n, GaloisField n) => (Slice, n) -> Seq String
+      printSlice (x, c)
+        | c == 0 = error "printSlice: coefficient of 0"
+        | c == 1 = Seq.fromList [" + ", show x]
+        | c == -1 = Seq.fromList [" - ", show x]
+        | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
+        | otherwise = Seq.fromList [" + ", show c <> show x]
+
+      printRefs :: (Integral n, GaloisField n) => (Ref, n) -> Seq String
+      printRefs (x, c)
+        | c == 0 = error "printRefs: coefficient of 0"
         | c == 1 = Seq.fromList [" + ", show x]
         | c == -1 = Seq.fromList [" - ", show x]
         | c < 0 = Seq.fromList [" - ", show (Prelude.negate c) <> show x]
@@ -194,7 +205,7 @@ data View n
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 view :: PolyL n -> View n
 view (PolyL constant _ refs intervals) =
-  let slices = toSlices_ intervals
+  let slices = intervalMaptoSlices intervals
    in case (Map.toList refs, slices) of
         ([], [slice]) -> SliceMonomial constant slice
         ([], []) -> error "[ panic ] PolyL.view: empty"
@@ -255,8 +266,8 @@ toIntervalSets pairs =
         then Nothing
         else Just result
 
-toSlices_ :: Map RefU (IntervalSet n) -> [(Slice, n)]
-toSlices_ = concatMap (uncurry IntervalSet.toSlices) . Map.toList
+intervalMaptoSlices :: Map RefU (IntervalSet n) -> [(Slice, n)]
+intervalMaptoSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList
 
 -- | From a list of (Slice, n) pairs to a Map of valid IntervalSets
 fromSlices :: (Num n, Eq n) => [(Slice, n)] -> Maybe (Map RefU (IntervalSet n))

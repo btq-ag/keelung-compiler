@@ -259,6 +259,7 @@ test-suite keelung-test
       Test.Optimization.UInt.Bitwise
       Test.Optimization.UInt.CLDivMod
       Test.Optimization.UInt.Misc
+      Test.Optimization.UInt.Statement
       Test.Optimization.Util
       Test.Relations
       Test.Relations.Field
