@@ -60,7 +60,7 @@ tests =
         let program divisor = do
               dividend <- input Public :: Comp (UInt 8)
               performDivMod dividend divisor
-
+        -- TODO: examine (145,1)
         let genPair = do
               dividend <- choose (0, 255)
               divisor <- choose (1, 255)

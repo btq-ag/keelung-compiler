@@ -31,7 +31,7 @@ import Keelung.Syntax.Counters
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
 compilerVersion :: (Int, Int)
-compilerVersion = (0, 20)
+compilerVersion = (0, 21)
 
 patchVersion :: Int
 patchVersion = 0

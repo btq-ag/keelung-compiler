@@ -23,7 +23,7 @@ tests = describe "Statement" $ do
     it "from variables" $ do
       (cs, cs') <- executeGF181 $ do
         xs <- inputList Public 8
-        x <- pack xs
+        x <- fromBools xs
         return (x :: UInt 8)
       cs `shouldHaveSize` 33
       cs' `shouldHaveSize` 24
@@ -31,7 +31,7 @@ tests = describe "Statement" $ do
     it "bit tests" $ do
       (cs, cs') <- executeGF181 $ do
         xs <- inputList Public 8
-        x <- pack [xs !! 0, xs !! 2, xs !! 4, xs !! 6, xs !! 1, xs !! 3, xs !! 5, xs !! 7]
+        x <- fromBools [xs !! 0, xs !! 2, xs !! 4, xs !! 6, xs !! 1, xs !! 3, xs !! 5, xs !! 7]
         return (x :: UInt 8)
       cs `shouldHaveSize` 33
       cs' `shouldHaveSize` 24

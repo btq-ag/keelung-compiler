@@ -45,7 +45,7 @@ tests = describe "Statement" $ do
 
   describe "fromField" $ do
     describe "from variable" $ do
-      let program = input Public >>= toUInt 8 :: Comp (UInt 8)
+      let program = input Public >>= fromField 8 :: Comp (UInt 8)
       it "GF181" $ do
         forAll (chooseInteger (0, 255)) $ \n -> do
           testCompiler gf181 program [n] [] [n `mod` 256]
@@ -56,7 +56,7 @@ tests = describe "Statement" $ do
         forAll (chooseInteger (0, 3)) $ \n -> do
           testCompiler (Binary 7) program [n] [] [n `mod` 4]
     describe "from constant" $ do
-      let program n = toUInt 8 (n :: Field) :: Comp (UInt 8)
+      let program n = fromField 8 (n :: Field) :: Comp (UInt 8)
       it "GF181" $ do
         forAll (chooseInteger (0, 255)) $ \n -> do
           testCompiler gf181 (program (fromInteger n)) [] [] [n `mod` 256]
@@ -71,14 +71,14 @@ tests = describe "Statement" $ do
     it "from variables" $ do
       let program = do
             xs <- inputList Public 8
-            pack xs :: Comp (UInt 8)
+            fromBools xs :: Comp (UInt 8)
       property $ \(x :: Word) -> do
         let bits = map (\b -> if b then 1 else 0) $ Data.Bits.testBit x <$> [0 .. 7]
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           testCompiler field program bits [] [fromIntegral x]
     it "from constants" $ do
       let program xs = do
-            pack xs :: Comp (UInt 8)
+            fromBools xs :: Comp (UInt 8)
       property $ \(x :: Word) -> do
         let bits = map (\b -> if b then true else false) $ Data.Bits.testBit x <$> [0 .. 7]
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
@@ -87,8 +87,8 @@ tests = describe "Statement" $ do
     it "from Field element" $ do
       let program = do
             x' <- input Public
-            x <- toUInt 2 x' :: Comp (UInt 2)
-            pack [x !!! 0, x !!! 1] :: Comp (UInt 2)
+            x <- fromField 2 x' :: Comp (UInt 2)
+            fromBools [x !!! 0, x !!! 1] :: Comp (UInt 2)
       property $ \(x :: Word) -> do
         let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
             expected = foldr set (0 :: Word) $ [ (i, Data.Bits.testBit x i) | i <- [0 .. 1] ]
