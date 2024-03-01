@@ -192,9 +192,6 @@ writeMulWithPolyL (Right xs) (Left y) (Right zs) = writeMulWithPolyL (Left y) (R
 writeMulWithPolyL (Right xs) (Right ys) (Left z) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ cs {cmMulL = (xs, ys, Left z) Seq.<| cmMulL cs})
 writeMulWithPolyL (Right xs) (Right ys) (Right zs) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ addOccurrence zs $ cs {cmMulL = (xs, ys, Right zs) Seq.<| cmMulL cs})
 
-writeMulWithLimbs :: (GaloisField n, Integral n) => (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> (n, [(Limb, n)]) -> M n ()
-writeMulWithLimbs as bs cs = writeMulWithPolyL (uncurry PolyL.fromLimbs as) (uncurry PolyL.fromLimbs bs) (uncurry PolyL.fromLimbs cs)
-
 --------------------------------------------------------------------------------
 
 -- | Assign a field element to a Ref
@@ -361,3 +358,9 @@ allocLimb :: (GaloisField n, Integral n) => Width -> M n Limb
 allocLimb w = do
   refU <- freshRefU w
   return $ Limb.new refU w 0 (Left True)
+
+-- | Allocates a Slice
+allocSlice :: (GaloisField n, Integral n) => Width -> M n Slice
+allocSlice w = do
+  refU <- freshRefU w
+  return $ Slice.fromRefU refU

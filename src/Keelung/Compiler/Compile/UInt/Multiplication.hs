@@ -17,9 +17,11 @@ import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
+import qualified Keelung.Data.Slice as Slice
 
 --------------------------------------------------------------------------------
 
@@ -105,16 +107,17 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       let carryLimbWidth = lmbWidth x + lmbWidth y - currentLimbWidth
-      upperLimb <- allocLimb carryLimbWidth
-      lowerLimb <- allocLimb currentLimbWidth
-      writeMulWithLimbs
-        (a, [(x, 1)])
-        (b, [(y, 1)])
-        ( 0,
-          [ (lowerLimb, 1),
-            (upperLimb, 2 ^ currentLimbWidth)
-          ]
-        )
+      -- (a + x) * (b + y) = (lower + upper * 2^currentLimbWidth)
+      let firstOperand = PolyL.fromLimbs a [(x, 1)]
+      let secondOperand = PolyL.fromLimbs b [(y, 1)]
+
+      lowerSlice <- allocSlice currentLimbWidth
+      upperSlice <- allocSlice carryLimbWidth
+      let rightHandSide = PolyL.new 0 [] [(lowerSlice, 1), (upperSlice, 2 ^ currentLimbWidth)]
+      writeMulWithPolyL firstOperand secondOperand rightHandSide
+
+      let lowerLimb = Slice.toLimb lowerSlice
+      let upperLimb = Slice.toLimb upperSlice
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
 
 -- | n-limb by n-limb multiplication

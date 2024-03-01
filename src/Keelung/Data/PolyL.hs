@@ -53,6 +53,7 @@ import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (negate, null)
 import Prelude qualified
+import Data.Bifunctor (first)
 
 -- | Polynomial made of Limbs + a constant
 data PolyL n = PolyL
@@ -114,11 +115,14 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
 
 -- | Construct a PolyL from a constant, Refs, and Limbs
 new :: (Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> Either n (PolyL n)
-new constant refs slices = case (toMap refs, fromSlices slices) of
-  (Nothing, Nothing) -> Left constant
-  (Nothing, Just slices') -> Right (PolyL constant mempty mempty slices')
-  (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
-  (Just refs', Just slices') -> Right (PolyL constant mempty refs' slices')
+new constant refs slices = 
+  let limbs = Map.fromListWith (+) (fmap (first sliceToLimb) slices)
+   in
+      case (toMap refs, fromSlices slices) of
+      (Nothing, Nothing) -> Left constant
+      (Nothing, Just slices') -> Right (PolyL constant limbs mempty slices')
+      (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
+      (Just refs', Just slices') -> Right (PolyL constant limbs refs' slices')
 
 -- | Construct a PolyL from a single Ref
 fromRef :: (Integral n) => Ref -> PolyL n
