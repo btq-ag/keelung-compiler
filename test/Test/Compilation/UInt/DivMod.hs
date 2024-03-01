@@ -60,11 +60,23 @@ tests =
         let program divisor = do
               dividend <- input Public :: Comp (UInt 8)
               performDivMod dividend divisor
-        -- TODO: examine (145,1)
         let genPair = do
               dividend <- choose (0, 255)
               divisor <- choose (1, 255)
               return (dividend, divisor)
+
+        forAll genPair $ \(dividend, divisor) -> do
+          let expected = [dividend `div` divisor, dividend `mod` divisor]
+          forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+            testCompiler field (program (fromIntegral divisor)) [dividend] [] expected
+
+      it "variable dividend / constant divisor = 1" $ do
+        let program divisor = do
+              dividend <- input Public :: Comp (UInt 8)
+              performDivMod dividend divisor
+        let genPair = do
+              dividend <- choose (0, 255)
+              return (dividend, 1)
 
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
