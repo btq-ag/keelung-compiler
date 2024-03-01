@@ -29,14 +29,6 @@ tests = describe "PolyRS" $ do
     property $ \poly -> do
       PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
-  describe "fromLimb" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(constant, limb) -> do
-        let poly = PolyL.fromLimb constant limb
-        PolyL.polyConstant poly `shouldBe` constant
-        PolyL.polyLimbs poly `shouldBe` Map.singleton limb 1
-        PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
-
   describe "fromLimbs" $ do
     it "should result in valid PolyL" $ do
       property $ \(constant, limbs) -> do

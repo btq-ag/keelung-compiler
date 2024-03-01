@@ -26,7 +26,6 @@ import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Syntax (widthOf)
-import qualified Keelung.Data.Limb as Limb
 
 --------------------------------------------------------------------------------
 
@@ -104,7 +103,7 @@ compileSideEffect (BitsToUInt width varU bits) = do
       let (vars, vals) = Either.partitionEithers zipped
       let summedVals = sum [(if val then 1 else 0) * (2 ^ i) | (i, val) <- vals]
       let weightedVars = [(B var, 2 ^ i) | (i, var) <- vars]
-      let poly1 = PolyL.fromLimb summedVals (Limb.new refU width 0 (Left False))
+      let poly1 = PolyL.fromSlice summedVals (Slice.Slice refU 0 width)
       let poly = PolyL.insertRefs 0 weightedVars poly1
       writeAddWithPolyL poly
     else do

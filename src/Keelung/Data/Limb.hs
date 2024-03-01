@@ -7,7 +7,6 @@ module Keelung.Data.Limb
     new,
     isPositive,
     null,
-    refUToLimbs,
     trim,
     split,
     MergeError (..),
@@ -93,16 +92,6 @@ isPositive :: Limb -> Bool
 isPositive limb = case lmbSigns limb of
   Left sign -> sign
   Right signs -> and signs
-
--- | Convert a RefU to a bunch of Limbs
---   (in case that the field width is not large enough to hold the RefU)
-refUToLimbs :: Width -> RefU -> [Limb]
-refUToLimbs desiredWidth refU = step (widthOf refU) 0
-  where
-    width = widthOf refU `min` desiredWidth
-    step remainingWidth offset
-      | remainingWidth <= width = [Limb refU remainingWidth offset (Left True)]
-      | otherwise = Limb refU width offset (Left True) : step (remainingWidth - width) (offset + width)
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb

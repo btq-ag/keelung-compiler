@@ -147,7 +147,7 @@ instance GenerateReindexReport Ref where
   generateReindexReport env tags (B refB) = generateReindexReport env tags refB
 
 instance GenerateReindexReport RefU where
-  generateReindexReport env tags refU = generateReindexReport env tags (Limb.refUToLimbs (envFieldWidth env) refU)
+  generateReindexReport env tags refU = generateReindexReport env tags (Slice.fromRefUWithDesiredWidth (envFieldWidth env) refU)
 
 instance GenerateReindexReport (PolyL n) where
   generateReindexReport env tags poly =

@@ -11,7 +11,6 @@ module Keelung.Data.PolyL
 
     -- * Constructors
     fromLimbs,
-    fromLimb,
     fromRef,
     fromRefs,
     fromSlice,
@@ -143,10 +142,6 @@ fromSlice :: (Integral n) => n -> Slice -> PolyL n
 fromSlice constant slice = case fromSlices [(slice, 1)] of
   Nothing -> error "[ panic ] PolyL.fromSlice: impossible"
   Just ss -> PolyL constant (Map.singleton (sliceToLimb slice) 1) mempty ss
-
--- | Construct a PolyL from a constant and a single Limb
-fromLimb :: (Integral n) => n -> Limb -> PolyL n
-fromLimb constant limb = PolyL constant (Map.singleton limb 1) mempty (Map.singleton (lmbRef limb) (IntervalSet.fromLimb (limb, 1)))
 
 -- | Construct a PolyL from a constant and a list of (Ref, coefficient) pairs
 fromRefs :: (Integral n) => n -> [(Ref, n)] -> Either n (PolyL n)
