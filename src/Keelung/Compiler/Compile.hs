@@ -106,8 +106,6 @@ compileSideEffect (BitsToUInt width varU bits) = do
       let weightedVars = [(B var, 2 ^ i) | (i, var) <- vars]
       let poly1 = PolyL.fromLimb summedVals (Limb.new refU width 0 (Left False))
       let poly = PolyL.insertRefs 0 weightedVars poly1
-      -- let poly = PolyL.new summedVals weightedVars []
-      -- let poly = PolyL.new summedVals weightedVars [(Slice.fromRefU refU, -1)]
       writeAddWithPolyL poly
     else do
       forM_ (zip [0 .. width - 1] bits) $ \(i, bit) -> do

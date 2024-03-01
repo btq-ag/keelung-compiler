@@ -14,6 +14,7 @@ module Keelung.Data.PolyL
     fromLimb,
     fromRef,
     fromRefs,
+    fromSlice,
     toSlices,
 
     -- * Operations
@@ -136,6 +137,12 @@ fromLimbs constant xs =
 -- | Convert a PolyL to a list of (Slice, coefficient) pairs
 toSlices :: PolyL n -> [(Slice, n)]
 toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList . polySlices
+
+-- | Construct a PolyL from a constant and a single slice
+fromSlice :: (Integral n) => n -> Slice -> PolyL n
+fromSlice constant slice = case fromSlices [(slice, 1)] of
+  Nothing -> error "[ panic ] PolyL.fromSlice: impossible"
+  Just ss -> PolyL constant (Map.singleton (sliceToLimb slice) 1) mempty ss
 
 -- | Construct a PolyL from a constant and a single Limb
 fromLimb :: (Integral n) => n -> Limb -> PolyL n
@@ -265,6 +272,9 @@ toIntervalSets pairs =
    in if Map.null result
         then Nothing
         else Just result
+
+sliceToLimb :: Slice -> Limb
+sliceToLimb (Slice.Slice ref start end) = Limb.new ref (end - start) start (Left True)
 
 intervalMaptoSlices :: Map RefU (IntervalSet n) -> [(Slice, n)]
 intervalMaptoSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList

@@ -4,6 +4,7 @@ module Keelung.Data.Slice
   ( -- * Construction
     Slice (..),
     fromRefU,
+    fromRefUWithDesiredWidth,
 
     -- * Conversion
 
@@ -32,7 +33,8 @@ import GHC.Generics (Generic)
 import Keelung (HasWidth, widthOf)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.Reference (RefU)
+import Keelung.Data.Reference (RefU (..))
+import Keelung.Syntax (Width)
 import Prelude hiding (map, null)
 
 --------------------------------------------------------------------------------
@@ -64,9 +66,16 @@ instance Semigroup Slice where
 
 --------------------------------------------------------------------------------
 
--- | Construct a "Slice" from a "Refu"
+-- | Construct a "Slice" from a "RefU" that covers its entire width
 fromRefU :: RefU -> Slice
 fromRefU ref = Slice ref 0 (widthOf ref)
+
+-- | Construct "Slice"s from a "RefU" with a desired width
+fromRefUWithDesiredWidth :: Width -> RefU -> [Slice]
+fromRefUWithDesiredWidth width refU =
+  if width > 0
+    then [Slice refU i ((i + width) `min` widthOf refU) | i <- [0, width .. widthOf refU - 1]]
+    else error "[ panic ] Slice.fromRefUWithDesiredWidth: desired width must be positive"
 
 -- | Construct a "Slice" from a "RefU" and an index
 fromRefUBit :: RefU -> Int -> Slice

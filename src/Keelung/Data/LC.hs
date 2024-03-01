@@ -13,11 +13,12 @@ import Data.Bits qualified
 import Data.Field.Galois
 import Keelung (HasWidth (widthOf))
 import Keelung.Data.FieldInfo
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
+
 -- import qualified Keelung.Data.Slice as Slice
 
 -- | Linear combination of variables and constants.
@@ -39,12 +40,9 @@ fromRefU fieldInfo (Right val) =
         let range = [0 .. (fieldWidth fieldInfo `min` width) - 1]
         Constant $ fromInteger $ sum [2 ^ i | i <- range, Data.Bits.testBit val (limbStart + i)]
    in map go [0, fieldWidth fieldInfo .. width - 1]
-fromRefU fieldInfo (Left var) = 
-  -- case PolyL.new 0 [] [(Slice.fromRefU var, 1)] of 
-  -- Left constant -> [Constant constant]
-  -- Right poly -> [Polynomial poly]
-  let limbs = Limb.refUToLimbs (fieldWidth fieldInfo) var
-   in map (Polynomial . PolyL.fromLimb 0) limbs
+fromRefU fieldInfo (Left var) =
+  let slices = Slice.fromRefUWithDesiredWidth (fieldWidth fieldInfo) var
+   in map (Polynomial . PolyL.fromSlice 0) slices
 
 toPolyL :: (Num n, Eq n) => LC n -> Either n (PolyL n)
 toPolyL (Constant c) = Left c

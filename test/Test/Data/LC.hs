@@ -7,9 +7,9 @@ import Data.Field.Galois qualified as Galois
 import Keelung
 import Keelung.Data.FieldInfo (caseFieldType)
 import Keelung.Data.LC
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U qualified as U
 import Test.Hspec
 
@@ -51,9 +51,8 @@ tests = describe "LC" $ do
       let refU = RefUX intWidth 0
 
       it "GF181" $ do
-        let limbs = Limb.refUToLimbs 180 refU
-        let expected = map (Polynomial . PolyL.fromLimb 0) limbs
-
+        let slices = Slice.fromRefUWithDesiredWidth 180 refU
+        let expected = map (Polynomial . PolyL.fromSlice 0) slices
         caseFieldType
           gf181
           ( \_ fieldInfo -> do
@@ -61,8 +60,8 @@ tests = describe "LC" $ do
           )
           undefined
       it "Prime 2" $ do
-        let limbs = Limb.refUToLimbs 1 refU
-        let expected = map (Polynomial . PolyL.fromLimb 0) limbs
+        let slices = Slice.fromRefUWithDesiredWidth 1 refU
+        let expected = map (Polynomial . PolyL.fromSlice 0) slices
         caseFieldType
           (Prime 2)
           ( \_ fieldInfo -> do
@@ -70,8 +69,8 @@ tests = describe "LC" $ do
           )
           undefined
       it "Binary 7" $ do
-        let limbs = Limb.refUToLimbs 2 refU
-        let expected = map (Polynomial . PolyL.fromLimb 0) limbs
+        let slices = Slice.fromRefUWithDesiredWidth 2 refU
+        let expected = map (Polynomial . PolyL.fromSlice 0) slices
         caseFieldType
           (Binary 7)
           undefined
