@@ -32,7 +32,7 @@ import GHC.Generics (Generic)
 import Keelung (FieldType (..), widthOf)
 import Keelung.Compiler.Optimize.OccurU (OccurU)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
-import Keelung.Compiler.Util (indent)
+import Keelung.Compiler.Util
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.FieldInfo qualified as FieldInfo
@@ -87,8 +87,7 @@ new = SliceRelations (Mapping mempty) (Mapping mempty) (Mapping mempty) (Mapping
 -- | Given a Slice and a value, assign the value to all members of the equivalence class of th Slice
 assign :: Slice -> U -> SliceRelations -> SliceRelations
 assign slice value relations = flip execState relations $ do
-  family <- getFamilyM slice
-  mapM_ (assignValueSegment value) family
+  lookupFamilyM slice >>= assignValueToFamily value
 
 -- | Given 2 Slices, modify the SliceRelations so that they are related
 relate :: Slice -> Slice -> SliceRelations -> SliceRelations
@@ -259,72 +258,59 @@ collectFailure relations = fromKinshipConstruction <> fromInvalidSliceLookup
 
 type M = State SliceRelations
 
-getFamilyM :: Slice -> M [Slice]
-getFamilyM = gets . getFamily
+lookupFamilyM :: Slice -> M FamilyLookup
+lookupFamilyM = gets . lookupFamily
 
 relateSegment :: ((Slice, Segment), (Slice, Segment)) -> M ()
 relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment2) of
-  (SliceLookup.Constant val1, _) -> do
-    family <- getFamilyM slice2
-    mapM_ (assignValueSegment val1) family
-  (_, SliceLookup.Constant val2) -> do
-    family <- getFamilyM slice1
-    mapM_ (assignValueSegment val2) family
+  (SliceLookup.Constant val1, _) -> lookupFamilyM slice2 >>= assignValueToFamily val1
+  (_, SliceLookup.Constant val2) -> lookupFamilyM slice1 >>= assignValueToFamily val2
   (SliceLookup.ChildOf root1, SliceLookup.ChildOf root2) ->
     if root1 > root2
-      then do
-        family <- getFamilyM slice2
-        mapM_ (assignRootSegment root1) family
-      else do
-        family <- getFamilyM slice1
-        mapM_ (assignRootSegment root2) family
+      then lookupFamilyM slice2 >>= relateRootToFamily root1
+      else lookupFamilyM slice1 >>= relateRootToFamily root2
   (SliceLookup.ChildOf root1, SliceLookup.Parent {}) ->
     if root1 > slice2
-      then do
-        family <- getFamilyM slice2
-        mapM_ (assignRootSegment root1) family
-      else do
-        family <- getFamilyM slice1
-        mapM_ (assignRootSegment slice2) family
-  (SliceLookup.ChildOf root1, SliceLookup.Empty _) -> assignRootSegment root1 slice2
+      then lookupFamilyM slice2 >>= relateRootToFamily root1
+      else lookupFamilyM slice1 >>= relateRootToFamily slice2
+  (SliceLookup.ChildOf root1, SliceLookup.Empty _) -> relateRootSegment root1 slice2
   (SliceLookup.Parent {}, SliceLookup.ChildOf root2) ->
     if slice1 > root2
-      then do
-        family <- getFamilyM slice2
-        mapM_ (assignRootSegment slice1) family
-      else do
-        family <- getFamilyM slice1
-        mapM_ (assignRootSegment root2) family
+      then lookupFamilyM slice2 >>= relateRootToFamily slice1
+      else lookupFamilyM slice1 >>= relateRootToFamily root2
   (SliceLookup.Parent {}, SliceLookup.Parent {}) ->
     if slice1 > slice2
-      then do
-        family <- getFamilyM slice2
-        mapM_ (assignRootSegment slice1) family
-      else do
-        family <- getFamilyM slice1
-        mapM_ (assignRootSegment slice2) family
-  (SliceLookup.Parent {}, SliceLookup.Empty _) -> assignRootSegment slice1 slice2
-  (SliceLookup.Empty _, SliceLookup.ChildOf root2) -> assignRootSegment root2 slice1
-  (SliceLookup.Empty _, SliceLookup.Parent {}) -> assignRootSegment slice2 slice1
+      then lookupFamilyM slice2 >>= relateRootToFamily slice1
+      else lookupFamilyM slice1 >>= relateRootToFamily slice2
+  (SliceLookup.Parent {}, SliceLookup.Empty _) -> relateRootSegment slice1 slice2
+  (SliceLookup.Empty _, SliceLookup.ChildOf root2) -> relateRootSegment root2 slice1
+  (SliceLookup.Empty _, SliceLookup.Parent {}) -> relateRootSegment slice2 slice1
   (SliceLookup.Empty _, SliceLookup.Empty _) ->
     if slice1 > slice2
-      then assignRootSegment slice1 slice2
-      else assignRootSegment slice2 slice1
+      then relateRootSegment slice1 slice2
+      else relateRootSegment slice2 slice1
 
 assignValueSegment :: U -> Slice -> M ()
 assignValueSegment val slice@(Slice ref start end) =
   modify $
     modifySliceLookup
       slice
-      (mapSliceLookup (SliceLookup.fromRefU ref))
-      mapSliceLookup
+      (mapSliceLookup (SliceLookup.fromRefU ref)) -- insert this SliceLookup if it does not exist
+      mapSliceLookup -- else modify the existing SliceLookup
   where
     mapSliceLookup :: SliceLookup -> SliceLookup
     mapSliceLookup = SliceLookup.mapInterval (const (SliceLookup.Constant val)) (start, end)
 
+assignValueToFamily :: U -> FamilyLookup -> M ()
+assignValueToFamily _ (FamilyLookup _ []) = return ()
+assignValueToFamily val (FamilyLookup _ (x : xs)) = do
+  let (val1, val2) = U.split val (widthOf (head x))
+  mapM_ (assignValueSegment val1) x
+  assignValueToFamily val2 (FamilyLookup undefined xs)
+
 -- | Relate a child Slice with a parent Slice
-assignRootSegment :: Slice -> Slice -> M ()
-assignRootSegment root child = do
+relateRootSegment :: Slice -> Slice -> M ()
+relateRootSegment root child = do
   modifySegment addRootToChild child
   modifySegment addChildToRoot root
   where
@@ -334,8 +320,8 @@ assignRootSegment root child = do
     addChildToRoot :: Maybe Segment -> Segment
     addChildToRoot Nothing = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
     addChildToRoot (Just (SliceLookup.Parent width children)) = SliceLookup.Parent width (Map.insertWith (<>) (sliceRefU child) (Set.singleton child) children)
-    addChildToRoot (Just (SliceLookup.ChildOf _)) = error "[ panic ] assignRootSegment: the root already has a parent"
-    addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] assignRootSegment: the root already has a value"
+    addChildToRoot (Just (SliceLookup.ChildOf _)) = error "[ panic ] relateRootSegment: the root already has a parent"
+    addChildToRoot (Just (SliceLookup.Constant _)) = error "[ panic ] relateRootSegment: the root already has a value"
     addChildToRoot (Just (SliceLookup.Empty _)) = SliceLookup.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
 
     modifySegment :: (Maybe Segment -> Segment) -> Slice -> M ()
@@ -345,6 +331,13 @@ assignRootSegment root child = do
           slice
           (SliceLookup.fromSegment slice (f Nothing)) -- what to do if the SliceLookup does not exist
           (SliceLookup.mapIntervalWithSlice (const (f . Just)) slice)
+
+relateRootToFamily :: Slice -> FamilyLookup -> M ()
+relateRootToFamily _ (FamilyLookup _ []) = return ()
+relateRootToFamily root (FamilyLookup _ (x : xs)) = do
+  let (root1, root2) = Slice.split (widthOf (head x)) root
+  mapM_ (relateRootSegment root1) x
+  relateRootToFamily root2 (FamilyLookup undefined xs)
 
 --------------------------------------------------------------------------------
 
@@ -387,17 +380,30 @@ modifySliceLookup (Slice var _ _) e f relations = case var of
 
 --------------------------------------------------------------------------------
 
--- | Given a Slice, return all members of the equivalence class (including the slice itself)
-getFamily :: Slice -> SliceRelations -> [Slice]
-getFamily slice relations =
+-- | The equivalence class version of SliceLookup
+data FamilyLookup = FamilyLookup
+  { _familySlice :: Slice, -- the Slice these segments belong to
+    _familySegments :: [[Slice]] -- the equivalence class of each segment
+  }
+
+-- | Given a Slice, return all members of the equivalence class of each segments from that Slice
+--   so that we can, for example, assign a value to all members of the equivalence class
+--   or relate then to another Slice
+lookupFamily :: Slice -> SliceRelations -> FamilyLookup
+lookupFamily slice relations =
   let SliceLookup _ segments = lookup slice relations
-   in IntMap.elems segments >>= go
+   in FamilyLookup slice (map lookupSegment (IntMap.elems segments))
   where
-    go :: Segment -> [Slice]
-    go (SliceLookup.Constant _) = []
-    go (SliceLookup.ChildOf root) = getFamily root relations
-    go (SliceLookup.Parent _ children) = slice : Set.toList (Set.unions (Map.elems children))
-    go (SliceLookup.Empty _) = [slice]
+    lookupSegment :: Segment -> [Slice]
+    lookupSegment (SliceLookup.Constant _) = [] -- TODO: should this be [slice] ??
+    lookupSegment (SliceLookup.ChildOf root) =
+      let FamilyLookup _ slices = lookupFamily root relations
+       in case slices of
+            [] -> error "[ panic ] getFamily: ChildOf root has no segments"
+            [x] -> x
+            _ -> error "[ panic ] getFamily: ChildOf root has more than one segment"
+    lookupSegment (SliceLookup.Parent _ children) = slice : Set.toList (Set.unions (Map.elems children))
+    lookupSegment (SliceLookup.Empty _) = [slice]
 
 -- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
 --   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two lookups.

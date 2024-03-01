@@ -9,6 +9,7 @@ module Keelung.Data.U
     mapWidth,
     adjustWidth,
     slice,
+    split,
     modInv,
     aesMul,
     clAdd,
@@ -103,6 +104,16 @@ adjustWidthOfInteger oldWidth newWidth value = case oldWidth `compare` newWidth 
 slice :: U -> Int -> Width -> U
 slice (U _ value) offset width = U (Just width) ((value `Data.Bits.shiftR` offset) `Prelude.mod` (2 ^ width))
 
+-- | Split a U value into two U values.
+split :: U -> Int -> (U, U)
+split u@(U _ value) index = 
+  let width = widthOf u
+      mask = (2 ^ index) - 1
+      a = U (Just index) (value .&. mask)
+      b = U (Just (width - index)) (value `Data.Bits.shiftR` index)
+   in (a, b)
+
+  
 --------------------------------------------------------------------------------
 
 add :: U -> U -> U
