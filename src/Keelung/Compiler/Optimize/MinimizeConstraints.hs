@@ -470,25 +470,15 @@ data Changes = Changes
 applyChanges :: (GaloisField n, Integral n) => Changes -> RoundM n ()
 applyChanges changes = modify' $ removeOccurrences (removedLimbs changes) . addOccurrences (addedLimbs changes) . removeOccurrences (removedRefs changes) . addOccurrences (addedRefs changes)
 
--- | Mark a limb as added
-addLimb :: Limb -> Maybe Changes -> Maybe Changes
-addLimb limb (Just changes) = Just (changes {addedLimbs = Set.insert limb (addedLimbs changes)})
-addLimb limb Nothing = Just (Changes (Set.singleton limb) mempty mempty mempty)
-
 -- | Mark a Slice as added
--- addSlice :: Slice -> Maybe Changes -> Maybe Changes
--- addSlice slice (Just changes) = Just (changes {addedLimbs = Set.insert (Slice.toLimb slice) (addedLimbs changes)})
--- addSlice slice Nothing = Just (Changes (Set.singleton (Slice.toLimb slice)) mempty mempty mempty)
-
--- | Mark a Limb as removed
-removeLimb :: Limb -> Maybe Changes -> Maybe Changes
-removeLimb limb (Just changes) = Just (changes {removedLimbs = Set.insert limb (removedLimbs changes)})
-removeLimb limb Nothing = Just (Changes mempty (Set.singleton limb) mempty mempty)
+addSlice :: Slice -> Maybe Changes -> Maybe Changes
+addSlice slice (Just changes) = Just (changes {addedLimbs = Set.insert (Slice.toLimb slice) (addedLimbs changes)})
+addSlice slice Nothing = Just (Changes (Set.singleton (Slice.toLimb slice)) mempty mempty mempty)
 
 -- | Mark a Slice as removed
--- removeSlice :: Slice -> Maybe Changes -> Maybe Changes
--- removeSlice slice (Just changes) = Just (changes {removedLimbs = Set.insert (Slice.toLimb slice) (removedLimbs changes)})
--- removeSlice slice Nothing = Just (Changes mempty (Set.singleton (Slice.toLimb slice)) mempty mempty)
+removeSlice :: Slice -> Maybe Changes -> Maybe Changes
+removeSlice slice (Just changes) = Just (changes {removedLimbs = Set.insert (Slice.toLimb slice) (removedLimbs changes)})
+removeSlice slice Nothing = Just (Changes mempty (Set.singleton (Slice.toLimb slice)) mempty mempty)
 
 -- | Mark a Ref as added
 addRef :: Ref -> Maybe Changes -> Maybe Changes
@@ -547,14 +537,14 @@ substSlice relations initState (sliceWhole, multiplier) =
           coefficient = multiplier * 2 ^ offset
        in case segment of
             SliceLookup.Constant constant -> case accPoly of
-              Left c -> (Left (fromIntegral constant * coefficient + c), removeLimb (Slice.toLimb slice) changes)
-              Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral coefficient) xs, removeLimb (Slice.toLimb slice) changes)
+              Left c -> (Left (fromIntegral constant * coefficient + c), removeSlice slice changes)
+              Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral coefficient) xs, removeSlice slice changes)
             SliceLookup.ChildOf root ->
               let rootLimb = Slice.toLimb root
                in case accPoly of
                     -- replace `limb` with `root`
-                    Left c -> (PolyL.fromLimbs c [(rootLimb, coefficient)], (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
-                    Right accPoly' -> (PolyL.insertLimbs 0 [(rootLimb, coefficient)] accPoly', (addLimb rootLimb . removeLimb (Slice.toLimb slice)) changes)
+                    Left c -> (PolyL.fromLimbs c [(rootLimb, coefficient)], (addSlice root . removeSlice slice) changes)
+                    Right accPoly' -> (PolyL.insertLimbs 0 [(rootLimb, coefficient)] accPoly', (addSlice root . removeSlice slice) changes)
             SliceLookup.Parent _ _ -> case accPoly of
               Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, coefficient)], changes)
               Right xs -> (PolyL.insertLimbs 0 [(Slice.toLimb slice, coefficient)] xs, changes)
