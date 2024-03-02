@@ -118,34 +118,49 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
 -- | Construct a PolyL from a constant, Refs, and Limbs
 new :: (Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> Either n (PolyL n)
 new constant refs slices =
-  let limbs = toLimbMap (fmap (first sliceToLimb) slices)
-   in case (toRefMap refs, limbs, slicesToIntervalMap slices) of
-        (Nothing, Nothing, Nothing) -> Left constant
-        (Nothing, Nothing, Just slices') ->
-          if null slices'
-            then Right (PolyL constant mempty mempty mempty)
-            else error "[ panic ] PolyL.new: empty Limbs with non-empty Slices 1"
-        (Nothing, Just limbs', Nothing) ->
-          if null limbs'
-            then Left constant
-            else error $ "[ panic ] PolyL.new: empty Slices with non-empty Limbs 1:\n  Limbs: " <> show (Map.keys limbs')
-        (Nothing, Just limbs', Just slices') ->
-          if limbsToIntervalMap (Map.toList limbs') == Just slices'
-            then Right (PolyL constant limbs' mempty slices')
-            else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 1:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
-        (Just refs', Nothing, Nothing) -> Right (PolyL constant mempty refs' mempty)
-        (Just refs', Nothing, Just slices') ->
-          if null slices'
-            then Right (PolyL constant mempty refs' mempty)
-            else error "[ panic ] PolyL.new: empty Limbs with non-empty Slices 1"
-        (Just refs', Just limbs', Nothing) ->
-          if null limbs'
-            then Right (PolyL constant mempty refs' mempty)
-            else error $ "[ panic ] PolyL.new: empty Slices with non-empty Limbs 2:\n  Limbs: " <> show (Map.keys limbs')
-        (Just refs', Just limbs', Just slices') ->
-          if limbsToIntervalMap (Map.toList limbs') == Just slices'
-            then Right (PolyL constant limbs' refs' slices')
-            else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 2:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
+  case (toRefMap refs, fromSlicesHelper slices) of
+    (Nothing, Nothing) -> Left constant
+    (Nothing, Just (limbs', slices')) ->
+      if limbsToIntervalMap (Map.toList limbs') == Just slices'
+        then Right (PolyL constant limbs' mempty slices')
+        else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 1:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
+    (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
+    (Just refs', Just (limbs', slices')) ->
+      if limbsToIntervalMap (Map.toList limbs') == Just slices'
+        then Right (PolyL constant limbs' refs' slices')
+        else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 2:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
+
+-- | Helper for converting Slices to Limbs and make sure they are equal
+fromSlicesHelper :: (Integral n) => [(Slice, n)] -> Maybe (Map Limb n, Map RefU (IntervalSet n))
+fromSlicesHelper xs = case (toLimbMap (fmap (first sliceToLimb) xs), slicesToIntervalMap xs) of
+  (Nothing, Nothing) -> Nothing
+  (Nothing, Just slices) ->
+    if null slices
+      then Just (mempty, mempty)
+      else error "[ panic ] PolyL.fromSlicesHelper: empty Limbs with non-empty Slices"
+  (Just limbs, Nothing) ->
+    if null limbs
+      then Nothing
+      else error $ "[ panic ] PolyL.fromSlicesHelper: empty Slices with non-empty Limbs:\n  Limbs: " <> show (Map.keys limbs)
+  (Just limbs, Just slices) ->
+    if limbsToIntervalMap (Map.toList limbs) == Just slices
+      then Just (limbs, slices)
+      else error $ "[ panic ] PolyL.fromSlicesHelper: mismatch between Slices & Limbs:\n  Slices: " <> show (map fst xs) <> "\n  Limbs: " <> show (Map.keys limbs)
+
+-- | Helper for converting Limbs to Slices and make sure they are equal
+fromLimbsHelper :: (Integral n) => [(Limb, n)] -> Maybe (Map Limb n, Map RefU (IntervalSet n))
+fromLimbsHelper xs =
+  case (toLimbMap xs, limbsToIntervalMap xs) of
+    (Nothing, Nothing) -> Nothing
+    (Nothing, Just slices) ->
+      if null slices
+        then Nothing
+        else error $ "[ panic ] PolyL.fromLimbsHelper: empty Limbs with non-empty Slices:\n  Slices: " <> show (map fst $ intervalMaptoSlices slices)
+    (Just limbs, Nothing) ->
+      if null limbs
+        then Nothing
+        else error $ "[ panic ] PolyL.fromLimbsHelper: empty Slices with non-empty Limbs:\n  Limbs: " <> show (Map.keys limbs)
+    (Just limbs, Just slices) -> Just (limbs, slices)
 
 -- | Construct a PolyL from a single Ref
 fromRef :: (Integral n) => Ref -> PolyL n
@@ -153,12 +168,9 @@ fromRef ref = PolyL 0 mempty (Map.singleton ref 1) mempty
 
 -- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
 fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
-fromLimbs constant xs =
-  case (toLimbMap xs, limbsToIntervalMap xs) of
-    (Nothing, Nothing) -> Left constant
-    (Nothing, Just _) -> error "[ panic ] PolyL.fromLimbs: impossible"
-    (Just _, Nothing) -> error "[ panic ] PolyL.fromLimbs: impossible"
-    (Just limbs, Just slices) -> Right (PolyL constant limbs mempty slices)
+fromLimbs constant xs = case fromLimbsHelper xs of
+  Nothing -> Left constant
+  Just (limbs, slices) -> Right (PolyL constant limbs mempty slices)
 
 -- | Convert a PolyL to a list of (Slice, coefficient) pairs
 toSlices :: PolyL n -> [(Slice, n)]
