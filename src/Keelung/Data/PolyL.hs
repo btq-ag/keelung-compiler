@@ -118,12 +118,34 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
 -- | Construct a PolyL from a constant, Refs, and Limbs
 new :: (Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> Either n (PolyL n)
 new constant refs slices =
-  let limbs = Data.Maybe.fromMaybe mempty (toMap (fmap (first sliceToLimb) slices))
-   in case (toMap refs, slicesToIntervalMap slices) of
-        (Nothing, Nothing) -> Left constant
-        (Nothing, Just slices') -> Right (PolyL constant limbs mempty slices')
-        (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
-        (Just refs', Just slices') -> Right (PolyL constant limbs refs' slices')
+  let limbs = toLimbMap (fmap (first sliceToLimb) slices)
+   in case (toRefMap refs, limbs, slicesToIntervalMap slices) of
+        (Nothing, Nothing, Nothing) -> Left constant
+        (Nothing, Nothing, Just slices') ->
+          if null slices'
+            then Right (PolyL constant mempty mempty mempty)
+            else error "[ panic ] PolyL.new: empty Limbs with non-empty Slices 1"
+        (Nothing, Just limbs', Nothing) ->
+          if null limbs'
+            then Left constant
+            else error $ "[ panic ] PolyL.new: empty Slices with non-empty Limbs 1:\n  Limbs: " <> show (Map.keys limbs')
+        (Nothing, Just limbs', Just slices') ->
+          if limbsToIntervalMap (Map.toList limbs') == Just slices'
+            then Right (PolyL constant limbs' mempty slices')
+            else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 1:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
+        (Just refs', Nothing, Nothing) -> Right (PolyL constant mempty refs' mempty)
+        (Just refs', Nothing, Just slices') ->
+          if null slices'
+            then Right (PolyL constant mempty refs' mempty)
+            else error "[ panic ] PolyL.new: empty Limbs with non-empty Slices 1"
+        (Just refs', Just limbs', Nothing) ->
+          if null limbs'
+            then Right (PolyL constant mempty refs' mempty)
+            else error $ "[ panic ] PolyL.new: empty Slices with non-empty Limbs 2:\n  Limbs: " <> show (Map.keys limbs')
+        (Just refs', Just limbs', Just slices') ->
+          if limbsToIntervalMap (Map.toList limbs') == Just slices'
+            then Right (PolyL constant limbs' refs' slices')
+            else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 2:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
 
 -- | Construct a PolyL from a single Ref
 fromRef :: (Integral n) => Ref -> PolyL n
@@ -132,7 +154,7 @@ fromRef ref = PolyL 0 mempty (Map.singleton ref 1) mempty
 -- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
 fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
 fromLimbs constant xs =
-  case (toMap xs, limbsToIntervalMap xs) of
+  case (toLimbMap xs, limbsToIntervalMap xs) of
     (Nothing, Nothing) -> Left constant
     (Nothing, Just _) -> error "[ panic ] PolyL.fromLimbs: impossible"
     (Just _, Nothing) -> error "[ panic ] PolyL.fromLimbs: impossible"
@@ -150,7 +172,7 @@ fromSlice constant slice = case slicesToIntervalMap [(slice, 1)] of
 
 -- | Construct a PolyL from a constant and a list of (Ref, coefficient) pairs
 fromRefs :: (Integral n) => n -> [(Ref, n)] -> Either n (PolyL n)
-fromRefs constant xs = case toMap xs of
+fromRefs constant xs = case toRefMap xs of
   Nothing -> Left constant
   Just refs -> Right (PolyL constant mempty refs mempty)
 
@@ -169,7 +191,7 @@ insertLimbs c' ls' (PolyL c ls rs ss) =
 
 insertSlices :: (Integral n) => [(Slice, n)] -> PolyL n -> Either n (PolyL n)
 insertSlices ss' (PolyL c ls rs ss) =
-  let limbs = mergeAndClean ls (Data.Maybe.fromMaybe mempty (toMap (fmap (first sliceToLimb) ss')))
+  let limbs = mergeAndClean ls (Data.Maybe.fromMaybe mempty (toLimbMap (fmap (first sliceToLimb) ss')))
       slices = case slicesToIntervalMap ss' of
         Nothing -> ss
         Just ss'' -> mergeIntervalSetAndClean ss ss''
@@ -265,10 +287,16 @@ validate (PolyL _ limbs refs slices) =
             else Just (LimbsWithZeroWidth limbsWithZeroWidth)
         else Just ConstantOnly
 
--- | Helper function for converting a list of (a, n) pairs to a Map
-toMap :: (Integral n, Ord a) => [(a, n)] -> Maybe (Map a n)
-toMap xs =
+toRefMap :: (Integral n) => [(Ref, n)] -> Maybe (Map Ref n)
+toRefMap xs =
   let result = Map.filter (/= 0) (Map.fromListWith (+) xs)
+   in if Map.null result
+        then Nothing
+        else Just result
+
+toLimbMap :: (Integral n) => [(Limb, n)] -> Maybe (Map Limb n)
+toLimbMap xs =
+  let result = Map.filterWithKey (\limb n -> not (Limb.null limb) && n /= 0) (Map.fromListWith (+) xs)
    in if Map.null result
         then Nothing
         else Just result
