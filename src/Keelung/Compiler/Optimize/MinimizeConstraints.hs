@@ -1,7 +1,5 @@
 module Keelung.Compiler.Optimize.MinimizeConstraints (run) where
 
--- import Control.Monad.State
-
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
@@ -539,18 +537,16 @@ substSlice relations initState (sliceWhole, multiplier) =
             SliceLookup.Constant constant -> case accPoly of
               Left c -> (Left (fromIntegral constant * coefficient + c), removeSlice slice changes)
               Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral coefficient) xs, removeSlice slice changes)
-            SliceLookup.ChildOf root ->
-              let rootLimb = Slice.toLimb root
-               in case accPoly of
-                    -- replace `limb` with `root`
-                    Left c -> (PolyL.fromLimbs c [(rootLimb, coefficient)], (addSlice root . removeSlice slice) changes)
-                    Right accPoly' -> (PolyL.insertLimbs 0 [(rootLimb, coefficient)] accPoly', (addSlice root . removeSlice slice) changes)
+            SliceLookup.ChildOf root -> case accPoly of
+              -- replace `slice` with `root`
+              Left c -> (PolyL.new c [] [(root, coefficient)], (addSlice root . removeSlice slice) changes)
+              Right accPoly' -> (PolyL.insertSlices [(root, coefficient)] accPoly', (addSlice root . removeSlice slice) changes)
             SliceLookup.Parent _ _ -> case accPoly of
-              Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, coefficient)], changes)
-              Right xs -> (PolyL.insertLimbs 0 [(Slice.toLimb slice, coefficient)] xs, changes)
+              Left c -> (PolyL.new c [] [(slice, coefficient)], changes)
+              Right xs -> (PolyL.insertSlices [(slice, coefficient)] xs, changes)
             SliceLookup.Empty _ -> case accPoly of
-              Left c -> (PolyL.fromLimbs c [(Slice.toLimb slice, coefficient)], changes)
-              Right xs -> (PolyL.insertLimbs 0 [(Slice.toLimb slice, coefficient)] xs, changes)
+              Left c -> (PolyL.new c [] [(slice, coefficient)], changes)
+              Right xs -> (PolyL.insertSlices [(slice, coefficient)] xs, changes)
 
 -- | Substitutes a Ref in a PolyL.
 substRef ::

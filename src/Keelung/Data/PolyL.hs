@@ -18,6 +18,7 @@ module Keelung.Data.PolyL
 
     -- * Operations
     insertLimbs,
+    insertSlices,
     insertRefs,
     addConstant,
     multiplyBy,
@@ -36,10 +37,12 @@ module Keelung.Data.PolyL
 where
 
 import Control.DeepSeq (NFData)
+import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (..), toList)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Maybe qualified
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
@@ -53,7 +56,6 @@ import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (negate, null)
 import Prelude qualified
-import Data.Bifunctor (first)
 
 -- | Polynomial made of Limbs + a constant
 data PolyL n = PolyL
@@ -115,14 +117,13 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
 
 -- | Construct a PolyL from a constant, Refs, and Limbs
 new :: (Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> Either n (PolyL n)
-new constant refs slices = 
-  let limbs = Map.fromListWith (+) (fmap (first sliceToLimb) slices)
-   in
-      case (toMap refs, fromSlices slices) of
-      (Nothing, Nothing) -> Left constant
-      (Nothing, Just slices') -> Right (PolyL constant limbs mempty slices')
-      (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
-      (Just refs', Just slices') -> Right (PolyL constant limbs refs' slices')
+new constant refs slices =
+  let limbs = Data.Maybe.fromMaybe mempty (toMap (fmap (first sliceToLimb) slices))
+   in case (toMap refs, slicesToIntervalMap slices) of
+        (Nothing, Nothing) -> Left constant
+        (Nothing, Just slices') -> Right (PolyL constant limbs mempty slices')
+        (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
+        (Just refs', Just slices') -> Right (PolyL constant limbs refs' slices')
 
 -- | Construct a PolyL from a single Ref
 fromRef :: (Integral n) => Ref -> PolyL n
@@ -131,7 +132,7 @@ fromRef ref = PolyL 0 mempty (Map.singleton ref 1) mempty
 -- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
 fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
 fromLimbs constant xs =
-  case (toMap xs, toIntervalSets xs) of
+  case (toMap xs, limbsToIntervalMap xs) of
     (Nothing, Nothing) -> Left constant
     (Nothing, Just _) -> error "[ panic ] PolyL.fromLimbs: impossible"
     (Just _, Nothing) -> error "[ panic ] PolyL.fromLimbs: impossible"
@@ -143,7 +144,7 @@ toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList . polySlices
 
 -- | Construct a PolyL from a constant and a single slice
 fromSlice :: (Integral n) => n -> Slice -> PolyL n
-fromSlice constant slice = case fromSlices [(slice, 1)] of
+fromSlice constant slice = case slicesToIntervalMap [(slice, 1)] of
   Nothing -> error "[ panic ] PolyL.fromSlice: impossible"
   Just ss -> PolyL constant (Map.singleton (sliceToLimb slice) 1) mempty ss
 
@@ -159,12 +160,22 @@ fromRefs constant xs = case toMap xs of
 insertLimbs :: (Integral n) => n -> [(Limb, n)] -> PolyL n -> Either n (PolyL n)
 insertLimbs c' ls' (PolyL c ls rs ss) =
   let limbs = mergeListAndClean ls ls'
-      slices = case toIntervalSets ls' of
+      slices = case limbsToIntervalMap ls' of
         Nothing -> ss
         Just ss' -> mergeIntervalSetAndClean ss ss'
    in if null limbs && null rs
         then Left (c + c')
         else Right (PolyL (c + c') limbs rs slices)
+
+insertSlices :: (Integral n) => [(Slice, n)] -> PolyL n -> Either n (PolyL n)
+insertSlices ss' (PolyL c ls rs ss) =
+  let limbs = mergeAndClean ls (Data.Maybe.fromMaybe mempty (toMap (fmap (first sliceToLimb) ss')))
+      slices = case slicesToIntervalMap ss' of
+        Nothing -> ss
+        Just ss'' -> mergeIntervalSetAndClean ss ss''
+   in if null limbs && null rs
+        then Left c
+        else Right (PolyL c limbs rs slices)
 
 insertRefs :: (Integral n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
 insertRefs c' rs' (PolyL c ls rs ss) =
@@ -263,8 +274,8 @@ toMap xs =
         else Just result
 
 -- | From a list of (Limb, n) pairs to a Map of IntervalSets
-toIntervalSets :: (Integral n) => [(Limb, n)] -> Maybe (Map RefU (IntervalSet n))
-toIntervalSets pairs =
+limbsToIntervalMap :: (Integral n) => [(Limb, n)] -> Maybe (Map RefU (IntervalSet n))
+limbsToIntervalMap pairs =
   let fromPair (limb, n) = (lmbRef limb, IntervalSet.fromLimb (limb, n))
       xs = Map.fromListWith (<>) (map fromPair pairs)
       result = Map.filter (not . IntervalSet.allZero) xs
@@ -279,8 +290,8 @@ intervalMaptoSlices :: Map RefU (IntervalSet n) -> [(Slice, n)]
 intervalMaptoSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList
 
 -- | From a list of (Slice, n) pairs to a Map of valid IntervalSets
-fromSlices :: (Num n, Eq n) => [(Slice, n)] -> Maybe (Map RefU (IntervalSet n))
-fromSlices pairs =
+slicesToIntervalMap :: (Num n, Eq n) => [(Slice, n)] -> Maybe (Map RefU (IntervalSet n))
+slicesToIntervalMap pairs =
   let raw = Map.mapMaybe id $ Map.fromListWith mergeEntry (map (\(slice, n) -> (Slice.sliceRefU slice, IntervalSet.fromSlice (slice, n))) pairs)
       result = Map.filter (not . IntervalSet.allZero) raw
    in if Map.null result
