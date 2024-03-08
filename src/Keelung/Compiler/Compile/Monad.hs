@@ -137,11 +137,6 @@ writeAddWithLC xs = case xs of
   Constant _ -> return ()
   Polynomial poly -> writeAddWithPolyL (Right poly)
 
-writeAddWithLCAndLimbs :: (GaloisField n, Integral n) => LC n -> n -> [(Limb, n)] -> M n ()
-writeAddWithLCAndLimbs lc constant limbs = case lc of
-  Constant _ -> return ()
-  Polynomial poly -> writeAddWithPolyL $ PolyL.insertLimbs constant limbs poly
-
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyL (PolyL.fromRefs c as)
 

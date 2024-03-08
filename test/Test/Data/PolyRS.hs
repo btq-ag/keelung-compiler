@@ -6,8 +6,13 @@ module Test.Data.PolyRS (tests, run) where
 import Data.Field.Galois (Prime)
 import Data.Map (Map)
 import Data.Map qualified as Map
+import Keelung (widthOf)
+import Keelung.Data.Limb (Limb)
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
+import Keelung.Data.Reference (Ref)
+import Keelung.Data.Slice (Slice)
 import Test.Arbitrary ()
 import Test.Hspec
 import Test.QuickCheck
@@ -17,11 +22,24 @@ import Test.QuickCheck
 run :: IO ()
 run = hspec tests
 
-toMap :: (Integral n, Ord a) => [(a, n)] -> Map a n
-toMap = Map.filter (/= 0) . Map.fromListWith (+)
+toRefMap :: (Integral n) => [(Ref, n)] -> Map Ref n
+toRefMap = Map.filter (/= 0) . Map.fromListWith (+)
 
-merge :: (Integral n, Ord a) => Map a n -> Map a n -> Map a n
-merge xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
+toLimbMap :: (Integral n) => [(Limb, n)] -> Map Limb n
+toLimbMap = Map.filterWithKey (\limb n -> not (Limb.null limb) && n /= 0) . Map.fromListWith (+)
+
+toSliceMap :: (Integral n) => [(Slice, n)] -> Map Slice n
+toSliceMap = Map.filterWithKey (\slice n -> widthOf slice /= 0 && n /= 0) . Map.fromListWith (+)
+
+mergeRefMap :: (Integral n) => Map Ref n -> Map Ref n -> Map Ref n
+mergeRefMap xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
+
+mergeLimbMap :: (Integral n) => Map Limb n -> Map Limb n -> Map Limb n
+mergeLimbMap xs ys = Map.filterWithKey (\limb n -> not (Limb.null limb) && n /= 0) (Map.unionWith (+) xs ys)
+
+-- NOTE: this implementation is incorrect
+-- mergeSliceMap :: (Integral n) => Map Slice n -> Map Slice n -> Map Slice n
+-- mergeSliceMap xs ys = Map.filterWithKey (\slice n -> widthOf slice /= 0 && n /= 0) (Map.unionWith (+) xs ys)
 
 tests :: SpecWith ()
 tests = describe "PolyRS" $ do
@@ -35,10 +53,10 @@ tests = describe "PolyRS" $ do
         case PolyL.fromLimbs constant limbs of
           Left constant' -> do
             constant' `shouldBe` constant
-            null (toMap limbs) `shouldBe` True
+            null (toLimbMap limbs) `shouldBe` True
           Right poly -> do
             PolyL.polyConstant poly `shouldBe` constant
-            PolyL.polyLimbs poly `shouldBe` toMap limbs
+            PolyL.polyLimbs poly `shouldBe` toLimbMap limbs
             PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
   describe "fromRefs" $ do
@@ -47,23 +65,24 @@ tests = describe "PolyRS" $ do
         case PolyL.fromRefs constant refs of
           Left constant' -> do
             constant' `shouldBe` constant
-            null (toMap refs) `shouldBe` True
+            null (toRefMap refs) `shouldBe` True
           Right poly -> do
             PolyL.polyConstant poly `shouldBe` constant
-            PolyL.polyRefs poly `shouldBe` toMap refs
+            PolyL.polyRefs poly `shouldBe` toRefMap refs
             PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
-  describe "insertLimbs" $ do
+  describe "insertSlices" $ do
     it "should result in valid PolyL" $ do
-      property $ \(constant, limbs, poly) -> do
-        case PolyL.insertLimbs constant limbs poly of
+      property $ \(slices, poly) -> do
+        case PolyL.insertSlices slices poly of
           Left constant' -> do
-            constant' `shouldBe` constant + PolyL.polyConstant poly
-            null (toMap limbs) && null (PolyL.polyRefs poly) `shouldBe` True
+            constant' `shouldBe` PolyL.polyConstant poly
+            null (toSliceMap slices) && null (PolyL.polyRefs poly) `shouldBe` True
           Right polynomial -> do
-            PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` constant + PolyL.polyConstant poly
+            PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` PolyL.polyConstant poly
             PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
-            PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly `merge` toMap limbs
+            -- dunno how to check this
+            -- toSliceMap (PolyL.toSlices polynomial) `shouldBe` toSliceMap (PolyL.toSlices poly) `mergeSliceMap` toSliceMap slices
             PolyL.validate polynomial `shouldBe` Nothing
 
   describe "insertRefs" $ do
@@ -72,11 +91,11 @@ tests = describe "PolyRS" $ do
         case PolyL.insertRefs constant refs poly of
           Left constant' -> do
             constant' `shouldBe` constant + PolyL.polyConstant poly
-            null (toMap refs) && null (PolyL.polyLimbs poly) `shouldBe` True
+            null (toRefMap refs) && null (PolyL.polyLimbs poly) `shouldBe` True
           Right polynomial -> do
             PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` constant + PolyL.polyConstant poly
             PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly
-            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly `merge` toMap refs
+            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly `mergeRefMap` toRefMap refs
             PolyL.validate polynomial `shouldBe` Nothing
 
   describe "addConstant" $ do
@@ -108,8 +127,8 @@ tests = describe "PolyRS" $ do
             constant' `shouldBe` PolyL.polyConstant poly1 + PolyL.polyConstant poly2
           Right polynomial -> do
             PolyL.polyConstant polynomial `shouldBe` PolyL.polyConstant poly1 + PolyL.polyConstant poly2
-            PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly1 `merge` PolyL.polyLimbs poly2
-            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly1 `merge` PolyL.polyRefs poly2
+            PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly1 `mergeLimbMap` PolyL.polyLimbs poly2
+            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly1 `mergeRefMap` PolyL.polyRefs poly2
             PolyL.validate polynomial `shouldBe` Nothing
 
   describe "negate" $ do

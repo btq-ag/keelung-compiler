@@ -17,7 +17,6 @@ module Keelung.Data.PolyL
     toSlices,
 
     -- * Operations
-    insertLimbs,
     insertSlices,
     insertRefs,
     addConstant,
@@ -190,17 +189,7 @@ fromRefs constant xs = case toRefMap xs of
 
 --------------------------------------------------------------------------------
 
--- | Insert a list of (Limb, coefficient) pairs into a PolyL
-insertLimbs :: (Integral n) => n -> [(Limb, n)] -> PolyL n -> Either n (PolyL n)
-insertLimbs c' ls' (PolyL c ls rs ss) =
-  let limbs = mergeListAndClean ls ls'
-      slices = case limbsToIntervalMap ls' of
-        Nothing -> ss
-        Just ss' -> mergeIntervalSetAndClean ss ss'
-   in if null limbs && null rs
-        then Left (c + c')
-        else Right (PolyL (c + c') limbs rs slices)
-
+-- | Insert a list of (Slice, coefficient) pairs into a PolyL
 insertSlices :: (Integral n) => [(Slice, n)] -> PolyL n -> Either n (PolyL n)
 insertSlices ss' (PolyL c ls rs ss) =
   let limbs = mergeAndClean ls (Data.Maybe.fromMaybe mempty (toLimbMap (fmap (first sliceToLimb) ss')))

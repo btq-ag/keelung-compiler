@@ -19,8 +19,9 @@ import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.LC qualified as LC
-import Keelung.Data.Limb qualified as Limb
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 
 compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU U)) -> ExprB n -> M n (Either RefB Bool)
@@ -364,13 +365,15 @@ xorBs xs = do
       let vars = var : vars'
       -- devise an unsigned integer for expressing the sum of vars
       let width = widthOfInteger (toInteger (length vars))
-      limb <- allocLimb width
+      slice <- allocSlice width
       -- compose the LC for the sum
       let sumOfVars = mconcat (fmap (\x -> 1 @ B x) vars)
       -- equate the LC with the unsigned integer
-      writeAddWithLCAndLimbs sumOfVars 0 [(limb, -1)]
+      case sumOfVars of
+        Constant _ -> return ()
+        Polynomial poly -> writeAddWithPolyL $ PolyL.insertSlices [(slice, -1)] poly
       -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
-      return $ RefUBit (Limb.lmbRef limb) 0
+      return $ RefUBit (Slice.sliceRefU slice) 0
 
     flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
     flipResult (Right False) = return $ Right True
