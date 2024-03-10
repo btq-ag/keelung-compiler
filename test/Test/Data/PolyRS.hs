@@ -37,6 +37,8 @@ mergeRefMap xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
 mergeLimbMap :: (Integral n) => Map Limb n -> Map Limb n -> Map Limb n
 mergeLimbMap xs ys = Map.filterWithKey (\limb n -> not (Limb.null limb) && n /= 0) (Map.unionWith (+) xs ys)
 
+-- limbsToSlices :: (Integral n) => sliceToLimb
+
 -- NOTE: this implementation is incorrect
 -- mergeSliceMap :: (Integral n) => Map Slice n -> Map Slice n -> Map Slice n
 -- mergeSliceMap xs ys = Map.filterWithKey (\slice n -> widthOf slice /= 0 && n /= 0) (Map.unionWith (+) xs ys)

@@ -254,7 +254,7 @@ writeLimbEq a b =
   let as = Slice.fromLimb a
       bs = Slice.fromLimb b
    in case (as, bs) of
-        ([(coeffA, sliceA)], [(coeffB, sliceB)]) ->
+        ([(sliceA, coeffA)], [(sliceB, coeffB)]) ->
           if coeffA == coeffB
             then writeSliceEq sliceA sliceB
             else error $ "[ panic ] writeLimbEq: coefficient mismatch, " <> show coeffA <> " /= " <> show coeffB

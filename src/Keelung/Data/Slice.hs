@@ -82,11 +82,11 @@ fromRefUBit :: RefU -> Int -> Slice
 fromRefUBit ref i = Slice ref i (i + 1)
 
 -- | Construct "Slice"s from a "Limb" with a list of coeffients
-fromLimb :: Limb -> [(Integer, Slice)]
+fromLimb :: Limb -> [(Slice, Integer)]
 fromLimb limb = case Limb.lmbSigns limb of
-  Left sign -> [(if sign then 1 else -1, Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb))]
+  Left sign -> [(Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb), if sign then 1 else -1)]
   Right signs ->
-    [ (if sign then 2 ^ i else -(2 ^ i), fromRefUBit (Limb.lmbRef limb) (i + Limb.lmbOffset limb))
+    [ (fromRefUBit (Limb.lmbRef limb) (i + Limb.lmbOffset limb), if sign then 2 ^ i else -(2 ^ i))
       | (i, sign) <- zip [0 .. widthOf limb - 1] signs
     ]
 

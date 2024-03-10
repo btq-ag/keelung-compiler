@@ -342,7 +342,6 @@ learnFromAddL poly = case PolyL.view poly of
     --  constant + slice1 * multiplier1  = 0
     --    =>
     --  slice1 = - constant / multiplier1
-    -- let pairs = Slice.fromLimbWithValue limb1 (toInteger (-constant / multiplier1))
     assignS slice1 (toInteger (-constant / multiplier1))
     return True
   PolyL.SliceBinomial constant (slice1, multiplier1) (slice2, multiplier2) -> do
@@ -514,7 +513,7 @@ substLimb ::
   (Limb, n) ->
   (Either n (PolyL n), Maybe Changes)
 substLimb relations initState (limb, multiplier) =
-  let pairs = [(slice, fromInteger coeff * multiplier) | (coeff, slice) <- Slice.fromLimb limb, not (Slice.null slice)]
+  let pairs = [(slice, fromInteger coeff * multiplier) | (slice, coeff) <- Slice.fromLimb limb, not (Slice.null slice)]
    in foldl (substSlice relations) initState pairs
 
 substSlice ::
