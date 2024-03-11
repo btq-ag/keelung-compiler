@@ -497,8 +497,10 @@ substPolyL relations poly = do
       initState = (Left constant, Nothing)
       afterSubstSlice =
         foldl
+          -- (substSlice (Relations.relationsS relations))
           (substLimb (Relations.relationsS relations))
           initState
+          -- (PolyL.toSlices poly)
           (Map.toList $ PolyL.polyLimbs poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstSlice (PolyL.polyRefs poly)
   case afterSubstRef of

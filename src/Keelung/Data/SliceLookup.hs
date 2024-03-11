@@ -161,7 +161,7 @@ fromSegment (Slice ref start end) segment =
 --   May result in invalid empty segments!
 unsafeSplitSegment :: Int -> Segment -> (Segment, Segment)
 unsafeSplitSegment index segment = case segment of
-  Constant val -> (Constant (U.slice val 0 index), Constant (U.slice val index (widthOf val - index)))
+  Constant val -> (Constant (U.slice val (0, index)), Constant (U.slice val (index, widthOf val)))
   ChildOf slice -> let (slice1, slice2) = Slice.split index slice in (ChildOf slice1, ChildOf slice2)
   Parent len children ->
     let splittedChildren = fmap (Set.map (Slice.split index)) children

@@ -7,8 +7,6 @@ module Keelung.Data.Slice
     fromRefUWithDesiredWidth,
 
     -- * Conversion
-
-    -- fromLimb,
     fromLimb,
     fromLimbWithValue,
     toLimb,
@@ -16,6 +14,9 @@ module Keelung.Data.Slice
     -- * Predicates
     null,
     overlaps,
+
+    -- * Helpers
+    aggregateSigns,
 
     -- * Operations
     SplitError (..),
@@ -28,12 +29,12 @@ module Keelung.Data.Slice
 where
 
 import Control.DeepSeq (NFData)
-import Data.Bits qualified
 import GHC.Generics (Generic)
 import Keelung (HasWidth, widthOf)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU (..))
+import Keelung.Data.U qualified as U
 import Keelung.Syntax (Width)
 import Prelude hiding (map, null)
 
@@ -77,28 +78,52 @@ fromRefUWithDesiredWidth width refU =
     then [Slice refU i ((i + width) `min` widthOf refU) | i <- [0, width .. widthOf refU - 1]]
     else error "[ panic ] Slice.fromRefUWithDesiredWidth: desired width must be positive"
 
--- | Construct a "Slice" from a "RefU" and an index
-fromRefUBit :: RefU -> Int -> Slice
-fromRefUBit ref i = Slice ref i (i + 1)
+-- | Given a list of signs (each for one bit), returns a list of pairs of (sign, number of bits, bit offset so far)
+--   For example:
+--      [True, True] -> [(True, 2, 0)]
+--      [True, False] -> [(True, 1, 0), (False, 1, 1)]
+--      [True, True, False] -> [(True, 2, 0), (False, 1, 2)]
+aggregateSigns :: [Bool] -> [(Bool, Width, Int)]
+aggregateSigns = step Nothing
+  where
+    -- step :: (GaloisField n, Integral n) => Maybe (Int, Bool, Width, n) -> [Bool] -> [(Width, n)]
+    step :: Maybe (Int, Bool, Width, Int) -> [Bool] -> [(Bool, Width, Int)]
+    step Nothing [] = []
+    step Nothing (x : xs) = step (Just (1, x, 1, 0)) xs
+    step (Just (_, sign, width, offset)) [] = [(sign, width, offset)]
+    step (Just (i, sign, width, offset)) (x : xs) =
+      if sign == x
+        then step (Just (i + 1, sign, width + 1, offset)) xs
+        else (sign, width, offset) : step (Just (i + 1, x, 1, i)) xs
 
 -- | Construct "Slice"s from a "Limb" with a list of coeffients
 fromLimb :: Limb -> [(Slice, Integer)]
 fromLimb limb = case Limb.lmbSigns limb of
   Left sign -> [(Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb), if sign then 1 else -1)]
   Right signs ->
-    [ (fromRefUBit (Limb.lmbRef limb) (i + Limb.lmbOffset limb), if sign then 2 ^ i else -(2 ^ i))
-      | (i, sign) <- zip [0 .. widthOf limb - 1] signs
-    ]
+    let aggregatedSigns = aggregateSigns signs
+     in snd $ foldr (\(sign, width, offset) (i, acc) -> (i + width, (Slice (Limb.lmbRef limb) i (i + width), if sign then 2 ^ offset else -(2 ^ offset)) : acc)) (0, []) aggregatedSigns
 
--- | Like "fromLimb", but pairs the slices with chunks of the value adjusted by the signs
+-- | Like "fromLimb", but pairs the slices with chunks of the value
 fromLimbWithValue :: Limb -> Integer -> [(Slice, Integer)]
 fromLimbWithValue limb val = case Limb.lmbSigns limb of
   Left sign -> [(Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb), if sign then val else -val)]
   Right signs ->
-    [ let bit = Data.Bits.testBit val (offset - Limb.lmbOffset limb)
-       in (fromRefUBit (Limb.lmbRef limb) offset, if Data.Bits.xor sign bit then 1 else 0)
-      | (offset, sign) <- zip [Limb.lmbOffset limb .. Limb.lmbOffset limb + widthOf limb - 1] signs
-    ]
+    let u = U.new (widthOf limb) val
+        aggregatedSigns = aggregateSigns signs
+     in snd $
+          foldr
+            ( \(sign, width, offset) (i, acc) ->
+                ( i + width,
+                  ( Slice (Limb.lmbRef limb) i (i + width),
+                    let slicedVal = toInteger (U.slice u (offset, offset + width))
+                     in if sign then slicedVal else -slicedVal
+                  )
+                    : acc
+                )
+            )
+            (0, [])
+            aggregatedSigns
 
 -- | Convert a "Slice" to a "Limb"
 toLimb :: Slice -> Limb
