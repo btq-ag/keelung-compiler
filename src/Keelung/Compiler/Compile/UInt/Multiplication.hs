@@ -2,6 +2,7 @@ module Keelung.Compiler.Compile.UInt.Multiplication (compileMulU) where
 
 import Control.Monad.Except
 import Control.Monad.RWS
+import Data.Bifunctor (second)
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
@@ -19,9 +20,9 @@ import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
-import qualified Keelung.Data.Slice as Slice
 
 --------------------------------------------------------------------------------
 
@@ -91,19 +92,23 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       -- if the constant is 1, then the resulting limbs should be the same as the input
       return (LimbColumn.new 0 [x], mempty)
     Left constant -> do
+      -- (a + x) * constant = (lower + upper * 2^currentLimbWidth)
       -- the total amount of bits to represent the product = currentLimbWidth * (1 + ceil(lg(constant)))
       let upperLimbWidth = ceiling (logBase 2 (fromIntegral constant :: Double)) :: Int
-      upperLimb <- allocLimb upperLimbWidth
-      lowerLimb <- allocLimb currentLimbWidth
-      writeAddWithLimbs
-        (a * constant)
-        []
-        [ -- operand side
-          (x, constant),
-          -- negative side
-          (lowerLimb, -1),
-          (upperLimb, -(2 ^ currentLimbWidth))
-        ]
+      lowerSlice <- allocSlice currentLimbWidth
+      upperSlice <- allocSlice upperLimbWidth
+
+      let x' = fmap (second ((* constant) . fromInteger)) (Slice.fromLimb x)
+      writeAddWithPolyL $
+        PolyL.new
+          (a * constant)
+          []
+          ( (lowerSlice, -1)
+              : (upperSlice, -(2 ^ currentLimbWidth))
+              : x'
+          )
+      let lowerLimb = Slice.toLimb lowerSlice
+      let upperLimb = Slice.toLimb upperSlice
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       let carryLimbWidth = lmbWidth x + lmbWidth y - currentLimbWidth

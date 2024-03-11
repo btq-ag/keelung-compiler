@@ -4,7 +4,6 @@ import Control.Arrow (right)
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Bifunctor (first)
 import Data.Field.Galois (GaloisField)
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
@@ -141,7 +140,7 @@ writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
 writeAdd c as = writeAddWithPolyL (PolyL.fromRefs c as)
 
 writeAddWithSlices :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> M n ()
-writeAddWithSlices constant refs slices = writeAddWithLimbs constant refs (map (first Slice.toLimb) slices)
+writeAddWithSlices constant refs slices = writeAddWithPolyL $ PolyL.new constant refs slices
 
 writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> M n ()
 writeAddWithLimbs constant refs limbs = case PolyL.fromLimbs constant limbs of
@@ -353,6 +352,31 @@ allocLimb :: (GaloisField n, Integral n) => Width -> M n Limb
 allocLimb w = do
   refU <- freshRefU w
   return $ Limb.new refU w 0 (Left True)
+
+-- | Allocates a carry Slice with the given signs
+allocCarrySlice :: (GaloisField n, Integral n) => [Bool] -> M n [(Slice, n)]
+allocCarrySlice signs = do
+  let aggregated = aggregateSigns signs
+  forM aggregated $ \(width, coeff) -> do
+    slice <- allocSlice width
+    return (slice, coeff)
+
+-- | Given a list of signs (each for one bit), returns a list of pairs of (number of bits, coefficient)
+--   For example:
+--      [True, True] -> [(2, 1)]
+--      [True, False] -> [(1, 1), (1, -2)]
+--      [True, True, False] -> [(2, 1), (1, 4)]
+aggregateSigns :: (GaloisField n, Integral n) => [Bool] -> [(Width, n)]
+aggregateSigns = step Nothing
+  where
+    step :: (GaloisField n, Integral n) => Maybe (Int, Bool, Width, n) -> [Bool] -> [(Width, n)]
+    step Nothing [] = []
+    step Nothing (x : xs) = step (Just (1, x, 1, if x then 1 else -1)) xs
+    step (Just (_, _, width, coeff)) [] = [(width, coeff)]
+    step (Just (i, sign, width, coeff)) (x : xs) =
+      if sign == x
+        then step (Just (i + 1, sign, width + 1, coeff)) xs
+        else (width, coeff) : step (Just (i + 1, x, 1, if x then 2 ^ i else -(2 ^ i))) xs
 
 -- | Allocates a Slice
 allocSlice :: (GaloisField n, Integral n) => Width -> M n Slice

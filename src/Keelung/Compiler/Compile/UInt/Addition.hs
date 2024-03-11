@@ -107,19 +107,14 @@ addLimbColumn maxHeight finalResultLimb limbs = do
   case rest of
     Nothing -> do
       -- base case, there are no more limbs to be processed
-      result <- addLimbColumnView finalResultLimb stack
-      case result of
-        Nothing -> return mempty
-        Just carryLimb -> return (LimbColumn.singleton carryLimb)
+      addLimbColumnView finalResultLimb stack
     Just rest' -> do
       -- inductive case, there are more limbs to be processed
       resultLimb <- allocLimb (lmbWidth finalResultLimb)
-      result <- addLimbColumnView resultLimb stack
+      carryLimbs <- addLimbColumnView resultLimb stack
       -- insert the result limb of the current batch to the next batch
       moreCarryLimbs <- addLimbColumn maxHeight finalResultLimb (LimbColumn.insert resultLimb rest')
-      case result of
-        Nothing -> return moreCarryLimbs
-        Just carryLimb -> return $ LimbColumn.insert carryLimb moreCarryLimbs
+      return $ carryLimbs <> moreCarryLimbs
 
 -- | Compress a column of limbs into a single limb and some carry
 --
@@ -128,14 +123,14 @@ addLimbColumn maxHeight finalResultLimb limbs = do
 --  +           [ operand ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-addLimbColumnView :: (GaloisField n, Integral n) => Limb -> LimbColumn.View -> M n (Maybe Limb)
+addLimbColumnView :: (GaloisField n, Integral n) => Limb -> LimbColumn.View -> M n LimbColumn
 addLimbColumnView resultLimb (LimbColumn.OneConstantOnly constant) = do
   -- no limb => result = constant, no carry
   writeLimbVal resultLimb constant
-  return Nothing
+  return mempty
 addLimbColumnView resultLimb (LimbColumn.OneLimbOnly limb) = do
   writeLimbEq resultLimb limb
-  return Nothing
+  return mempty
 addLimbColumnView resultLimb (LimbColumn.Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (lmbWidth resultLimb) constant limbs
   carryLimb <- allocCarryLimb (length carrySigns) carrySigns
@@ -145,4 +140,4 @@ addLimbColumnView resultLimb (LimbColumn.Ordinary constant limbs) = do
       : (carryLimb, -(2 ^ lmbWidth resultLimb))
       -- positive side
       : fmap (,1) (toList limbs)
-  return $ Just carryLimb
+  return $ LimbColumn.singleton carryLimb
