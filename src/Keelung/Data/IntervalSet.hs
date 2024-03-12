@@ -101,11 +101,16 @@ toIntervalTable domainSize (IntervalSet intervals) =
         (occupiedSize + end - start)
 
 -- | O(1): Create an interval set from a limb
-fromLimb :: (Limb, n) -> IntervalSet n
+fromLimb :: (Num n) => (Limb, n) -> IntervalSet n
 fromLimb (limb, n) =
   if Limb.lmbWidth limb == 0
     then IntervalSet mempty
-    else IntervalSet $ IntMap.singleton (Limb.lmbOffset limb) (Limb.lmbOffset limb + Limb.lmbWidth limb, n)
+    else case Limb.lmbSigns limb of
+      Left True -> IntervalSet $ IntMap.singleton (Limb.lmbOffset limb) (Limb.lmbOffset limb + Limb.lmbWidth limb, n)
+      Left False -> IntervalSet $ IntMap.singleton (Limb.lmbOffset limb) (Limb.lmbOffset limb + Limb.lmbWidth limb, -n)
+      Right signs ->
+        let aggregateSigns = Slice.aggregateSigns signs
+         in IntervalSet $ IntMap.fromList $ map (\(sign, width, offset) -> (offset, (offset + width, if sign then n else -n))) aggregateSigns
 
 -- | O(n): Convert an interval set to a list of Slices
 toSlices :: RefU -> IntervalSet n -> [(Slice, n)]

@@ -267,7 +267,7 @@ data Error n
   = ConstantOnly -- The polynomial does not have any non-contant terms
   | LimbsWithZeroWidth [Limb] -- The polynomial has Limbs with zero width
   | InvalidSlices [IntervalSet.Error n] -- The polynomial has invalid Slices
-  | LimbsNotConsistentWithSlices (Map Slice n) (Map Limb n)
+  | LimbsNotConsistentWithSlices (n, Map RefU (IntervalSet n)) (n, Map Limb n)
   deriving (Eq, Show)
 
 -- | Validate a PolyL
@@ -279,23 +279,25 @@ validate (PolyL _ limbs refs slices) =
       notConstantOnly = limbsNonZero || refsNonZero || slicesNonZero
       limbsWithZeroWidth = filter ((== 0) . widthOf) (Map.keys limbs)
       invalidSlices = toList $ Map.mapMaybe IntervalSet.validate slices
-   in -- consistentLimbsAndSlices = Map.mapKeys sliceToLimb (toSliceMap (toSlices poly)) == polyLimbs poly
-      -- invalidSlices = map fst $ toSlices $ Map.filter (not . IntervalSet.isValid) slices
-      if notConstantOnly
+   in if notConstantOnly
         then
           if null limbsWithZeroWidth
             then
               if null invalidSlices
-                then Nothing
-                else -- if consistentLimbsAndSlices
-                --   then Nothing
-                --   else Just (LimbsNotConsistentWithSlices (toSliceMap (toSlices poly)) (polyLimbs poly))
-                  Just (InvalidSlices invalidSlices)
+                then
+                  if consistentLimbsAndSlices
+                    then Nothing
+                    else Just (LimbsNotConsistentWithSlices (sliceCoeffSum, slices) (limbCoeffSum, limbs))
+                else Just (InvalidSlices invalidSlices)
             else Just (LimbsWithZeroWidth limbsWithZeroWidth)
         else Just ConstantOnly
-
--- toSliceMap :: (Integral n) => [(Slice, n)] -> Map Slice n
--- toSliceMap = Map.filterWithKey (\slice n -> widthOf slice /= 0 && n /= 0) . Map.fromListWith (+)
+  where
+    -- we consider a set of Limbs and a set of Slices to be consistent,
+    --   if the sum of their coefficients are equal to each other
+    consistentLimbsAndSlices :: Bool
+    consistentLimbsAndSlices = limbCoeffSum == sliceCoeffSum
+    limbCoeffSum = sum $ Map.mapWithKey (\limb n -> fromIntegral (widthOf limb) * n) limbs
+    sliceCoeffSum = sum (fmap IntervalSet.totalCount slices)
 
 toRefMap :: (Integral n) => [(Ref, n)] -> Maybe (Map Ref n)
 toRefMap xs =

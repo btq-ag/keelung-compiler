@@ -3,6 +3,7 @@ module Keelung.Compiler.Optimize.MinimizeConstraints (run) where
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.Bifunctor (second)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
@@ -20,8 +21,10 @@ import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
+import Keelung.Compiler.Util
 import Keelung.Data.Limb (Limb)
-import Keelung.Data.PolyL
+import Keelung.Data.N (N (N))
+import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
@@ -489,6 +492,19 @@ removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 
 --------------------------------------------------------------------------------
 
+new :: Bool
+new = False
+
+isTarget :: PolyL n -> Bool
+isTarget poly =
+  any
+    ( \(slice, _) ->
+        (Slice.sliceRefU slice == RefUO 8 0 && Slice.sliceStart slice == 0)
+          || (Slice.sliceRefU slice == RefUX 16 1 && Slice.sliceStart slice == 0)
+          || (Slice.sliceRefU slice == RefUX 16 3 && Slice.sliceStart slice == 2)
+    )
+    (PolyL.toSlices poly)
+
 -- | Substitutes Limbs in a PolyL.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Changes)
@@ -496,12 +512,24 @@ substPolyL relations poly = do
   let constant = PolyL.polyConstant poly
       initState = (Left constant, Nothing)
       afterSubstSlice =
-        foldl
-          -- (substSlice (Relations.relationsS relations))
-          (substLimb (Relations.relationsS relations))
-          initState
-          -- (PolyL.toSlices poly)
-          (Map.toList $ PolyL.polyLimbs poly)
+        if new
+          then
+            foldl
+              (substSlice (Relations.relationsS relations))
+              initState
+              (PolyL.toSlices poly)
+          else
+            foldl
+              (substLimb (Relations.relationsS relations))
+              initState
+              (Map.toList $ PolyL.polyLimbs poly)
+      _test a =
+        let after = case fst afterSubstSlice of
+              Left c -> show (N c)
+              Right poly' -> show (fmap N poly')
+         in if new
+              then traceWhen (isTarget poly) ("\nbefore:  " <> show (map (second N) (PolyL.toSlices poly)) <> "\nafter:  " <> after <> "\n") a
+              else traceWhen (isTarget poly) ("\nbefore:  " <> show (map (second N) (Map.toList (PolyL.polyLimbs poly))) <> "\nafter:  " <> after <> "\n") a
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstSlice (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed
