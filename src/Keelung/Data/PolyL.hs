@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -54,6 +53,8 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
+import Keelung.Data.SlicePolynomial (SlicePoly)
+import Keelung.Data.SlicePolynomial qualified as SlicePoly
 import Prelude hiding (negate, null)
 import Prelude qualified
 
@@ -66,12 +67,16 @@ data PolyL n = PolyL
     -- | (Ref, coefficient)
     polyRefs :: Map Ref n,
     -- | (Slice, coefficient)
-    polySlices :: Map RefU (IntervalSet n)
+    polySlices :: Map RefU (IntervalSet n),
+    -- | SlicePolynomial
+    polySlices2 :: SlicePoly n
   }
-  deriving (Eq, Functor, Ord, Generic, NFData)
+  deriving (Eq, Functor, Ord, Generic)
+
+instance (NFData n) => NFData (PolyL n)
 
 instance (Integral n, GaloisField n) => Show (PolyL n) where
-  show (PolyL constant limbs refs intervals)
+  show (PolyL constant limbs refs intervals _)
     | constant == 0 =
         if firstSign == " + "
           then concat restOfTerms
@@ -116,27 +121,27 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
 --------------------------------------------------------------------------------
 
 -- | Construct a PolyL from a constant, Refs, and Limbs
-new :: (Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> Either n (PolyL n)
+new :: (Integral n, GaloisField n) => n -> [(Ref, n)] -> [(Slice, n)] -> Either n (PolyL n)
 new constant refs slices =
   case (toRefMap refs, fromSlicesHelper slices) of
     (Nothing, Nothing) -> Left constant
-    (Nothing, Just (limbs', slices')) ->
+    (Nothing, Just (limbs', slices', slices2')) ->
       if limbsToIntervalMap (Map.toList limbs') == Just slices'
-        then Right (PolyL constant limbs' mempty slices')
+        then Right (PolyL constant limbs' mempty slices' slices2')
         else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 1:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
-    (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty)
-    (Just refs', Just (limbs', slices')) ->
+    (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty mempty)
+    (Just refs', Just (limbs', slices', slices2')) ->
       if limbsToIntervalMap (Map.toList limbs') == Just slices'
-        then Right (PolyL constant limbs' refs' slices')
+        then Right (PolyL constant limbs' refs' slices' slices2')
         else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 2:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
 
 -- | Helper for converting Slices to Limbs and make sure they are equal
-fromSlicesHelper :: (Integral n) => [(Slice, n)] -> Maybe (Map Limb n, Map RefU (IntervalSet n))
+fromSlicesHelper :: (Integral n, GaloisField n) => [(Slice, n)] -> Maybe (Map Limb n, Map RefU (IntervalSet n), SlicePoly n)
 fromSlicesHelper xs = case (toLimbMap (fmap (first sliceToLimb) xs), slicesToIntervalMap xs) of
   (Nothing, Nothing) -> Nothing
   (Nothing, Just slices) ->
     if null slices
-      then Just (mempty, mempty)
+      then Just (mempty, mempty, mempty)
       else error "[ panic ] PolyL.fromSlicesHelper: empty Limbs with non-empty Slices"
   (Just limbs, Nothing) ->
     if null limbs
@@ -144,11 +149,11 @@ fromSlicesHelper xs = case (toLimbMap (fmap (first sliceToLimb) xs), slicesToInt
       else error $ "[ panic ] PolyL.fromSlicesHelper: empty Slices with non-empty Limbs:\n  Limbs: " <> show (Map.keys limbs)
   (Just limbs, Just slices) ->
     if limbsToIntervalMap (Map.toList limbs) == Just slices
-      then Just (limbs, slices)
+      then Just (limbs, slices, SlicePoly.fromSlices xs)
       else error $ "[ panic ] PolyL.fromSlicesHelper: mismatch between Slices & Limbs:\n  Slices: " <> show (map fst xs) <> "\n  Limbs: " <> show (Map.keys limbs)
 
 -- | Helper for converting Limbs to Slices and make sure they are equal
-fromLimbsHelper :: (Integral n) => [(Limb, n)] -> Maybe (Map Limb n, Map RefU (IntervalSet n))
+fromLimbsHelper :: (Integral n, GaloisField n) => [(Limb, n)] -> Maybe (Map Limb n, Map RefU (IntervalSet n), SlicePoly n)
 fromLimbsHelper xs =
   case (toLimbMap xs, limbsToIntervalMap xs) of
     (Nothing, Nothing) -> Nothing
@@ -160,75 +165,75 @@ fromLimbsHelper xs =
       if null limbs
         then Nothing
         else error $ "[ panic ] PolyL.fromLimbsHelper: empty Slices with non-empty Limbs:\n  Limbs: " <> show (Map.keys limbs)
-    (Just limbs, Just slices) -> Just (limbs, slices)
+    (Just limbs, Just slices) -> Just (limbs, slices, SlicePoly.fromSlices (intervalMaptoSlices slices))
 
 -- | Construct a PolyL from a single Ref
-fromRef :: (Integral n) => Ref -> PolyL n
-fromRef ref = PolyL 0 mempty (Map.singleton ref 1) mempty
+fromRef :: (Integral n, GaloisField n) => Ref -> PolyL n
+fromRef ref = PolyL 0 mempty (Map.singleton ref 1) mempty mempty
 
 -- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
-fromLimbs :: (Integral n) => n -> [(Limb, n)] -> Either n (PolyL n)
+fromLimbs :: (Integral n, GaloisField n) => n -> [(Limb, n)] -> Either n (PolyL n)
 fromLimbs constant xs = case fromLimbsHelper xs of
   Nothing -> Left constant
-  Just (limbs, slices) -> Right (PolyL constant limbs mempty slices)
+  Just (limbs, slices, slices2) -> Right (PolyL constant limbs mempty slices slices2)
 
 -- | Convert a PolyL to a list of (Slice, coefficient) pairs
 toSlices :: PolyL n -> [(Slice, n)]
 toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList . polySlices
 
 -- | Construct a PolyL from a constant and a single slice
-fromSlice :: (Integral n) => n -> Slice -> PolyL n
+fromSlice :: (Integral n, GaloisField n) => n -> Slice -> PolyL n
 fromSlice constant slice = case slicesToIntervalMap [(slice, 1)] of
   Nothing -> error "[ panic ] PolyL.fromSlice: impossible"
-  Just ss -> PolyL constant (Map.singleton (sliceToLimb slice) 1) mempty ss
+  Just ss -> PolyL constant (Map.singleton (sliceToLimb slice) 1) mempty ss (SlicePoly.fromSlices [(slice, 1)])
 
 -- | Construct a PolyL from a constant and a list of (Ref, coefficient) pairs
-fromRefs :: (Integral n) => n -> [(Ref, n)] -> Either n (PolyL n)
+fromRefs :: (Integral n, GaloisField n) => n -> [(Ref, n)] -> Either n (PolyL n)
 fromRefs constant xs = case toRefMap xs of
   Nothing -> Left constant
-  Just refs -> Right (PolyL constant mempty refs mempty)
+  Just refs -> Right (PolyL constant mempty refs mempty mempty)
 
 --------------------------------------------------------------------------------
 
 -- | Insert a list of (Slice, coefficient) pairs into a PolyL
-insertSlices :: (Integral n) => [(Slice, n)] -> PolyL n -> Either n (PolyL n)
-insertSlices ss' (PolyL c ls rs ss) =
+insertSlices :: (Integral n, GaloisField n) => [(Slice, n)] -> PolyL n -> Either n (PolyL n)
+insertSlices ss' (PolyL c ls rs ss ss2) =
   let limbs = mergeAndClean ls (Data.Maybe.fromMaybe mempty (toLimbMap (fmap (first sliceToLimb) ss')))
       slices = case slicesToIntervalMap ss' of
         Nothing -> ss
         Just ss'' -> mergeIntervalSetAndClean ss ss''
    in if null limbs && null rs
         then Left c
-        else Right (PolyL c limbs rs slices)
+        else Right (PolyL c limbs rs slices (SlicePoly.insertMany ss' ss2))
 
 insertRefs :: (Integral n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
-insertRefs c' rs' (PolyL c ls rs ss) =
+insertRefs c' rs' (PolyL c ls rs ss ss2) =
   let refs = mergeListAndClean rs rs'
    in if null rs' && null ls
         then Left (c + c')
-        else Right $ PolyL (c + c') ls refs ss
+        else Right $ PolyL (c + c') ls refs ss ss2
 
 addConstant :: (Integral n) => n -> PolyL n -> PolyL n
-addConstant c' (PolyL c ls rs ss) = PolyL (c + c') ls rs ss
+addConstant c' (PolyL c ls rs ss ss2) = PolyL (c + c') ls rs ss ss2
 
 -- | Multiply all coefficients and the constant by some non-zero number
-multiplyBy :: (Integral n) => n -> PolyL n -> Either n (PolyL n)
+multiplyBy :: (Integral n, GaloisField n) => n -> PolyL n -> Either n (PolyL n)
 multiplyBy 0 _ = Left 0
-multiplyBy m (PolyL c ls rs ss) = Right $ PolyL (m * c) (fmap (m *) ls) (fmap (m *) rs) (fmap (fmap (m *)) ss)
+multiplyBy m (PolyL c ls rs ss ss2) = Right $ PolyL (m * c) (fmap (m *) ls) (fmap (m *) rs) (fmap (fmap (m *)) ss) (SlicePoly.multiplyBy m ss2)
 
 -- | Merge two PolyLs
-merge :: (Integral n) => PolyL n -> PolyL n -> Either n (PolyL n)
-merge (PolyL c1 ls1 rs1 ss1) (PolyL c2 ls2 rs2 ss2) =
+merge :: (Integral n, GaloisField n) => PolyL n -> PolyL n -> Either n (PolyL n)
+merge (PolyL c1 ls1 rs1 ss1 sp1) (PolyL c2 ls2 rs2 ss2 sp2) =
   let limbs = mergeAndClean ls1 ls2
       refs = mergeAndClean rs1 rs2
       slices = mergeIntervalSetAndClean ss1 ss2
    in if null limbs && null refs
         then Left (c1 + c2)
-        else Right (PolyL (c1 + c2) limbs refs slices)
+        else Right (PolyL (c1 + c2) limbs refs slices (sp1 <> sp2))
 
 -- | Negate a polynomial
-negate :: (Num n, Eq n) => PolyL n -> PolyL n
-negate (PolyL c ls rs ss) = PolyL (-c) (fmap Prelude.negate ls) (fmap Prelude.negate rs) (fmap (fmap Prelude.negate) ss)
+negate :: (Integral n, GaloisField n) => PolyL n -> PolyL n
+negate (PolyL c ls rs ss sp) = PolyL (-c) (fmap Prelude.negate ls) (fmap Prelude.negate rs) (fmap (fmap Prelude.negate) ss) (SlicePoly.multiplyBy (-1) sp)
 
 --------------------------------------------------------------------------------
 
@@ -245,7 +250,7 @@ data View n
 
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
 view :: PolyL n -> View n
-view (PolyL constant _ refs intervals) =
+view (PolyL constant _ refs intervals _) =
   let slices = intervalMaptoSlices intervals
    in case (Map.toList refs, slices) of
         ([], [slice]) -> SliceMonomial constant slice
@@ -259,7 +264,7 @@ view (PolyL constant _ refs intervals) =
 
 -- | Number of terms (including the constant)
 size :: (Eq n, Num n) => PolyL n -> Int
-size (PolyL c _ refs intervals) = (if c == 0 then 0 else 1) + Map.size refs + length (concatMap (uncurry IntervalSet.toSlices) (Map.toList intervals))
+size (PolyL c _ refs intervals _) = (if c == 0 then 0 else 1) + Map.size refs + length (concatMap (uncurry IntervalSet.toSlices) (Map.toList intervals))
 
 --------------------------------------------------------------------------------
 
@@ -272,7 +277,7 @@ data Error n
 
 -- | Validate a PolyL
 validate :: (Integral n) => PolyL n -> Maybe (Error n)
-validate (PolyL _ limbs refs slices) =
+validate (PolyL _ limbs refs slices _) =
   let limbsNonZero = not (Map.null (Map.filter (/= 0) limbs))
       refsNonZero = not (Map.null (Map.filter (/= 0) refs))
       slicesNonZero = not (Map.null (Map.filter (not . IntervalSet.allZero) slices))

@@ -8,10 +8,12 @@ module Keelung.Data.SlicePolynomial
     new,
 
     -- * Conversion
+    fromSlices,
     toSlices,
 
     -- * Update
     insert,
+    insertMany,
     multiplyBy,
 
     -- * Query
@@ -22,6 +24,7 @@ module Keelung.Data.SlicePolynomial
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.Map (Map)
 import Data.Map qualified as Map
@@ -44,7 +47,9 @@ import Prelude qualified
 --      However, if we just merge the two intervals together, we'd get:
 --        `U₈0[0] + 2U₈0[1] + 4U₈0[2] + 8U₈0[3] + 16U₈0[4] + 32U₈0[5] + 64U₈0[6] + 128U₈0[7]`
 --      It's because that we didn't shift the multiplier of the second interval by the length of the first interval.
-newtype SlicePoly n = SlicePoly {unSlicePoly :: Map RefU (IntervalSet n)} deriving (Eq, Functor, Generic)
+newtype SlicePoly n = SlicePoly {unSlicePoly :: Map RefU (IntervalSet n)} deriving (Eq, Functor, Ord, Generic)
+
+instance (NFData n) => NFData (SlicePoly n)
 
 instance (Integral n, GaloisField n) => Semigroup (SlicePoly n) where
   (<>) = add
@@ -58,6 +63,10 @@ new = SlicePoly mempty
 
 --------------------------------------------------------------------------------
 
+-- | Convert a list of Slices to a polynomial
+fromSlices :: (Integral n, GaloisField n) => [(Slice, n)] -> SlicePoly n
+fromSlices = foldr insert new
+
 -- | Convert the polynomial to a list of Slices
 toSlices :: SlicePoly n -> [(Slice, n)]
 toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList . unSlicePoly
@@ -69,6 +78,10 @@ insert :: (Integral n, GaloisField n) => (Slice, n) -> SlicePoly n -> SlicePoly 
 insert (slice, n) (SlicePoly xs) = case IntervalSet.fromSlice (slice, n) of
   Nothing -> SlicePoly xs -- no-op
   Just x -> SlicePoly (Map.insertWith mergeEntry (Slice.sliceRefU slice) x xs)
+
+-- | Insert many Slices with multipliers into the polynomial
+insertMany :: (Integral n, GaloisField n) => [(Slice, n)] -> SlicePoly n -> SlicePoly n
+insertMany slices xs = foldr insert xs slices
 
 -- | Merge two IntervalSets while maintaining the correct multiplier
 mergeEntry :: (Integral n, GaloisField n) => IntervalSet n -> IntervalSet n -> IntervalSet n

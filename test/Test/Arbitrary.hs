@@ -5,6 +5,7 @@
 -- | Instances of 'Arbitrary'
 module Test.Arbitrary where
 
+import Data.Field.Galois (GaloisField)
 import Data.IntMap qualified as IntMap
 import Data.Map qualified as Map
 import Data.Set qualified as Set
@@ -131,7 +132,7 @@ instance Arbitrary Limb where
 --------------------------------------------------------------------------------
 
 -- | Generates valid PolyL
-instance (Arbitrary n, Integral n) => Arbitrary (PolyL n) where
+instance (Arbitrary n, Integral n, GaloisField n) => Arbitrary (PolyL n) where
   arbitrary =
     fst
       <$> ( do

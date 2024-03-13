@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -37,7 +36,7 @@ import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
 
-class Monoid rel => IsRelation rel where
+class (Monoid rel) => IsRelation rel where
   -- | Render a relation to some child as a string
   relationToString :: (String, rel) -> String
 
@@ -82,7 +81,9 @@ data VarStatus var n rel
     IsRoot (Map var rel)
   | -- | child = relation parent
     IsChildOf var rel
-  deriving (Show, Eq, Generic, NFData)
+  deriving (Show, Eq, Generic)
+
+instance (NFData var, NFData n, NFData rel) => NFData (VarStatus var n rel)
 
 data EquivClass var n rel = EquivClass
   { eqPoolName :: String,
@@ -137,7 +138,7 @@ instance (Show var, IsRelation rel, Show n) => Show (EquivClass var n rel) where
       toString (_var, IsChildOf _parent _relation) = []
 
 -- | Creates a new EquivClass, O(1)
-new :: Ord var => String -> EquivClass var n rel
+new :: (Ord var) => String -> EquivClass var n rel
 new name = EquivClass name mempty
 
 -- | Returns the result of looking up a variable in the UIntEquivClass, O(lg n)
@@ -360,7 +361,7 @@ allChildrenRecognizeTheirParent relations =
 rootsAreSenior :: (Ord var, IsRelation rel, Eq rel, Seniority var) => EquivClass var n rel -> Bool
 rootsAreSenior = Map.foldlWithKey' go True . eqPoolEquivClass
   where
-    go :: Seniority var => Bool -> var -> VarStatus var n rel -> Bool
+    go :: (Seniority var) => Bool -> var -> VarStatus var n rel -> Bool
     go False _ _ = False
     go True _ (IsConstant _) = True
     go True var (IsRoot children) = all (\child -> compareSeniority var child /= LT) (Map.keys children)
