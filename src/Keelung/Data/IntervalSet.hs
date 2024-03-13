@@ -17,6 +17,7 @@ module Keelung.Data.IntervalSet
     adjust,
     split,
     merge,
+    multiplyBy,
 
     -- * Conversion
     toIntervalTable,
@@ -27,6 +28,7 @@ module Keelung.Data.IntervalSet
     -- * Query
     intervalsWithin,
     totalCount,
+    getStartOffset,
     allZero,
     lookup,
     member,
@@ -140,6 +142,16 @@ adjust (start, end) count (IntervalSet xs) =
        in if normalizeAfterAdjust
             then normalize $ executeActions actions (IntervalSet xs)
             else executeActions actions (IntervalSet xs)
+
+-- | O(n): Multiply the count of all intervals by a number
+multiplyBy :: (Num n, Eq n) => n -> IntervalSet n -> IntervalSet n
+multiplyBy 0 _ = error "[ panic ] IntervalSet: multiplyBy 0"
+multiplyBy 1 (IntervalSet xs) = IntervalSet xs
+multiplyBy n (IntervalSet xs) = IntervalSet (fmap (\(end, count) -> (end, count * n)) xs)
+
+-- | O(1): Get the first offset of an interval set
+getStartOffset :: IntervalSet n -> Maybe Int
+getStartOffset (IntervalSet xs) = fst <$> IntMap.lookupMin xs
 
 -- | O(n): Compute the total count of all intervals (for testing purposes)
 totalCount :: (Num n) => IntervalSet n -> n
