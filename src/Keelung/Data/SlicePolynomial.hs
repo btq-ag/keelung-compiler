@@ -4,7 +4,7 @@
 -- | For storing Slices in a polynomial
 module Keelung.Data.SlicePolynomial
   ( -- * Construction
-    SlicePoly(unSlicePoly),
+    SlicePoly (unSlicePoly),
     new,
 
     -- * Conversion
@@ -18,6 +18,7 @@ module Keelung.Data.SlicePolynomial
 
     -- * Query
     null,
+    size,
     IntervalSet.Error (..),
     validate,
     isValid,
@@ -108,14 +109,14 @@ add (SlicePoly xs) (SlicePoly ys) = SlicePoly (Map.unionWith mergeEntry xs ys)
 null :: (Integral n) => SlicePoly n -> Bool
 null = all IntervalSet.allZero . unSlicePoly
 
+-- | Get the number of Slices in the polynomial
+size :: (Integral n) => SlicePoly n -> Int
+size = length . toSlices
+
 -- | Check if a PolySlice is valid
-validate :: (Eq n, Num n) => SlicePoly n -> Maybe [(RefU, IntervalSet.Error n)]
-validate (SlicePoly xs) =
-  let errors = Map.toList $ Map.mapMaybe IntervalSet.validate xs
-   in if Prelude.null errors
-        then Nothing
-        else Just errors
+validate :: (Eq n, Num n) => SlicePoly n -> [(RefU, IntervalSet.Error n)]
+validate (SlicePoly xs) = Map.toList $ Map.mapMaybe IntervalSet.validate xs
 
 -- | Check if a PolySlice is valid
 isValid :: (Eq n, Num n) => SlicePoly n -> Bool
-isValid = (==) Nothing . validate
+isValid = Prelude.null . validate
