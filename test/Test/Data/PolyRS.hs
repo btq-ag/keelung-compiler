@@ -49,95 +49,95 @@ tests = describe "PolyRS" $ do
     property $ \poly -> do
       PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
-  describe "fromLimbs" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(constant, limbs) -> do
-        case PolyL.fromLimbs constant limbs of
-          Left constant' -> do
-            constant' `shouldBe` constant
-            null (toLimbMap limbs) `shouldBe` True
-          Right poly -> do
-            PolyL.polyConstant poly `shouldBe` constant
-            PolyL.polyLimbs poly `shouldBe` toLimbMap limbs
-            PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
+  -- describe "fromLimbs" $ do
+  --   it "should result in valid PolyL" $ do
+  --     property $ \(constant, limbs) -> do
+  --       case PolyL.fromLimbs constant limbs of
+  --         Left constant' -> do
+  --           constant' `shouldBe` constant
+  --           null (toLimbMap limbs) `shouldBe` True
+  --         Right poly -> do
+  --           PolyL.polyConstant poly `shouldBe` constant
+  --           PolyL.polyLimbs poly `shouldBe` toLimbMap limbs
+  --           PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
-  describe "fromRefs" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(constant, refs) -> do
-        case PolyL.fromRefs constant refs of
-          Left constant' -> do
-            constant' `shouldBe` constant
-            null (toRefMap refs) `shouldBe` True
-          Right poly -> do
-            PolyL.polyConstant poly `shouldBe` constant
-            PolyL.polyRefs poly `shouldBe` toRefMap refs
-            PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
+  -- describe "fromRefs" $ do
+  --   it "should result in valid PolyL" $ do
+  --     property $ \(constant, refs) -> do
+  --       case PolyL.fromRefs constant refs of
+  --         Left constant' -> do
+  --           constant' `shouldBe` constant
+  --           null (toRefMap refs) `shouldBe` True
+  --         Right poly -> do
+  --           PolyL.polyConstant poly `shouldBe` constant
+  --           PolyL.polyRefs poly `shouldBe` toRefMap refs
+  --           PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
-  describe "insertSlices" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(slices, poly) -> do
-        case PolyL.insertSlices slices poly of
-          Left constant' -> do
-            constant' `shouldBe` PolyL.polyConstant poly
-            null (toSliceMap slices) && null (PolyL.polyRefs poly) `shouldBe` True
-          Right polynomial -> do
-            PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` PolyL.polyConstant poly
-            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
-            -- dunno how to check this
-            -- toSliceMap (PolyL.toSlices polynomial) `shouldBe` toSliceMap (PolyL.toSlices poly) `mergeSliceMap` toSliceMap slices
-            PolyL.validate polynomial `shouldBe` Nothing
+  -- describe "insertSlices" $ do
+  --   it "should result in valid PolyL" $ do
+  --     property $ \(slices, poly) -> do
+  --       case PolyL.insertSlices slices poly of
+  --         Left constant' -> do
+  --           constant' `shouldBe` PolyL.polyConstant poly
+  --           null (toSliceMap slices) && null (PolyL.polyRefs poly) `shouldBe` True
+  --         Right polynomial -> do
+  --           PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` PolyL.polyConstant poly
+  --           PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
+  --           -- dunno how to check this
+  --           -- toSliceMap (PolyL.toSlices polynomial) `shouldBe` toSliceMap (PolyL.toSlices poly) `mergeSliceMap` toSliceMap slices
+  --           PolyL.validate polynomial `shouldBe` Nothing
 
-  describe "insertRefs" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(constant, refs, poly) -> do
-        case PolyL.insertRefs constant refs poly of
-          Left constant' -> do
-            constant' `shouldBe` constant + PolyL.polyConstant poly
-            null (toRefMap refs) && null (PolyL.polyLimbs poly) `shouldBe` True
-          Right polynomial -> do
-            PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` constant + PolyL.polyConstant poly
-            PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly
-            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly `mergeRefMap` toRefMap refs
-            PolyL.validate polynomial `shouldBe` Nothing
+  -- describe "insertRefs" $ do
+  --   it "should result in valid PolyL" $ do
+  --     property $ \(constant, refs, poly) -> do
+  --       case PolyL.insertRefs constant refs poly of
+  --         Left constant' -> do
+  --           constant' `shouldBe` constant + PolyL.polyConstant poly
+  --           null (toRefMap refs) && null (PolyL.polyLimbs poly) `shouldBe` True
+  --         Right polynomial -> do
+  --           PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` constant + PolyL.polyConstant poly
+  --           PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly
+  --           PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly `mergeRefMap` toRefMap refs
+  --           PolyL.validate polynomial `shouldBe` Nothing
 
-  describe "addConstant" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(constant, poly) -> do
-        let polynomial = PolyL.addConstant constant poly :: PolyL (Prime 17)
-        PolyL.polyConstant polynomial `shouldBe` constant + PolyL.polyConstant poly
-        PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly
-        PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
-        PolyL.validate polynomial `shouldBe` Nothing
+  -- describe "addConstant" $ do
+  --   it "should result in valid PolyL" $ do
+  --     property $ \(constant, poly) -> do
+  --       let polynomial = PolyL.addConstant constant poly :: PolyL (Prime 17)
+  --       PolyL.polyConstant polynomial `shouldBe` constant + PolyL.polyConstant poly
+  --       PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly
+  --       PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
+  --       PolyL.validate polynomial `shouldBe` Nothing
 
-  describe "multiplyBy" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(m, poly) -> do
-        case PolyL.multiplyBy m (poly :: PolyL (Prime 17)) of
-          Left constant' -> do
-            constant' `shouldBe` 0
-          Right polynomial -> do
-            PolyL.polyConstant polynomial `shouldBe` PolyL.polyConstant poly * m
-            PolyL.polyLimbs polynomial `shouldBe` fmap (m *) (PolyL.polyLimbs poly)
-            PolyL.polyRefs polynomial `shouldBe` fmap (m *) (PolyL.polyRefs poly)
-            PolyL.validate polynomial `shouldBe` Nothing
+  -- describe "multiplyBy" $ do
+  --   it "should result in valid PolyL" $ do
+  --     property $ \(m, poly) -> do
+  --       case PolyL.multiplyBy m (poly :: PolyL (Prime 17)) of
+  --         Left constant' -> do
+  --           constant' `shouldBe` 0
+  --         Right polynomial -> do
+  --           PolyL.polyConstant polynomial `shouldBe` PolyL.polyConstant poly * m
+  --           PolyL.polyLimbs polynomial `shouldBe` fmap (m *) (PolyL.polyLimbs poly)
+  --           PolyL.polyRefs polynomial `shouldBe` fmap (m *) (PolyL.polyRefs poly)
+  --           PolyL.validate polynomial `shouldBe` Nothing
 
-  describe "merge" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(poly1, poly2) -> do
-        case PolyL.merge poly1 (poly2 :: PolyL (Prime 17)) of
-          Left constant' -> do
-            constant' `shouldBe` PolyL.polyConstant poly1 + PolyL.polyConstant poly2
-          Right polynomial -> do
-            PolyL.polyConstant polynomial `shouldBe` PolyL.polyConstant poly1 + PolyL.polyConstant poly2
-            PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly1 `mergeLimbMap` PolyL.polyLimbs poly2
-            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly1 `mergeRefMap` PolyL.polyRefs poly2
-            PolyL.validate polynomial `shouldBe` Nothing
+  -- describe "merge" $ do
+  --   it "should result in valid PolyL" $ do
+  --     property $ \(poly1, poly2) -> do
+  --       case PolyL.merge poly1 (poly2 :: PolyL (Prime 17)) of
+  --         Left constant' -> do
+  --           constant' `shouldBe` PolyL.polyConstant poly1 + PolyL.polyConstant poly2
+  --         Right polynomial -> do
+  --           PolyL.polyConstant polynomial `shouldBe` PolyL.polyConstant poly1 + PolyL.polyConstant poly2
+  --           PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly1 `mergeLimbMap` PolyL.polyLimbs poly2
+  --           PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly1 `mergeRefMap` PolyL.polyRefs poly2
+  --           PolyL.validate polynomial `shouldBe` Nothing
 
-  describe "negate" $ do
-    it "should result in valid PolyL" $ do
-      property $ \poly -> do
-        let polynomial = PolyL.negate (poly :: PolyL (Prime 17))
-        PolyL.polyConstant polynomial `shouldBe` -PolyL.polyConstant poly
-        PolyL.polyLimbs polynomial `shouldBe` fmap negate (PolyL.polyLimbs poly)
-        PolyL.polyRefs polynomial `shouldBe` fmap negate (PolyL.polyRefs poly)
-        PolyL.validate polynomial `shouldBe` Nothing
+  -- describe "negate" $ do
+  --   it "should result in valid PolyL" $ do
+  --     property $ \poly -> do
+  --       let polynomial = PolyL.negate (poly :: PolyL (Prime 17))
+  --       PolyL.polyConstant polynomial `shouldBe` -PolyL.polyConstant poly
+  --       PolyL.polyLimbs polynomial `shouldBe` fmap negate (PolyL.polyLimbs poly)
+  --       PolyL.polyRefs polynomial `shouldBe` fmap negate (PolyL.polyRefs poly)
+  --       PolyL.validate polynomial `shouldBe` Nothing

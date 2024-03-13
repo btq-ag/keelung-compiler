@@ -4,7 +4,7 @@
 -- | For storing Slices in a polynomial
 module Keelung.Data.SlicePolynomial
   ( -- * Construction
-    SlicePoly,
+    SlicePoly(unSlicePoly),
     new,
 
     -- * Conversion

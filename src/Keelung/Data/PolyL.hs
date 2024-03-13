@@ -76,7 +76,7 @@ data PolyL n = PolyL
 instance (NFData n) => NFData (PolyL n)
 
 instance (Integral n, GaloisField n) => Show (PolyL n) where
-  show (PolyL constant limbs refs intervals _)
+  show (PolyL constant limbs refs _ slicePolys)
     | constant == 0 =
         if firstSign == " + "
           then concat restOfTerms
@@ -85,7 +85,7 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
     where
       limbTerms = mconcat $ fmap printLimb (Map.toList limbs)
       refTerms = mconcat $ fmap printRefs (Map.toList refs)
-      slices = intervalMaptoSlices intervals
+      slices = SlicePoly.toSlices slicePolys
       sliceTerms = mconcat $ fmap printSlice slices
 
       (firstSign, restOfTerms) = case refTerms <> limbTerms <> sliceTerms of
@@ -125,47 +125,34 @@ new :: (Integral n, GaloisField n) => n -> [(Ref, n)] -> [(Slice, n)] -> Either 
 new constant refs slices =
   case (toRefMap refs, fromSlicesHelper slices) of
     (Nothing, Nothing) -> Left constant
-    (Nothing, Just (limbs', slices', slices2')) ->
-      if limbsToIntervalMap (Map.toList limbs') == Just slices'
-        then Right (PolyL constant limbs' mempty slices' slices2')
-        else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 1:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
+    (Nothing, Just (limbs', slices', slices2')) -> Right (PolyL constant limbs' mempty slices' slices2')
     (Just refs', Nothing) -> Right (PolyL constant mempty refs' mempty mempty)
-    (Just refs', Just (limbs', slices', slices2')) ->
-      if limbsToIntervalMap (Map.toList limbs') == Just slices'
-        then Right (PolyL constant limbs' refs' slices' slices2')
-        else error $ "[ panic ] PolyL.new: mismatch between Slices & Limbs 2:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs')
+    (Just refs', Just (limbs', slices', slices2')) -> Right (PolyL constant limbs' refs' slices' slices2')
 
 -- | Helper for converting Slices to Limbs and make sure they are equal
 fromSlicesHelper :: (Integral n, GaloisField n) => [(Slice, n)] -> Maybe (Map Limb n, Map RefU (IntervalSet n), SlicePoly n)
-fromSlicesHelper xs = case (toLimbMap (fmap (first sliceToLimb) xs), slicesToIntervalMap xs) of
-  (Nothing, Nothing) -> Nothing
-  (Nothing, Just slices) ->
-    if null slices
-      then Just (mempty, mempty, mempty)
-      else error "[ panic ] PolyL.fromSlicesHelper: empty Limbs with non-empty Slices"
-  (Just limbs, Nothing) ->
-    if null limbs
-      then Nothing
-      else error $ "[ panic ] PolyL.fromSlicesHelper: empty Slices with non-empty Limbs:\n  Limbs: " <> show (Map.keys limbs)
-  (Just limbs, Just slices) ->
-    if limbsToIntervalMap (Map.toList limbs) == Just slices
-      then Just (limbs, slices, SlicePoly.fromSlices xs)
-      else error $ "[ panic ] PolyL.fromSlicesHelper: mismatch between Slices & Limbs:\n  Slices: " <> show (map fst xs) <> "\n  Limbs: " <> show (Map.keys limbs)
+fromSlicesHelper slices =
+  let slicePoly = slicesToIntervalMap slices
+   in case toLimbMap (fmap (first sliceToLimb) slices) of
+        Nothing ->
+          if null slicePoly
+            then Just (mempty, mempty, mempty)
+            else error "[ panic ] PolyL.fromSlicesHelper: empty Limbs with non-empty Slices"
+        Just limbs ->
+          if limbsToIntervalMap (Map.toList limbs) == slicePoly
+            then Just (limbs, slicePoly, SlicePoly.fromSlices slices)
+            else error $ "[ panic ] PolyL.fromSlicesHelper: mismatch between Slices & Limbs:\n  Slices: " <> show (map fst slices) <> "\n  Limbs: " <> show (Map.keys limbs)
 
 -- | Helper for converting Limbs to Slices and make sure they are equal
 fromLimbsHelper :: (Integral n, GaloisField n) => [(Limb, n)] -> Maybe (Map Limb n, Map RefU (IntervalSet n), SlicePoly n)
 fromLimbsHelper xs =
-  case (toLimbMap xs, limbsToIntervalMap xs) of
-    (Nothing, Nothing) -> Nothing
-    (Nothing, Just slices) ->
-      if null slices
-        then Nothing
-        else error $ "[ panic ] PolyL.fromLimbsHelper: empty Limbs with non-empty Slices:\n  Slices: " <> show (map fst $ intervalMaptoSlices slices)
-    (Just limbs, Nothing) ->
-      if null limbs
-        then Nothing
-        else error $ "[ panic ] PolyL.fromLimbsHelper: empty Slices with non-empty Limbs:\n  Limbs: " <> show (Map.keys limbs)
-    (Just limbs, Just slices) -> Just (limbs, slices, SlicePoly.fromSlices (intervalMaptoSlices slices))
+  let intervalMap = limbsToIntervalMap xs
+   in case toLimbMap xs of
+        Nothing ->
+          if null intervalMap
+            then Nothing
+            else error $ "[ panic ] PolyL.fromLimbsHelper: empty Limbs with non-empty Slices:\n  Slices: " <> show (map fst $ intervalMaptoSlices intervalMap)
+        Just limbs -> Just (limbs, intervalMap, SlicePoly.fromSlices (intervalMaptoSlices intervalMap))
 
 -- | Construct a PolyL from a single Ref
 fromRef :: (Integral n, GaloisField n) => Ref -> PolyL n
@@ -183,9 +170,7 @@ toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList . polySlices
 
 -- | Construct a PolyL from a constant and a single slice
 fromSlice :: (Integral n, GaloisField n) => n -> Slice -> PolyL n
-fromSlice constant slice = case slicesToIntervalMap [(slice, 1)] of
-  Nothing -> error "[ panic ] PolyL.fromSlice: impossible"
-  Just ss -> PolyL constant (Map.singleton (sliceToLimb slice) 1) mempty ss (SlicePoly.fromSlices [(slice, 1)])
+fromSlice constant slice = PolyL constant (Map.singleton (sliceToLimb slice) 1) mempty (slicesToIntervalMap [(slice, 1)]) (SlicePoly.fromSlices [(slice, 1)])
 
 -- | Construct a PolyL from a constant and a list of (Ref, coefficient) pairs
 fromRefs :: (Integral n, GaloisField n) => n -> [(Ref, n)] -> Either n (PolyL n)
@@ -199,12 +184,8 @@ fromRefs constant xs = case toRefMap xs of
 insertSlices :: (Integral n, GaloisField n) => [(Slice, n)] -> PolyL n -> Either n (PolyL n)
 insertSlices ss' (PolyL c ls rs ss ss2) =
   let limbs = mergeAndClean ls (Data.Maybe.fromMaybe mempty (toLimbMap (fmap (first sliceToLimb) ss')))
-      slices = case slicesToIntervalMap ss' of
-        Nothing -> ss
-        Just ss'' -> mergeIntervalSetAndClean ss ss''
-   in if null limbs && null rs
-        then Left c
-        else Right (PolyL c limbs rs slices (SlicePoly.insertMany ss' ss2))
+      slices = mergeIntervalSetAndClean ss (slicesToIntervalMap ss')
+   in Right (PolyL c limbs rs slices (SlicePoly.insertMany ss' ss2))
 
 insertRefs :: (Integral n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
 insertRefs c' rs' (PolyL c ls rs ss ss2) =
@@ -319,14 +300,11 @@ toLimbMap xs =
         else Just result
 
 -- | From a list of (Limb, n) pairs to a Map of IntervalSets
-limbsToIntervalMap :: (Integral n) => [(Limb, n)] -> Maybe (Map RefU (IntervalSet n))
+limbsToIntervalMap :: (Integral n) => [(Limb, n)] -> Map RefU (IntervalSet n)
 limbsToIntervalMap pairs =
   let fromPair (limb, n) = (lmbRef limb, IntervalSet.fromLimb (limb, n))
       xs = Map.fromListWith (<>) (map fromPair pairs)
-      result = Map.filter (not . IntervalSet.allZero) xs
-   in if Map.null result
-        then Nothing
-        else Just result
+   in Map.filter (not . IntervalSet.allZero) xs
 
 sliceToLimb :: Slice -> Limb
 sliceToLimb (Slice.Slice ref start end) = Limb.new ref (end - start) start (Left True)
@@ -335,13 +313,9 @@ intervalMaptoSlices :: Map RefU (IntervalSet n) -> [(Slice, n)]
 intervalMaptoSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList
 
 -- | From a list of (Slice, n) pairs to a Map of valid IntervalSets
-slicesToIntervalMap :: (Num n, Eq n) => [(Slice, n)] -> Maybe (Map RefU (IntervalSet n))
+slicesToIntervalMap :: (Num n, Eq n) => [(Slice, n)] -> Map RefU (IntervalSet n)
 slicesToIntervalMap pairs =
-  let raw = Map.mapMaybe id $ Map.fromListWith mergeEntry (map (\(slice, n) -> (Slice.sliceRefU slice, IntervalSet.fromSlice (slice, n))) pairs)
-      result = Map.filter (not . IntervalSet.allZero) raw
-   in if Map.null result
-        then Nothing
-        else Just result
+  Map.filter (not . IntervalSet.allZero) $ Map.mapMaybe id $ Map.fromListWith mergeEntry (map (\(slice, n) -> (Slice.sliceRefU slice, IntervalSet.fromSlice (slice, n))) pairs)
   where
     mergeEntry Nothing xs = xs
     mergeEntry xs Nothing = xs
