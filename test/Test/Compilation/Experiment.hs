@@ -23,6 +23,7 @@ tests =
       let dividend = 239
       let divisor = 20
       let expected = [dividend `div` divisor, dividend `mod` divisor]
-      debug (Prime 17) (program (fromIntegral divisor)) 
+      -- debug (Prime 17) (program (fromIntegral divisor))
       testCompiler (Prime 17) (program (fromIntegral divisor)) [dividend] [] expected
-      -- debugSolver (Prime 17) (program (fromIntegral divisor)) [dividend] []
+
+-- debugSolver (Prime 17) (program (fromIntegral divisor)) [dividend] []

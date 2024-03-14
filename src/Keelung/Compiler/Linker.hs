@@ -37,7 +37,6 @@ import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.IntervalTable (IntervalTable)
 import Keelung.Data.IntervalTable qualified as IntervalTable
-import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Polynomial (Poly)
@@ -121,8 +120,8 @@ linkConstraint env (CRefBNEq x y) =
     Left _ -> error "CRefBNEq: two variables are the same"
     Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CSliceEq x y) =
-  let x' = reindexSlice env x True
-      y' = reindexSlice env y False
+  let x' = reindexSlice env x 1
+      y' = reindexSlice env y (-1)
    in case Poly.buildWithIntMap 0 (IntMap.unionWith (+) x' y') of
         Left _ -> error "CSliceEq: impossible"
         Right xs -> Seq.fromList [Linked.CAdd xs]
@@ -130,7 +129,7 @@ linkConstraint env (CRefFVal x n) = case Poly.buildEither (-n) [(reindexRef env 
   Left _ -> error "CRefFVal: impossible"
   Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CSliceVal slice val) =
-  case Poly.buildWithIntMap (fromIntegral val) (reindexSlice env slice False) of
+  case Poly.buildWithIntMap (fromIntegral val) (reindexSlice env slice (-1)) of
     Left _ -> error "CSliceVal: impossible"
     Right xs -> Seq.fromList [Linked.CAdd xs]
 linkConstraint env (CMulL as bs cs) =
@@ -156,10 +155,9 @@ updateCounters tableF tableB tableU =
 linkPolyL :: (Integral n, GaloisField n) => Env -> PolyL n -> Either n (Poly n)
 linkPolyL env poly =
   let constant = PolyL.polyConstant poly
-      -- slicePolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexSlice2 env)) (PolyL.toSlices poly))
-      limbPolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexLimb env)) (Map.toList (PolyL.polyLimbs poly)))
+      slicePolynomial = IntMap.unionsWith (+) (fmap (uncurry (reindexSlice env)) (PolyL.toSlices poly))
       varPolynomial = IntMap.fromList (map (first (reindexRef env)) (Map.toList (PolyL.polyRefs poly)))
-   in Poly.buildWithIntMap constant (IntMap.unionWith (+) limbPolynomial varPolynomial)
+   in Poly.buildWithIntMap constant (IntMap.unionWith (+) slicePolynomial varPolynomial)
 
 linkPolyLUnsafe :: (Integral n, GaloisField n) => Env -> PolyL n -> Poly n
 linkPolyLUnsafe env xs = case linkPolyL env xs of
@@ -172,46 +170,8 @@ reindexRef :: Env -> Ref -> Var
 reindexRef env (F x) = reindexRefF env x
 reindexRef env (B x) = reindexRefB env x
 
-reindexLimb :: (Integral n, GaloisField n) => Env -> Limb -> n -> IntMap n
-reindexLimb env limb multiplier = case lmbSigns limb of
-  Left sign ->
-    -- precondition of `fromDistinctAscList` is that the keys are in ascending order
-    IntMap.fromDistinctAscList
-      [ ( reindexRefU
-            env
-            (lmbRef limb)
-            (i + lmbOffset limb),
-          2 ^ i * if sign then multiplier else (-multiplier)
-        )
-        | i <- [0 .. lmbWidth limb - 1]
-      ]
-  Right signs ->
-    -- precondition of `fromDistinctAscList` is that the keys are in ascending order
-    IntMap.fromDistinctAscList
-      [ ( reindexRefU
-            env
-            (lmbRef limb)
-            (i + lmbOffset limb),
-          2 ^ i * if sign then multiplier else (-multiplier)
-        )
-        | (i, sign) <- zip [0 .. lmbWidth limb - 1] signs
-      ]
-
-reindexSlice :: (Integral n, GaloisField n) => Env -> Slice -> Bool -> IntMap n
-reindexSlice env slice sign =
-  -- precondition of `fromDistinctAscList` is that the keys are in ascending order
-  IntMap.fromDistinctAscList
-    [ ( reindexRefU
-          env
-          (Slice.sliceRefU slice)
-          (Slice.sliceStart slice + i),
-        if sign then 2 ^ i else -(2 ^ i)
-      )
-      | i <- [0 .. Slice.sliceEnd slice - Slice.sliceStart slice - 1]
-    ]
-
-_reindexSlice2 :: (Integral n, GaloisField n) => Env -> Slice -> n -> IntMap n
-_reindexSlice2 env slice multiplier =
+reindexSlice :: (Integral n, GaloisField n) => Env -> Slice -> n -> IntMap n
+reindexSlice env slice multiplier =
   -- precondition of `fromDistinctAscList` is that the keys are in ascending order
   IntMap.fromDistinctAscList
     [ ( reindexRefU

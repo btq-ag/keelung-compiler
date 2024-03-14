@@ -18,8 +18,6 @@ import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Linker
 import Keelung.Compiler.Util (showList')
 import Keelung.Data.Constraint (Constraint (..))
-import Keelung.Data.Limb (Limb)
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -104,19 +102,6 @@ checkReport counters (ReindexReport xs) =
 class GenerateReindexReport a where
   generateReindexReport :: Env -> [String] -> a -> ReindexReport
 
-instance GenerateReindexReport Limb where
-  generateReindexReport env tags limb =
-    ReindexReport $
-      IntMap.fromList
-        [ ( reindexRefU
-              env
-              (Limb.lmbRef limb)
-              (i + Limb.lmbOffset limb),
-            Set.singleton (TaggedRef (B (RefUBit (Limb.lmbRef limb) (i + Limb.lmbOffset limb))) tags)
-          )
-          | i <- [0 .. Limb.lmbWidth limb - 1]
-        ]
-
 instance GenerateReindexReport Slice where
   generateReindexReport env tags slice =
     ReindexReport $
@@ -149,13 +134,13 @@ instance GenerateReindexReport Ref where
 instance GenerateReindexReport RefU where
   generateReindexReport env tags refU = generateReindexReport env tags (Slice.fromRefUWithDesiredWidth (envFieldWidth env) refU)
 
-instance GenerateReindexReport (PolyL n) where
+instance Num n => GenerateReindexReport (PolyL n) where
   generateReindexReport env tags poly =
-    let limbReindexReport = generateReindexReport env tags (Map.keys (PolyL.polyLimbs poly))
+    let sliceReindexReport = generateReindexReport env tags (map fst (PolyL.toSlices poly))
         refReindexReport = generateReindexReport env tags (Map.keys (PolyL.polyRefs poly))
-     in limbReindexReport <> refReindexReport
+     in sliceReindexReport <> refReindexReport
 
-instance GenerateReindexReport (Constraint n) where
+instance Num n => GenerateReindexReport (Constraint n) where
   generateReindexReport env tags (CAddL poly) = generateReindexReport env ("CAddL" : tags) poly
   generateReindexReport env tags (CRefEq x y) = generateReindexReport env ("CRefEq L" : tags) x <> generateReindexReport env ("CRefEq R" : tags) y
   generateReindexReport env tags (CRefBNEq x y) = generateReindexReport env ("CRefBNEq L" : tags) x <> generateReindexReport env ("CRefBNEq R" : tags) y

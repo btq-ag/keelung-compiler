@@ -49,7 +49,7 @@ import Prelude qualified
 --      However, if we just merge the two intervals together, we'd get:
 --        `U₈0[0] + 2U₈0[1] + 4U₈0[2] + 8U₈0[3] + 16U₈0[4] + 32U₈0[5] + 64U₈0[6] + 128U₈0[7]`
 --      It's because that we didn't shift the multiplier of the second interval by the length of the first interval.
-newtype SlicePoly n = SlicePoly {unSlicePoly :: Map RefU (IntervalSet n)} deriving (Eq, Functor, Ord, Generic)
+newtype SlicePoly n = SlicePoly {unSlicePoly :: Map RefU (IntervalSet n)} deriving (Show, Eq, Functor, Ord, Generic)
 
 instance (NFData n) => NFData (SlicePoly n)
 

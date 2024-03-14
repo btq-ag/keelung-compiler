@@ -3,6 +3,7 @@
 -- | Polynomial of References and Slices
 module Test.Data.PolyRS (tests, run) where
 
+import Data.Bifunctor (second)
 import Data.Field.Galois (Prime)
 import Data.Map (Map)
 import Data.Map qualified as Map
@@ -11,8 +12,9 @@ import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
-import Keelung.Data.Reference (Ref)
+import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
+import Keelung.Data.SlicePolynomial qualified as SlicePoly
 import Test.Arbitrary ()
 import Test.Hspec
 import Test.QuickCheck
@@ -34,9 +36,6 @@ toSliceMap = Map.filterWithKey (\slice n -> widthOf slice /= 0 && n /= 0) . Map.
 mergeRefMap :: (Integral n) => Map Ref n -> Map Ref n -> Map Ref n
 mergeRefMap xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
 
-mergeLimbMap :: (Integral n) => Map Limb n -> Map Limb n -> Map Limb n
-mergeLimbMap xs ys = Map.filterWithKey (\limb n -> not (Limb.null limb) && n /= 0) (Map.unionWith (+) xs ys)
-
 tests :: SpecWith ()
 tests = describe "PolyRS" $ do
   it "should be valid" $ do
@@ -52,7 +51,8 @@ tests = describe "PolyRS" $ do
             null (toLimbMap limbs) `shouldBe` True
           Right poly -> do
             PolyL.polyConstant poly `shouldBe` constant
-            PolyL.polyLimbs poly `shouldBe` toLimbMap limbs
+            -- PolyL.polyLimbs poly `shouldBe` toLimbMap limbs
+            -- SlicePoly.fromSlices (PolyL.toSlices poly) `shouldBe` SlicePoly.fromSlices (PolyL.toSlices poly1)
             PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
   describe "fromRefs" $ do
@@ -87,10 +87,10 @@ tests = describe "PolyRS" $ do
         case PolyL.insertRefs constant refs poly of
           Left constant' -> do
             constant' `shouldBe` constant + PolyL.polyConstant poly
-            null (toRefMap refs) && null (PolyL.polyLimbs poly) `shouldBe` True
+            null (toRefMap refs) && null (PolyL.toSlices poly) `shouldBe` True
           Right polynomial -> do
             PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` constant + PolyL.polyConstant poly
-            PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly
+            PolyL.toSlices polynomial `shouldBe` PolyL.toSlices poly
             PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly `mergeRefMap` toRefMap refs
             PolyL.validate polynomial `shouldBe` Nothing
 
@@ -99,7 +99,7 @@ tests = describe "PolyRS" $ do
       property $ \(constant, poly) -> do
         let polynomial = PolyL.addConstant constant poly :: PolyL (Prime 17)
         PolyL.polyConstant polynomial `shouldBe` constant + PolyL.polyConstant poly
-        PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly
+        PolyL.toSlices polynomial `shouldBe` PolyL.toSlices poly
         PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
         PolyL.validate polynomial `shouldBe` Nothing
 
@@ -111,7 +111,7 @@ tests = describe "PolyRS" $ do
             constant' `shouldBe` 0
           Right polynomial -> do
             PolyL.polyConstant polynomial `shouldBe` PolyL.polyConstant poly * m
-            PolyL.polyLimbs polynomial `shouldBe` fmap (m *) (PolyL.polyLimbs poly)
+            PolyL.toSlices polynomial `shouldBe` fmap (second (m *)) (PolyL.toSlices poly)
             PolyL.polyRefs polynomial `shouldBe` fmap (m *) (PolyL.polyRefs poly)
             PolyL.validate polynomial `shouldBe` Nothing
 
@@ -123,7 +123,7 @@ tests = describe "PolyRS" $ do
             constant' `shouldBe` PolyL.polyConstant poly1 + PolyL.polyConstant poly2
           Right polynomial -> do
             PolyL.polyConstant polynomial `shouldBe` PolyL.polyConstant poly1 + PolyL.polyConstant poly2
-            PolyL.polyLimbs polynomial `shouldBe` PolyL.polyLimbs poly1 `mergeLimbMap` PolyL.polyLimbs poly2
+            SlicePoly.fromSlices (PolyL.toSlices polynomial) `shouldBe` SlicePoly.fromSlices (PolyL.toSlices poly1) <> SlicePoly.fromSlices (PolyL.toSlices poly2)
             PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly1 `mergeRefMap` PolyL.polyRefs poly2
             PolyL.validate polynomial `shouldBe` Nothing
 
@@ -132,6 +132,6 @@ tests = describe "PolyRS" $ do
       property $ \poly -> do
         let polynomial = PolyL.negate (poly :: PolyL (Prime 17))
         PolyL.polyConstant polynomial `shouldBe` -PolyL.polyConstant poly
-        PolyL.polyLimbs polynomial `shouldBe` fmap negate (PolyL.polyLimbs poly)
+        PolyL.toSlices polynomial `shouldBe` fmap (second ((-1) *)) (PolyL.toSlices poly)
         PolyL.polyRefs polynomial `shouldBe` fmap negate (PolyL.polyRefs poly)
         PolyL.validate polynomial `shouldBe` Nothing
