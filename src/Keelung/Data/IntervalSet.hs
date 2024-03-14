@@ -7,8 +7,9 @@
 
 module Keelung.Data.IntervalSet
   ( -- * Construction
-    IntervalSet,
+    IntervalSet (unIntervalSet),
     new,
+    singleton,
     InitInsertCase (..),
     InsertCase (..),
 
@@ -22,8 +23,6 @@ module Keelung.Data.IntervalSet
     -- * Conversion
     toIntervalTable,
     fromLimb,
-    toSlices,
-    fromSlice,
 
     -- * Query
     intervalsWithin,
@@ -49,8 +48,6 @@ import Keelung.Compiler.Util (showList')
 import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.Reference (RefU)
-import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (lookup)
 
@@ -90,6 +87,13 @@ type Interval = (Int, Int) -- (start, end)
 new :: IntervalSet n
 new = IntervalSet mempty
 
+-- | O(1): Create a 1-length interval set
+singleton :: (Eq n, Num n) => (Int, Int) -> n -> Maybe (IntervalSet n)
+singleton (start, end) n =
+  if start >= end || n == 0
+    then Nothing
+    else Just $ IntervalSet $ IntMap.singleton start (end, n)
+
 -- | O(n). To an IntervalTable
 toIntervalTable :: Int -> IntervalSet Int -> IntervalTable
 toIntervalTable domainSize (IntervalSet intervals) =
@@ -113,22 +117,6 @@ fromLimb (limb, n) =
       Right signs ->
         let aggregateSigns = Slice.aggregateSigns signs
          in IntervalSet $ IntMap.fromList $ map (\(sign, width, offset) -> (offset, (offset + width, if sign then n else -n))) aggregateSigns
-
--- | O(n): Convert an interval set to a list of Slices
-toSlices :: (Num n) => RefU -> IntervalSet n -> [(Slice, n)]
-toSlices ref (IntervalSet xss) = case IntMap.toList xss of
-  [] -> []
-  ((firstStart, (firstEnd, firstCount)) : xs) ->
-    -- we need to know what's the first interval, so that we can adjust the multiplier of the rest
-    (Slice.Slice ref firstStart firstEnd, firstCount)
-      : map (\(start, (end, count)) -> (Slice.Slice ref start end, count * 2 ^ (start - firstStart))) xs
-
--- | O(1): Create an interval set from a Slice and a multiplier
-fromSlice :: (Num n, Eq n) => (Slice, n) -> Maybe (IntervalSet n)
-fromSlice (Slice.Slice _ start end, n) =
-  if start == end || n == 0
-    then Nothing
-    else Just $ IntervalSet $ IntMap.singleton start (end, n)
 
 --------------------------------------------------------------------------------
 

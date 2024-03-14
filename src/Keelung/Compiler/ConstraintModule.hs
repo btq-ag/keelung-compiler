@@ -34,8 +34,6 @@ import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
-import Keelung.Data.IntervalSet (IntervalSet)
-import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
@@ -277,21 +275,3 @@ instance UpdateOccurrences (Slice, n) where
     case Slice.sliceRefU slice of
       RefUX width var -> cm {cmOccurrenceU = OccurU.decrease width var (Slice.sliceStart slice, Slice.sliceEnd slice) (cmOccurrenceU cm)}
       _ -> cm
-
-instance (Num n) => UpdateOccurrences (RefU, IntervalSet n) where
-  addOccurrence (ref, intervals) cm =
-    case ref of
-      RefUX _ _ ->
-        let slices = IntervalSet.toSlices ref intervals
-         in addOccurrences slices cm
-      _ -> cm
-  removeOccurrence (ref, intervals) cm =
-    case ref of
-      RefUX _ _ ->
-        let slices = IntervalSet.toSlices ref intervals
-         in removeOccurrences slices cm
-      _ -> cm
-
--- instance UpdateOccurrences (Map RefU (IntervalSet n)) where
---   addOccurrence = addOccurrences . Map.toList
---   removeOccurrence = removeOccurrences . Map.toList

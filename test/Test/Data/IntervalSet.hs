@@ -57,12 +57,12 @@ tests = describe "Interval Sets" $ do
         IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
         IntervalSet.validate intervals `shouldBe` Nothing
 
-  describe "fromSlice" $ do
+  describe "singleton" $ do
     it "should result in a valid IntervalSet" $ do
-      property $ \xs -> do
-        case IntervalSet.fromSlice (xs :: (Slice, Prime 17)) of
+      property $ \(start, end, count) -> do
+        case IntervalSet.singleton (start, end) (count :: Prime 17) of 
           Nothing -> return ()
-          Just intervals -> IntervalSet.validate intervals `shouldBe` Nothing
+          Just xs -> IntervalSet.validate xs `shouldBe` Nothing
 
   describe "toIntervalTable" $ do
     it "should generate well-behaved IntervalTable" $ do

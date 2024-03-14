@@ -27,6 +27,7 @@ where
 
 import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
+import Data.IntMap qualified as IntMap
 import Data.Map (Map)
 import Data.Map qualified as Map
 import GHC.Generics (Generic)
@@ -70,15 +71,23 @@ fromSlices = foldr insert new
 
 -- | Convert the polynomial to a list of Slices
 toSlices :: (Num n) => SlicePoly n -> [(Slice, n)]
-toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList . unSlicePoly
+toSlices = concatMap (uncurry convert) . Map.toList . unSlicePoly
+  where
+    convert :: (Num n) => RefU -> IntervalSet n -> [(Slice, n)]
+    convert ref xss = case IntMap.toList (IntervalSet.unIntervalSet xss) of
+      [] -> []
+      ((firstStart, (firstEnd, firstCount)) : xs) ->
+        -- we need to know what's the first interval, so that we can adjust the multiplier of the rest
+        (Slice.Slice ref firstStart firstEnd, firstCount)
+          : map (\(start, (end, count)) -> (Slice.Slice ref start end, count * 2 ^ (start - firstStart))) xs
 
 --------------------------------------------------------------------------------
 
 -- | Insert a Slice with a multiplier into the polynomial
 insert :: (Integral n, GaloisField n) => (Slice, n) -> SlicePoly n -> SlicePoly n
-insert (slice, n) (SlicePoly xs) = case IntervalSet.fromSlice (slice, n) of
+insert (Slice.Slice ref start end, n) (SlicePoly xs) = case IntervalSet.singleton (start, end) n of
   Nothing -> SlicePoly xs -- no-op
-  Just x -> SlicePoly (Map.insertWith mergeEntry (Slice.sliceRefU slice) x xs)
+  Just x -> SlicePoly (Map.insertWith mergeEntry ref x xs)
 
 -- | Insert many Slices with multipliers into the polynomial
 insertMany :: (Integral n, GaloisField n) => [(Slice, n)] -> SlicePoly n -> SlicePoly n
