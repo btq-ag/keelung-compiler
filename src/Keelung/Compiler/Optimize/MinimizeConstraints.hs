@@ -495,7 +495,7 @@ removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 new :: Bool
 new = False
 
-isTarget :: PolyL n -> Bool
+isTarget :: Num n => PolyL n -> Bool
 isTarget poly =
   any
     ( \(slice, _) ->

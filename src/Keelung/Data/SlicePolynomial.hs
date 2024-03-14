@@ -4,7 +4,7 @@
 -- | For storing Slices in a polynomial
 module Keelung.Data.SlicePolynomial
   ( -- * Construction
-    SlicePoly (unSlicePoly),
+    SlicePoly,
     new,
 
     -- * Conversion
@@ -69,7 +69,7 @@ fromSlices :: (Integral n, GaloisField n) => [(Slice, n)] -> SlicePoly n
 fromSlices = foldr insert new
 
 -- | Convert the polynomial to a list of Slices
-toSlices :: SlicePoly n -> [(Slice, n)]
+toSlices :: (Num n) => SlicePoly n -> [(Slice, n)]
 toSlices = concatMap (uncurry IntervalSet.toSlices) . Map.toList . unSlicePoly
 
 --------------------------------------------------------------------------------
@@ -86,14 +86,16 @@ insertMany slices xs = foldr insert xs slices
 
 -- | Merge two IntervalSets while maintaining the correct multiplier
 mergeEntry :: (Integral n, GaloisField n) => IntervalSet n -> IntervalSet n -> IntervalSet n
-mergeEntry a b = case (IntervalSet.getStartOffset a, IntervalSet.getStartOffset b) of
-  (Nothing, Nothing) -> mempty
-  (Just _, Nothing) -> a
-  (Nothing, Just _) -> b
-  (Just x, Just y) -> case x `compare` y of
-    LT -> a <> IntervalSet.multiplyBy (recip (2 ^ (y - x))) b
-    EQ -> a <> b
-    GT -> b <> IntervalSet.multiplyBy (recip (2 ^ (x - y))) a
+mergeEntry a b =
+  let result = case (IntervalSet.getStartOffset a, IntervalSet.getStartOffset b) of
+        (Nothing, Nothing) -> mempty
+        (Just _, Nothing) -> a
+        (Nothing, Just _) -> b
+        (Just x, Just y) -> case x `compare` y of
+          LT -> a <> IntervalSet.multiplyBy (recip (2 ^ (y - x))) b
+          EQ -> a <> b
+          GT -> b <> IntervalSet.multiplyBy (recip (2 ^ (x - y))) a
+   in result
 
 -- | Multiply all Slices in the polynomial by a number
 multiplyBy :: (Integral n, GaloisField n) => n -> SlicePoly n -> SlicePoly n

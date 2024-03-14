@@ -163,7 +163,7 @@ fromLimbs constant xs = case fromLimbsHelper xs of
   Just (limbs, slices) -> Right (PolyL constant limbs mempty slices)
 
 -- | Convert a PolyL to a list of (Slice, coefficient) pairs
-toSlices :: PolyL n -> [(Slice, n)]
+toSlices :: Num n => PolyL n -> [(Slice, n)]
 toSlices = SlicePoly.toSlices . polySlices2
 
 -- | Construct a PolyL from a constant and a single slice
@@ -228,7 +228,7 @@ data View n
   deriving (Eq, Show)
 
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
-view :: PolyL n -> View n
+view :: Num n => PolyL n -> View n
 view (PolyL constant _ refs slicePoly) =
   let slices = SlicePoly.toSlices slicePoly
    in case (Map.toList refs, slices) of

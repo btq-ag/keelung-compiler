@@ -202,7 +202,7 @@ addOccurrences xs cm = foldl (flip addOccurrence) cm xs
 removeOccurrences :: (UpdateOccurrences ref, Foldable t) => t ref -> ConstraintModule n -> ConstraintModule n
 removeOccurrences xs cm = foldl (flip removeOccurrence) cm xs
 
-instance UpdateOccurrences (PolyL n) where
+instance (Num n) => UpdateOccurrences (PolyL n) where
   addOccurrence poly cm =
     let slices = PolyL.toSlices poly
         refs = Map.keysSet $ PolyL.polyRefs poly
@@ -278,7 +278,7 @@ instance UpdateOccurrences (Slice, n) where
       RefUX width var -> cm {cmOccurrenceU = OccurU.decrease width var (Slice.sliceStart slice, Slice.sliceEnd slice) (cmOccurrenceU cm)}
       _ -> cm
 
-instance UpdateOccurrences (RefU, IntervalSet n) where
+instance (Num n) => UpdateOccurrences (RefU, IntervalSet n) where
   addOccurrence (ref, intervals) cm =
     case ref of
       RefUX _ _ ->

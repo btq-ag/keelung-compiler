@@ -115,8 +115,13 @@ fromLimb (limb, n) =
          in IntervalSet $ IntMap.fromList $ map (\(sign, width, offset) -> (offset, (offset + width, if sign then n else -n))) aggregateSigns
 
 -- | O(n): Convert an interval set to a list of Slices
-toSlices :: RefU -> IntervalSet n -> [(Slice, n)]
-toSlices ref (IntervalSet xs) = map (\(start, (end, count)) -> (Slice.Slice ref start end, count)) $ IntMap.toList xs
+toSlices :: (Num n) => RefU -> IntervalSet n -> [(Slice, n)]
+toSlices ref (IntervalSet xss) = case IntMap.toList xss of
+  [] -> []
+  ((firstStart, (firstEnd, firstCount)) : xs) ->
+    -- we need to know what's the first interval, so that we can adjust the multiplier of the rest
+    (Slice.Slice ref firstStart firstEnd, firstCount)
+      : map (\(start, (end, count)) -> (Slice.Slice ref start end, count * 2 ^ (start - firstStart))) xs
 
 -- | O(1): Create an interval set from a Slice and a multiplier
 fromSlice :: (Num n, Eq n) => (Slice, n) -> Maybe (IntervalSet n)
