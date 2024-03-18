@@ -34,7 +34,6 @@ import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
-import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -202,11 +201,11 @@ removeOccurrences xs cm = foldl (flip removeOccurrence) cm xs
 
 instance (Num n) => UpdateOccurrences (PolyL n) where
   addOccurrence poly cm =
-    let slices = PolyL.toSlices poly
+    let slices = map fst $ PolyL.toSlices poly
         refs = Map.keysSet $ PolyL.polyRefs poly
      in (addOccurrences slices . addOccurrences refs) cm
   removeOccurrence poly cm =
-    let slices = PolyL.toSlices poly
+    let slices = map fst $ PolyL.toSlices poly
         refs = Map.keysSet $ PolyL.polyRefs poly
      in (removeOccurrences slices . removeOccurrences refs) cm
 
@@ -256,22 +255,12 @@ instance UpdateOccurrences RefB where
       RefBX var -> cm {cmOccurrenceB = OccurB.decrease var (cmOccurrenceB cm)}
       _ -> cm
 
-instance UpdateOccurrences Limb where
-  addOccurrence limb cm =
-    case lmbRef limb of
-      RefUX width var -> cm {cmOccurrenceU = OccurU.increase width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceU cm)}
-      _ -> cm
-  removeOccurrence limb cm =
-    case lmbRef limb of
-      RefUX width var -> cm {cmOccurrenceU = OccurU.decrease width var (lmbOffset limb, lmbOffset limb + lmbWidth limb) (cmOccurrenceU cm)}
-      _ -> cm
-
-instance UpdateOccurrences (Slice, n) where
-  addOccurrence (slice, _) cm =
+instance UpdateOccurrences Slice where
+  addOccurrence slice cm =
     case Slice.sliceRefU slice of
       RefUX width var -> cm {cmOccurrenceU = OccurU.increase width var (Slice.sliceStart slice, Slice.sliceEnd slice) (cmOccurrenceU cm)}
       _ -> cm
-  removeOccurrence (slice, _) cm =
+  removeOccurrence slice cm =
     case Slice.sliceRefU slice of
       RefUX width var -> cm {cmOccurrenceU = OccurU.decrease width var (Slice.sliceStart slice, Slice.sliceEnd slice) (cmOccurrenceU cm)}
       _ -> cm

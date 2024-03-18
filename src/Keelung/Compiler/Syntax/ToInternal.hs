@@ -115,6 +115,7 @@ convertExprU expr = case expr of
   T.SetU w x i b -> SetU w <$> convertExprU x <*> pure i <*> convertExprB b
   T.IfU w p x y -> IfU w <$> convertExprB p <*> convertExprU x <*> convertExprU y
   T.BtoU w x -> BtoU w <$> convertExprB x
+  T.SliceU w x i j -> SliceU w <$> convertExprU x <*> pure i <*> pure j
 
 convertExprAndAllocOutputVar :: (GaloisField n, Integral n) => T.Expr -> M n [(Var, Expr n)]
 convertExprAndAllocOutputVar expr = case expr of

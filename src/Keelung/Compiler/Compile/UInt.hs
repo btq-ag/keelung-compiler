@@ -110,6 +110,13 @@ compile out expr = case expr of
   BtoU w x -> do
     x' <- compileExprB x
     Bitwise.compileBtoU w out x'
+  SliceU _ x i j -> do
+    result <- wireU x
+    case result of
+      Left var -> writeSliceEq (Slice.fromRefU out) (Slice.Slice var i j)
+      Right val -> writeSliceVal (Slice.fromRefU out) (toInteger (U.slice val (i, j)))
+
+-- error "[ panic ] Slice not implemented"
 
 --------------------------------------------------------------------------------
 

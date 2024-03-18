@@ -20,7 +20,6 @@ import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
-import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -383,7 +382,7 @@ assignS slice value = do
     Nothing -> return ()
     Just relations -> do
       markChanged RelationChanged
-      put $ removeOccurrences (Set.singleton (Slice.toLimb slice)) $ cm {cmRelations = relations}
+      put $ removeOccurrences (Set.singleton slice) $ cm {cmRelations = relations}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
@@ -410,7 +409,7 @@ relateS slice1 slice2 = do
     Nothing -> return False
     Just relations -> do
       markChanged RelationChanged
-      modify' $ \cm' -> removeOccurrences (Set.fromList [Slice.toLimb slice1, Slice.toLimb slice2]) $ cm' {cmRelations = relations}
+      modify' $ \cm' -> removeOccurrences (Set.fromList [slice1, slice2]) $ cm' {cmRelations = relations}
       return True
 
 --------------------------------------------------------------------------------
@@ -457,25 +456,25 @@ addAddL poly = case PolyL.view poly of
 
 -- | Keep track of what has been changed in the substitution
 data Changes = Changes
-  { addedLimbs :: Set Limb,
-    removedLimbs :: Set Limb,
+  { addedSlices :: Set Slice,
+    removedSlices :: Set Slice,
     addedRefs :: Set Ref,
     removedRefs :: Set Ref
   }
   deriving (Eq, Show)
 
 applyChanges :: (GaloisField n, Integral n) => Changes -> RoundM n ()
-applyChanges changes = modify' $ removeOccurrences (removedLimbs changes) . addOccurrences (addedLimbs changes) . removeOccurrences (removedRefs changes) . addOccurrences (addedRefs changes)
+applyChanges changes = modify' $ removeOccurrences (removedSlices changes) . addOccurrences (addedSlices changes) . removeOccurrences (removedRefs changes) . addOccurrences (addedRefs changes)
 
 -- | Mark a Slice as added
 addSlice :: Slice -> Maybe Changes -> Maybe Changes
-addSlice slice (Just changes) = Just (changes {addedLimbs = Set.insert (Slice.toLimb slice) (addedLimbs changes)})
-addSlice slice Nothing = Just (Changes (Set.singleton (Slice.toLimb slice)) mempty mempty mempty)
+addSlice slice (Just changes) = Just (changes {addedSlices = Set.insert slice (addedSlices changes)})
+addSlice slice Nothing = Just (Changes (Set.singleton slice) mempty mempty mempty)
 
 -- | Mark a Slice as removed
 removeSlice :: Slice -> Maybe Changes -> Maybe Changes
-removeSlice slice (Just changes) = Just (changes {removedLimbs = Set.insert (Slice.toLimb slice) (removedLimbs changes)})
-removeSlice slice Nothing = Just (Changes mempty (Set.singleton (Slice.toLimb slice)) mempty mempty)
+removeSlice slice (Just changes) = Just (changes {removedSlices = Set.insert slice (removedSlices changes)})
+removeSlice slice Nothing = Just (Changes mempty (Set.singleton slice) mempty mempty)
 
 -- | Mark a Ref as added
 addRef :: Ref -> Maybe Changes -> Maybe Changes

@@ -22,7 +22,6 @@ module Keelung.Data.IntervalSet
 
     -- * Conversion
     toIntervalTable,
-    fromLimb,
 
     -- * Query
     intervalsWithin,
@@ -46,9 +45,6 @@ import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Compiler.Util (showList')
 import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
-import Keelung.Data.Limb (Limb)
-import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (lookup)
 
 -- | Key: start of an interval
@@ -105,18 +101,6 @@ toIntervalTable domainSize (IntervalSet intervals) =
       FoldState
         (IntMap.insert start (end, start - occupiedSize) acc) -- insert the total size of "holes" before this interval
         (occupiedSize + end - start)
-
--- | O(1): Create an interval set from a limb
-fromLimb :: (Num n) => (Limb, n) -> IntervalSet n
-fromLimb (limb, n) =
-  if Limb.lmbWidth limb == 0
-    then IntervalSet mempty
-    else case Limb.lmbSigns limb of
-      Left True -> IntervalSet $ IntMap.singleton (Limb.lmbOffset limb) (Limb.lmbOffset limb + Limb.lmbWidth limb, n)
-      Left False -> IntervalSet $ IntMap.singleton (Limb.lmbOffset limb) (Limb.lmbOffset limb + Limb.lmbWidth limb, -n)
-      Right signs ->
-        let aggregateSigns = Slice.aggregateSigns signs
-         in IntervalSet $ IntMap.fromList $ map (\(sign, width, offset) -> (offset, (offset + width, if sign then n else -n))) aggregateSigns
 
 --------------------------------------------------------------------------------
 
