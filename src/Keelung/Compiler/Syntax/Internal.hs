@@ -164,8 +164,10 @@ data ExprU n
   | SetU Width (ExprU n) Int (ExprB n) -- set bit
   | -- conversion operators
     BtoU Width (ExprB n)
-    -- slice operator
-  | SliceU Width (ExprU n) Int Int
+  | -- slice operator
+    SliceU Width (ExprU n) Int Int
+  | -- join operator
+    JoinU Width (ExprU n) (ExprU n)
   deriving (Functor, Eq)
 
 instance (Show n, Integral n) => Show (ExprU n) where
@@ -191,6 +193,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     SetU _ x i b -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . showsPrec 9 i . showString "] := " . showsPrec 9 b
     BtoU _ x -> showString "B→U " . showsPrec prec x
     SliceU _ x i j -> showParen (prec > 8) $ showsPrec 9 x . showString "[" . showsPrec 9 i . showString ":" . showsPrec 9 j . showString "]"
+    JoinU _ x y -> chain prec " ++ " 6 $ x :<| y :<| Empty
 
 instance HasWidth (ExprU n) where
   widthOf expr = case expr of
@@ -215,6 +218,7 @@ instance HasWidth (ExprU n) where
     SetU w _ _ _ -> w
     BtoU w _ -> w
     SliceU w _ _ _ -> w
+    JoinU w _ _ -> w
 
 --------------------------------------------------------------------------------
 

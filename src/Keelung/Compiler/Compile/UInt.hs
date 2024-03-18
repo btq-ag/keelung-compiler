@@ -115,8 +115,17 @@ compile out expr = case expr of
     case result of
       Left var -> writeSliceEq (Slice.fromRefU out) (Slice.Slice var i j)
       Right val -> writeSliceVal (Slice.fromRefU out) (toInteger (U.slice val (i, j)))
-
--- error "[ panic ] Slice not implemented"
+  JoinU _ x y -> do
+    let widthX = widthOf x
+    let widthY = widthOf y
+    resultX <- wireU x
+    case resultX of
+      Left var -> writeSliceEq (Slice.Slice out 0 widthX) (Slice.fromRefU var)
+      Right val -> writeSliceVal (Slice.Slice out 0 widthX) (toInteger val)
+    resultY <- wireU y
+    case resultY of
+      Left var -> writeSliceEq (Slice.Slice out widthX (widthX + widthY)) (Slice.fromRefU var)
+      Right val -> writeSliceVal (Slice.Slice out widthX (widthX + widthY)) (toInteger val)
 
 --------------------------------------------------------------------------------
 

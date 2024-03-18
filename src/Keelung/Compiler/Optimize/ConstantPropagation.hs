@@ -126,6 +126,7 @@ propagateExprU e = do
     SetU w x i b -> SetU w <$> propagateExprU x <*> pure i <*> propagateExprB b
     BtoU w x -> BtoU w <$> propagateExprB x
     SliceU w x i j -> SliceU w <$> propagateExprU x <*> pure i <*> pure j
+    JoinU w x y -> JoinU w <$> propagateExprU x <*> propagateExprU y
   where
     lookupU :: Width -> Var -> Struct a b (IntMap u) -> Maybe u
     lookupU width var bindings = IntMap.lookup var =<< IntMap.lookup width (structU bindings)
