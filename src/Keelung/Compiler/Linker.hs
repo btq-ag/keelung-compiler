@@ -21,7 +21,7 @@ import Data.IntSet qualified as IntSet
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
-import Keelung
+import Keelung (GaloisField, HasWidth (widthOf), Var, Width)
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.ConstraintSystem (ConstraintSystem (..))
 import Keelung.Compiler.ConstraintSystem qualified as Linked
