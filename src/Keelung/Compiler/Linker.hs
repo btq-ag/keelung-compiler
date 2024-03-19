@@ -197,9 +197,9 @@ reindexRefB env (RefBX x) = IntervalTable.reindex (envIndexTableB env) x + getOf
 reindexRefB env (RefUBit x i) = reindexRefU env x i
 
 reindexRefU :: Env -> RefU -> Int -> Var
-reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envCounters env) (Output, ReadAllUInts)
-reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envCounters env) (PublicInput, ReadAllUInts)
-reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envCounters env) (PrivateInput, ReadAllUInts)
+reindexRefU env (RefUO w x) i = w * x + i `mod` w + getOffset (envCounters env) (Output, ReadUInt w)
+reindexRefU env (RefUI w x) i = w * x + i `mod` w + getOffset (envCounters env) (PublicInput, ReadUInt w)
+reindexRefU env (RefUP w x) i = w * x + i `mod` w + getOffset (envCounters env) (PrivateInput, ReadUInt w)
 reindexRefU env (RefUX w x) i = case IntMap.lookup w (envIndexTableU env) of
   Nothing -> error "[ panic ] reindexRefU: impossible"
   Just (offset, table) ->
