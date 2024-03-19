@@ -121,8 +121,8 @@ adjust amount width var (start, end) (OccurU xs) = OccurU $ IntMap.alter increas
     interval' = (width * var + start, width * var + end)
 
     increase' :: Maybe (IntervalSet Int) -> Maybe (IntervalSet Int)
-    increase' Nothing = Just $ IntervalSet.adjust interval' amount IntervalSet.new
-    increase' (Just intervalSet) = Just $ IntervalSet.adjust interval' amount intervalSet
+    increase' Nothing = Just $ IntervalSet.insert interval' amount IntervalSet.new
+    increase' (Just intervalSet) = Just $ IntervalSet.insert interval' amount intervalSet
 
 -- | O(1). Increase the count of an interval of bits in a RefU
 increase :: Width -> Var -> (Int, Int) -> OccurU -> OccurU

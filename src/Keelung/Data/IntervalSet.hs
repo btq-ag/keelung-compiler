@@ -14,7 +14,7 @@ module Keelung.Data.IntervalSet
 
     -- * Operations
     normalize,
-    adjust,
+    insert,
     split,
     merge,
     multiplyBy,
@@ -103,19 +103,19 @@ toIntervalTable domainSize (IntervalSet intervals) =
 
 --------------------------------------------------------------------------------
 
--- | Whether to normalize after adjusting
-normalizeAfterAdjust :: Bool
-normalizeAfterAdjust = True
+-- | Whether to normalize after insertion
+normalizeAfterInsert :: Bool
+normalizeAfterInsert = True
 
--- | O(min(n, W)): Adjust the count of an interval.
-adjust :: (Num n, Eq n) => Interval -> n -> IntervalSet n -> IntervalSet n
-adjust _ 0 (IntervalSet xs) = IntervalSet xs
-adjust (start, end) count (IntervalSet xs) =
+-- | O(min(n, W)): Insert an interval into an interval set
+insert :: (Num n, Eq n) => Interval -> n -> IntervalSet n -> IntervalSet n
+insert _ 0 (IntervalSet xs) = IntervalSet xs
+insert (start, end) count (IntervalSet xs) =
   if start == end
     then IntervalSet xs
     else
       let actions = calculateActionInit (start, end) count (IntervalSet xs)
-       in if normalizeAfterAdjust
+       in if normalizeAfterInsert
             then normalize $ executeActions actions (IntervalSet xs)
             else executeActions actions (IntervalSet xs)
 

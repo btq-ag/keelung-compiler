@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Test.Data.IntervalSet (tests, run) where
 
@@ -9,7 +7,6 @@ import Data.Field.Galois (Prime)
 import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.IntervalTable qualified as IntervalTable
-import Keelung.Data.Slice (Slice)
 import Test.Arbitrary ()
 import Test.Hspec
 import Test.QuickCheck
@@ -19,39 +16,39 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Interval Sets" $ do
-  describe "adjust" $ do
+  describe "insert" $ do
     it "should merge adjecent intervals with the count" $ do
-      let operations = [Adjust (0, 10) 1, Adjust (10, 20) 1]
+      let operations = [Insert (0, 10) 1, Insert (10, 20) 1]
       let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
       IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
       IntervalSet.validate intervals `shouldBe` Nothing
 
     it "should merge adjecent intervals with the count" $ do
-      let operations = [Adjust (10, 20) 1, Adjust (0, 10) 1]
+      let operations = [Insert (10, 20) 1, Insert (0, 10) 1]
       let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
       IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
       IntervalSet.validate intervals `shouldBe` Nothing
 
     it "should merge adjecent intervals with the count" $ do
-      let operations = [Adjust (10, 20) 10, Adjust (0, 30) (-5), Adjust (20, 30) 10]
+      let operations = [Insert (10, 20) 10, Insert (0, 30) (-5), Insert (20, 30) 10]
       let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
       IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
       IntervalSet.validate intervals `shouldBe` Nothing
 
     it "should merge adjecent intervals with the count" $ do
-      let operations = [Adjust (40, 60) 10, Adjust (60, 100) 30, Adjust (50, 60) 20]
+      let operations = [Insert (40, 60) 10, Insert (60, 100) 30, Insert (50, 60) 20]
       let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
       IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
       IntervalSet.validate intervals `shouldBe` Nothing
 
     it "should merge adjecent intervals with the count" $ do
-      let operations = [Adjust (20, 30) 20, Adjust (0, 20) 20, Adjust (10, 40) 40]
+      let operations = [Insert (20, 30) 20, Insert (0, 20) 20, Insert (10, 40) 40]
       -- 20 60 60 40
       let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
       IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
       IntervalSet.validate intervals `shouldBe` Nothing
 
-    it "should preserve invariants after applying randomized adjustments" $ do
+    it "should preserve invariants after applying randomized insertions" $ do
       property $ \operations -> do
         let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
         IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
@@ -60,7 +57,7 @@ tests = describe "Interval Sets" $ do
   describe "singleton" $ do
     it "should result in a valid IntervalSet" $ do
       property $ \(start, end, count) -> do
-        case IntervalSet.singleton (start, end) (count :: Prime 17) of 
+        case IntervalSet.singleton (start, end) (count :: Prime 17) of
           Nothing -> return ()
           Just xs -> IntervalSet.validate xs `shouldBe` Nothing
 
@@ -98,9 +95,9 @@ tests = describe "Interval Sets" $ do
 
 instance (Arbitrary n, Eq n, Num n, Show n) => Arbitrary (IntervalSet n) where
   arbitrary = do
-    -- create a new IntervalSet by inserting a random number of random intervals with IntervalSet.adjust
+    -- create a new IntervalSet by inserting a random number of random intervals with IntervalSet.insert
     intervals <- arbitrary :: (Arbitrary n, Num n) => Gen [(Interval, n)]
-    pure $ foldl (\xs (Interval interval, count) -> IntervalSet.normalize $ IntervalSet.adjust interval count xs) IntervalSet.new intervals
+    pure $ foldl (\xs (Interval interval, count) -> IntervalSet.normalize $ IntervalSet.insert interval count xs) IntervalSet.new intervals
 
 --------------------------------------------------------------------------------
 
@@ -115,26 +112,26 @@ instance Arbitrary Interval where
 --------------------------------------------------------------------------------
 
 -- | Datatype for testing operations on interval sets
-data Operation n = Adjust (Int, Int) n deriving (Eq, Show)
+data Operation n = Insert (Int, Int) n deriving (Eq, Show)
 
 -- | Generate a random operation
 instance (Num n) => Arbitrary (Operation n) where
   arbitrary = do
     Interval interval <- arbitrary
     amount <- chooseInt (-100, 100)
-    pure $ Adjust interval (fromIntegral amount)
+    pure $ Insert interval (fromIntegral amount)
 
 -- | Apply an operation to an interval set
 applyOperation :: (Num n, Eq n) => Operation n -> IntervalSet n -> IntervalSet n
-applyOperation (Adjust interval amount) = IntervalSet.adjust interval amount
+applyOperation (Insert interval amount) = IntervalSet.insert interval amount
 
 -- | Calculate the total count of an operation
 countOfOperation :: (Num n) => Operation n -> n
-countOfOperation (Adjust (start, end) amount) = amount * fromIntegral (end - start)
+countOfOperation (Insert (start, end) amount) = amount * fromIntegral (end - start)
 
 -- | Calculate the total size of an operation
 sizeOfOperation :: (Eq n, Num n) => Operation n -> Int
-sizeOfOperation (Adjust (start, end) amount) = if amount == 0 then 0 else end - start
+sizeOfOperation (Insert (start, end) amount) = if amount == 0 then 0 else end - start
 
 --------------------------------------------------------------------------------
 
@@ -151,7 +148,7 @@ instance (Num n) => Arbitrary (NonOverlappingOperations n) where
           ( \(acc, prevEnd) _ -> do
               gap <- chooseInt (0, 4)
               let start = prevEnd + gap
-              x@(Adjust (_, end) _) <- genOperation start
+              x@(Insert (_, end) _) <- genOperation start
               return (x : acc, end)
           )
           ([], 0)
@@ -165,8 +162,8 @@ instance (Num n) => Arbitrary (NonOverlappingOperations n) where
         len <- chooseInt (0, 10)
         let end = start + len
         amount <- chooseInt (0, 10)
-        pure (Adjust (start, end) (fromIntegral amount))
+        pure (Insert (start, end) (fromIntegral amount))
 
 memberOfNonOverlappingOperations :: (Eq n, Num n) => NonOverlappingOperations n -> Int -> Bool
 memberOfNonOverlappingOperations (NonOverlappingOperations operations _) point =
-  any (\(Adjust (start, end) amount) -> amount /= 0 && start <= point && point < end) operations
+  any (\(Insert (start, end) amount) -> amount /= 0 && start <= point && point < end) operations
