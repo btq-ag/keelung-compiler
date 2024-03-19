@@ -491,6 +491,10 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
     SliceU _ x i j -> do
       xs <- interpretU x
       return [U.slice x' (i, j) | x' <- xs]
+    JoinU _ x y -> do
+      xs <- interpretU x
+      ys <- interpretU y
+      return [U.join x' y' | (x', y') <- zip xs ys]
 
 -- instance (GaloisField n, Integral n) => Interpret Expr n where
 --   interpret expr = case expr of
@@ -608,3 +612,4 @@ instance FreeVar UInt where
     IfU _ p x y -> freeVars p <> freeVars x <> freeVars y
     BtoU _ x -> freeVars x
     SliceU _ x _ _ -> freeVars x
+    JoinU _ x y -> freeVars x <> freeVars y

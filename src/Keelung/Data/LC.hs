@@ -31,6 +31,11 @@ data LC n
 fromPolyL :: Either n (PolyL n) -> LC n
 fromPolyL = either Constant Polynomial
 
+-- | Converting to 'Either n (PolyL n)'
+toPolyL :: (Num n, Eq n) => LC n -> Either n (PolyL n)
+toPolyL (Constant c) = Left c
+toPolyL (Polynomial xs) = Right xs
+
 -- | Converting from a 'Either RefU U' to a list of 'LC n'.
 fromRefU :: (GaloisField n, Integral n) => FieldInfo -> Either RefU U -> [LC n]
 fromRefU fieldInfo (Right val) =
@@ -43,10 +48,6 @@ fromRefU fieldInfo (Right val) =
 fromRefU fieldInfo (Left var) =
   let slices = Slice.fromRefUWithDesiredWidth (fieldWidth fieldInfo) var
    in map (Polynomial . PolyL.fromSlice 0) slices
-
-toPolyL :: (Num n, Eq n) => LC n -> Either n (PolyL n)
-toPolyL (Constant c) = Left c
-toPolyL (Polynomial xs) = Right xs
 
 -- | A LC is a semigroup under addition.
 instance (Integral n, GaloisField n) => Semigroup (LC n) where

@@ -6,6 +6,7 @@ module Test.Compilation.UInt (tests, run) where
 import Keelung hiding (compile)
 import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compiler
+import Keelung.Data.U qualified as U
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver qualified as Solver
 import Test.Compilation.UInt.AESMul qualified as AESMul
@@ -23,8 +24,6 @@ import Test.Compilation.UInt.Multiplication qualified as Multiplication
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
-import Keelung.Data.U qualified as U
-
 
 run :: IO ()
 run = hspec tests
@@ -218,64 +217,116 @@ tests = do
           (InterpreterError $ Interpreter.AssertionError "¬ (3 = 3)")
           (CompilerError (Compiler.ConflictingValuesB True False) :: Error GF181)
     describe "Slice" $ do
-            it "should throw exception when the starting index < 0" $ do
-                  let program = do
-                        x <- input Public :: Comp (UInt 8)
-                        return $ slice x (-1, 3) :: Comp (UInt 4)
-                  testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
-                  testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
-                  testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
+      it "should throw exception when the starting index < 0" $ do
+        let program = do
+              x <- input Public :: Comp (UInt 8)
+              return $ slice x (-1, 3) :: Comp (UInt 4)
+        testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
+        testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
+        testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
 
-            it "should throw exception when the ending index is smaller than the starting index" $ do
-                  let program = do
-                        x <- input Public :: Comp (UInt 8)
-                        return $ slice x (3, 1) :: Comp (UInt 4)
-                  testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
-                  testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
-                  testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
+      it "should throw exception when the ending index is smaller than the starting index" $ do
+        let program = do
+              x <- input Public :: Comp (UInt 8)
+              return $ slice x (3, 1) :: Comp (UInt 4)
+        testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
+        testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
+        testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
 
-            it "should throw exception when the ending index is greater than the bit width" $ do
-                  let program = do
-                        x <- input Public :: Comp (UInt 8)
-                        return $ slice x (3, 9) :: Comp (UInt 4)
-                  testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
-                  testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
-                  testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
+      it "should throw exception when the ending index is greater than the bit width" $ do
+        let program = do
+              x <- input Public :: Comp (UInt 8)
+              return $ slice x (3, 9) :: Comp (UInt 4)
+        testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
+        testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
+        testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
 
-            it "should throw exception when the range does not match with the type" $ do
-                  let program = do
-                        x <- input Public :: Comp (UInt 8)
-                        return $ slice x (3, 6) :: Comp (UInt 4)
-                  testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
-                  testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
-                  testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
+      it "should throw exception when the range does not match with the type" $ do
+        let program = do
+              x <- input Public :: Comp (UInt 8)
+              return $ slice x (3, 6) :: Comp (UInt 4)
+        testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
+        testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
+        testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
 
-            it "constant (slice width = 4)" $ do
-                  let genParam = do
-                        i <- chooseInt (0, 4)
-                        val <- choose (0, 255)
-                        return (val, i)
+      it "constant (slice width = 4)" $ do
+        let genParam = do
+              i <- chooseInt (0, 4)
+              val <- choose (0, 255)
+              return (val, i)
 
-                  let program x (i, j) = do
-                        let u = fromInteger x :: UInt 8
-                        return $ slice u (i, j) :: Comp (UInt 4)
-                  forAll genParam $ \(val, i) -> do
-                    let expected = [toInteger (U.slice (U.new 8 val) (i, i + 4))]
-                    testCompiler (Binary 7) (program val (i, i + 4)) [] [] expected
-                    testCompiler (Prime 17) (program val (i, i + 4)) [] [] expected
-                    testCompiler gf181 (program val (i, i + 4)) [] [] expected
+        let program x (i, j) = do
+              let u = fromInteger x :: UInt 8
+              return $ slice u (i, j) :: Comp (UInt 4)
+        forAll genParam $ \(val, i) -> do
+          let expected = [toInteger (U.slice (U.new 8 val) (i, i + 4))]
+          testCompiler (Binary 7) (program val (i, i + 4)) [] [] expected
+          testCompiler (Prime 17) (program val (i, i + 4)) [] [] expected
+          testCompiler gf181 (program val (i, i + 4)) [] [] expected
 
-            it "variable (slice width = 4)" $ do
-                  let genParam = do
-                        i <- chooseInt (0, 4)
-                        val <- choose (0, 255)
-                        return (val, i)
+      it "variable (slice width = 4)" $ do
+        let genParam = do
+              i <- chooseInt (0, 4)
+              val <- choose (0, 255)
+              return (val, i)
 
-                  let program (i, j) = do
-                        x <- input Public :: Comp (UInt 8)
-                        return $ slice x (i, j) :: Comp (UInt 4)
-                  forAll genParam $ \(val, i) -> do
-                    let expected = [toInteger (U.slice (U.new 8 val) (i, i + 4))]
-                    testCompiler (Binary 7) (program (i, i + 4)) [val] [] expected
-                    testCompiler (Prime 17) (program (i, i + 4)) [val] [] expected
-                    testCompiler gf181 (program (i, i + 4)) [val] [] expected
+        let program (i, j) = do
+              x <- input Public :: Comp (UInt 8)
+              return $ slice x (i, j) :: Comp (UInt 4)
+        forAll genParam $ \(val, i) -> do
+          let expected = [toInteger (U.slice (U.new 8 val) (i, i + 4))]
+          testCompiler (Binary 7) (program (i, i + 4)) [val] [] expected
+          testCompiler (Prime 17) (program (i, i + 4)) [val] [] expected
+          testCompiler gf181 (program (i, i + 4)) [val] [] expected
+
+    describe "Join" $ do
+      it "constant (slice width: 4 / 4)" $ do
+        let genParam = do
+              x <- chooseInteger (0, 15)
+              y <- chooseInteger (0, 15)
+              return (x, y)
+
+        let program x y = do
+              let u = fromInteger x :: UInt 4
+              let v = fromInteger y :: UInt 4
+              return $ u `join` v :: Comp (UInt 8)
+
+        forAll genParam $ \(x, y) -> do
+          let expected = [toInteger (U.join (U.new 4 x) (U.new 4 y))]
+          testCompiler (Binary 7) (program x y) [] [] expected
+          testCompiler (Prime 17) (program x y) [] [] expected
+          testCompiler gf181 (program x y) [] [] expected
+
+      it "constant (slice width: 2 / 6)" $ do
+        let genParam = do
+              x <- chooseInteger (0, 3)
+              y <- chooseInteger (0, 63)
+              return (x, y)
+
+        let program x y = do
+              let u = fromInteger x :: UInt 2
+              let v = fromInteger y :: UInt 6
+              return $ u `join` v :: Comp (UInt 8)
+
+        forAll genParam $ \(x, y) -> do
+          let expected = [toInteger (U.join (U.new 2 x) (U.new 6 y))]
+          testCompiler (Binary 7) (program x y) [] [] expected
+          testCompiler (Prime 17) (program x y) [] [] expected
+          testCompiler gf181 (program x y) [] [] expected
+
+      it "variable (slice width: 2 / 6)" $ do
+        let genParam = do
+              x <- chooseInteger (0, 3)
+              y <- chooseInteger (0, 63)
+              return (x, y)
+
+        let program = do
+              u <- input Public :: Comp (UInt 2)
+              v <- input Public :: Comp (UInt 6)
+              return $ u `join` v :: Comp (UInt 8)
+
+        forAll genParam $ \(x, y) -> do
+          let expected = [toInteger (U.join (U.new 2 x) (U.new 6 y))]
+          testCompiler (Binary 7) program [x, y] [] expected
+          testCompiler (Prime 17) program [x, y] [] expected
+          testCompiler gf181 program [x, y] [] expected
