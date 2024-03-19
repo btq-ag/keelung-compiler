@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveFunctor #-}
--- For RefU Limb segement reference counting
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -27,7 +26,7 @@ module Keelung.Data.IntervalSet
     intervalsWithin,
     totalCount,
     getStartOffset,
-    allZero,
+    null,
     lookup,
     member,
     Error (..),
@@ -45,7 +44,7 @@ import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Compiler.Util (showList')
 import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
-import Prelude hiding (lookup)
+import Prelude hiding (lookup, null)
 
 -- | Key: start of an interval
 --   Value: (end of the interval, count of the interval)
@@ -134,9 +133,9 @@ getStartOffset (IntervalSet xs) = fst <$> IntMap.lookupMin xs
 totalCount :: (Num n) => IntervalSet n -> n
 totalCount (IntervalSet xs) = IntMap.foldlWithKey' (\acc start (end, count) -> acc + count * fromIntegral (end - start)) 0 xs
 
--- | O(n): Compute the total count of all intervals (for testing purposes)
-allZero :: (Num n, Eq n) => IntervalSet n -> Bool
-allZero (IntervalSet xs) = all ((== 0) . snd) xs
+-- | O(n): See if the interval set empty
+null :: (Num n, Eq n) => IntervalSet n -> Bool
+null (IntervalSet xs) = IntMap.null xs
 
 -- | O(min(n, W)): Look up the count of a variable in the interval set
 lookup :: IntervalSet n -> Int -> Maybe n
@@ -389,14 +388,6 @@ data InitInsertCase
 --   --  existing            ├─────┼─────┤
 --   LInBorder
 
--- initInsertCase :: Interval -> IntervalSet n -> InitInsertCase
--- initInsertCase (l, r) (IntervalSet xs) = case IntMap.lookupLT l xs of
---   Nothing -> InitNothingBefore
---   Just (_, (end, _)) -> case l `compare` end of
---     LT -> InitInBetween
---     EQ -> InitAtEnd
---     GT -> InitNothingBefore
-
 -- | Subsequent cases for insertion
 data InsertCase
   = --  inserted                  ├─────┤
@@ -406,22 +397,6 @@ data InsertCase
     --  existing                     ├─────┤
     InsertCase2
   | InsertCase4
-
--- insertCase :: Interval -> IntervalSet n -> InsertCase
--- insertCase (l, r) (IntervalSet xs) = case IntMap.lookupGE l xs of
---   Nothing -> InsertCase4
---   Just (_, (end, _)) -> case l `compare` start of
---     LT -> InsertCase2
---     EQ -> AtEnd
---     GT -> NothingAfter
-
--- rightCase :: Interval -> IntervalSet n -> InitCase
--- rightCase (l, r) (IntervalSet xs) = case IntMap.lookupGE l xs of
---   Nothing -> LNothing
---   Just (_, (end, _)) -> case l `compare` end of
---     LT -> LInBetween
---     EQ -> LAtEnd
---     GT -> LAtStart
 
 --------------------------------------------------------------------------------
 

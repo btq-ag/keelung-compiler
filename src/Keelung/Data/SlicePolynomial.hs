@@ -118,7 +118,7 @@ add (SlicePoly xs) (SlicePoly ys) = SlicePoly (Map.unionWith mergeEntry xs ys)
 
 -- | See if all Slices in the polynomial are zero
 null :: (Integral n) => SlicePoly n -> Bool
-null = all IntervalSet.allZero . unSlicePoly
+null = all IntervalSet.null . unSlicePoly
 
 -- | Get the number of Slices in the polynomial
 size :: (Integral n) => SlicePoly n -> Int
