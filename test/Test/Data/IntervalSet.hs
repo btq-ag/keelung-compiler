@@ -373,6 +373,13 @@ tests = describe "Interval Sets" $ do
       --     X   Y
       testInsertion [Insert (10, 20) 10, Insert (0, 10) 1]
 
+    it "CaseR2 empty merging" $ do
+      --         A   B
+      --         ├───┤
+      --     ├───┤
+      --     X   Y
+      testInsertion [Insert (10, 20) 10, Insert (0, 10) 10]
+
     it "CaseR2 non-immediate 1" $ do
       --         A   B
       --         ├───┤
