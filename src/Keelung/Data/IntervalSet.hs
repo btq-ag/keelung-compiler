@@ -7,10 +7,9 @@
 module Keelung.Data.IntervalSet
   ( -- * Construction
     IntervalSet (unIntervalSet),
+    Case (..),
     new,
     singleton,
-    InitInsertCase (..),
-    InsertCase (..),
 
     -- * Operations
     normalize,
@@ -313,90 +312,117 @@ data Validity n
       Interval -- previous interval
       n -- previous count
 
--- -- | Relationship between two intervals
--- --   The first letter represents "inserted.start `compare` existing.start"
--- --   The second word represents the position of "inserted.end" relative to "existing"
--- data Case
---   = --  inserted      ├──┤
---     --  existing            ├───────────┤
---     LBefore
---   | --  inserted      ├─────┤
---     --  existing            ├───────────┤
---     LStart
---   | --  inserted      ├───────────┤
---     --  existing            ├───────────┤
---     LBetween
---   | --  inserted      ├─────────────────┤
---     --  existing            ├───────────┤╠════╣
---     LEnd
---   | --  inserted      ├─────────────────┤
---     --  existing            ├───────────┼─────┤
---     LEndJ
---   | --  inserted      ├───────────────────────┤
---     --  existing            ├───────────┤
---     LAfter
---   | --  inserted            ├─────┤
---     --  existing      ╠════╣├───────────┤
---     EBefore
---   | --  inserted            ├─────┤
---     --  existing      ├─────┼───────────┤
---     JEBefore
---   | --  inserted            ├───────────┤
---     --  existing            ├───────────┤
---     EEnd
---   | --  inserted            ├───────────┤
---     --  existing      ├─────┼───────────┤╠════╣
---     JEEnd
---   | --  inserted            ├───────────┤
---     --  existing      ╠════╣├───────────┼─────┤
---     EEndJ
---   | --  inserted            ├───────────┤
---     --  existing      ├─────┼───────────┼─────┤
---     JEEndJ
---   | --  inserted            ├─────────────────┤
---     --  existing      ╠════╣├───────────┤
---     EAfter
---   | --  inserted            ├─────────────────┤
---     --  existing      ├─────┼───────────┤
---     JEAfter
---   | --  inserted                  ├──┤
---     --  existing            ├───────────┤
---     GBefore
---   | --  inserted                  ├─────┤
---     --  existing            ├───────────┤╠════╣
---     GEnd
---   | --  inserted                  ├─────┤
---     --  existing            ├───────────┼─────┤
---     GEndJ
---   | --  inserted                  ├───────────┤
---     --  existing            ├───────────┤
---     GAfter
+--------------------------------------------------------------------------------
 
--- | Initial cases for insertion
-data InitInsertCase
-  = --  inserted                  ├────...
-    --  existing               ├─────┤
-    InitInBetween
-  | --  inserted                  ├────...
-    --  existing            ├─────┤ ├───┤
-    InitAtEnd
-  | --  inserted                  ├────...
-    --  existing                    ├───┤
-    InitNothingBefore
+data Case
+  = -- A < X, A < Y, B < X, B < Y
+    --     A   B
+    --     ├───┤
+    --             ├───┤
+    --             X   Y
+    CaseL1
+  | -- A < X, A < Y, B = X, B < Y
+    --   A   B
+    --   ├───┤
+    --       ├───┤
+    --       X   Y
+    CaseL2
+  | -- A < X, A < Y, B > X, B < Y
+    --     A       B
+    --     ├───────┤
+    --         ├───────┤
+    --         X       Y
+    CaseL3
+  | -- A < X, A < Y, B > X, B = Y
+    --     A       B
+    --     ├───────┤
+    --         ├───┤
+    --         X   Y
+    CaseL4
+  | -- A < X, A < Y, B > X, B > Y
+    --     A           B
+    --     ├───────────┤
+    --         ├───┤
+    --         X   Y
+    CaseL5
+  | -- A = X, A < Y, B > X, B < Y
+    --     A   B
+    --     ├───┤
+    --     ├───────┤
+    --     X       Y
+    CaseM1
+  | -- A = X, A < Y, B > X, B = Y
+    --     A       B
+    --     ├───────┤
+    --     ├───────┤
+    --     X       Y
+    CaseM2
+  | -- A = X, A < Y, B > X, B > Y
+    --     A       B
+    --     ├───────┤
+    --     ├───┤
+    --     X   Y
+    CaseM3
+  | -- A > X, A < Y, B > X, B < Y
+    --         A   B
+    --         ├───┤
+    --     ├───────────┤
+    --     X           Y
+    CaseR5
+  | -- A > X, A < Y, B > X, B = Y
+    --         A   B
+    --         ├───┤
+    --     ├───────┤
+    --     X       Y
+    CaseR4
+  | -- A > X, A < Y, B > X, B > Y
+    --         A       B
+    --         ├───────┤
+    --     ├───────┤
+    --     X       Y
+    CaseR3
+  | -- A > X, A = Y, B > X, B > Y
+    --         A   B
+    --         ├───┤
+    --     ├───┤
+    --     X   Y
+    CaseR2
+  | -- A > X, A > Y, B > X, B > Y
+    --             A   B
+    --             ├───┤
+    --     ├───┤
+    --     X   Y
+    CaseR1
+  | --
+    --             A   B
+    --             ├───┤
+    CaseEmpty
 
---   --  inserted                  ├────...
---   --  existing            ├─────┼─────┤
---   LInBorder
-
--- | Subsequent cases for insertion
-data InsertCase
-  = --  inserted                  ├─────┤
-    --  existing                  ├─────┤
-    InsertCase1
-  | --  inserted                  ├─────┤
-    --  existing                     ├─────┤
-    InsertCase2
-  | InsertCase4
+-- | O(min(n, W)): Analyze the case of an interval in an interval set
+caseAnalysis :: Interval -> IntervalSet n -> Case
+caseAnalysis (a, b) (IntervalSet xs) = case IntMap.lookupLT a xs of
+  Nothing -> case IntMap.lookupGE a xs of
+    Nothing -> CaseEmpty
+    Just (x, (y, _)) ->
+      if a == x
+        then case b `compare` y of
+          LT -> CaseM1
+          EQ -> CaseM2
+          GT -> CaseM3
+        else case b `compare` x of
+          LT -> CaseL1
+          EQ -> CaseL2
+          GT -> case b `compare` y of
+            LT -> CaseL3
+            EQ -> CaseL4
+            GT -> CaseL5
+  Just (_, (y, _)) -> case a `compare` y of
+    LT -> case b `compare` y of
+      LT -> CaseR5
+      EQ -> CaseR4
+      GT -> CaseR3
+    EQ -> CaseR2
+    GT -> CaseR1
 
 --------------------------------------------------------------------------------
 
