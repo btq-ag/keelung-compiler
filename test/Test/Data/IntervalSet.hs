@@ -37,12 +37,26 @@ tests = describe "Interval Sets" $ do
       --         X       Y
       testInsertion [Insert (0, 20) 10, Insert (10, 30) 1]
 
+    it "CaseL3 negating" $ do
+      --     A       B
+      --     ├───────┤
+      --         ├───────┤
+      --         X       Y
+      testInsertion [Insert (0, 20) (-10), Insert (10, 30) 10]
+
     it "CaseL4 empty" $ do
       --     A       B
       --     ├───────┤
       --         ├───┤
       --         X   Y
       testInsertion [Insert (0, 20) 10, Insert (10, 20) 1]
+
+    it "CaseL4 empty negating" $ do
+      --     A       B
+      --     ├───────┤
+      --         ├───┤
+      --         X   Y
+      testInsertion [Insert (0, 20) (-10), Insert (10, 20) 10]
 
     it "CaseL4 non-immediate" $ do
       --     A       B
@@ -64,6 +78,13 @@ tests = describe "Interval Sets" $ do
       --         ├───┤
       --         X   Y
       testInsertion [Insert (0, 30) 10, Insert (10, 20) 1]
+
+    it "CaseL5 empty negating" $ do
+      --     A           B
+      --     ├───────────┤
+      --         ├───┤
+      --         X   Y
+      testInsertion [Insert (0, 30) (-10), Insert (10, 20) 10]
 
     it "CaseL5 non-immediate 1" $ do
       --     A           B
@@ -128,12 +149,26 @@ tests = describe "Interval Sets" $ do
       --     X       Y
       testInsertion [Insert (0, 10) 10, Insert (0, 20) 1]
 
+    it "CaseM1 negating" $ do
+      --     A   B
+      --     ├───┤
+      --     ├───────┤
+      --     X       Y
+      testInsertion [Insert (0, 10) (-10), Insert (0, 20) 10]
+
     it "CaseM2 empty" $ do
       --     A   B
       --     ├───┤
       --     ├───┤
       --     X   Y
       testInsertion [Insert (0, 10) 10, Insert (0, 10) 1]
+
+    it "CaseM2 empty negating" $ do
+      --     A   B
+      --     ├───┤
+      --     ├───┤
+      --     X   Y
+      testInsertion [Insert (0, 10) (-10), Insert (0, 10) 10]
 
     it "CaseM2 non-immediate" $ do
       --     A   B
@@ -155,6 +190,13 @@ tests = describe "Interval Sets" $ do
       --     ├───┤
       --     X   Y
       testInsertion [Insert (0, 20) 10, Insert (0, 10) 1]
+
+    it "CaseM3 empty negating" $ do
+      --     A       B
+      --     ├───────┤
+      --     ├───┤
+      --     X   Y
+      testInsertion [Insert (0, 20) (-10), Insert (0, 10) 10]
 
     it "CaseM3 non-immediate 1" $ do
       --     A       B
@@ -219,12 +261,26 @@ tests = describe "Interval Sets" $ do
       --     X           Y
       testInsertion [Insert (10, 20) 10, Insert (0, 30) 1]
 
+    it "CaseR5 negating" $ do
+      --         A   B
+      --         ├───┤
+      --     ├───────────┤
+      --     X           Y
+      testInsertion [Insert (10, 20) (-10), Insert (0, 30) 10]
+
     it "CaseR4 empty" $ do
       --         A   B
       --         ├───┤
       --     ├───────┤
       --     X       Y
       testInsertion [Insert (10, 20) 10, Insert (0, 20) 1]
+
+    it "CaseR4 empty negating" $ do
+      --         A   B
+      --         ├───┤
+      --     ├───────┤
+      --     X       Y
+      testInsertion [Insert (10, 20) (-10), Insert (0, 20) 10]
 
     it "CaseR4 non-immediate" $ do
       --         A   B
@@ -246,6 +302,13 @@ tests = describe "Interval Sets" $ do
       --     ├───────┤
       --     X       Y
       testInsertion [Insert (10, 30) 10, Insert (0, 20) 1]
+
+    it "CaseR3 empty negating" $ do
+      --         A       B
+      --         ├───────┤
+      --     ├───────┤
+      --     X       Y
+      testInsertion [Insert (10, 30) (-10), Insert (0, 20) 10]
 
     it "CaseR3 non-immediate 1" $ do
       --         A       B
@@ -386,6 +449,9 @@ tests = describe "Interval Sets" $ do
       --     ├───┤       ├───┤
       --     X   Y       Z   W
       testInsertion [Insert (20, 50) 10, Insert (30, 40) 2, Insert (0, 10) 1]
+
+    it "should preserve invariants after applying randomized insertions" $ do
+      property testInsertion
 
     it "should merge adjecent intervals with the count" $ do
       let operations = [Insert (0, 10) 1, Insert (10, 20) 1]

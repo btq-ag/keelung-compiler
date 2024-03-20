@@ -494,7 +494,10 @@ caseAnalysis ignoreBefore (a, b) (IntervalSet xs) = case IntMap.lookupLT a xs of
                     CaseL5 m z w
 
 insert2 :: (Num n, Eq n) => Interval -> n -> IntervalSet n -> IntervalSet n
-insert2 = insertPrim False
+insert2 (start, end) n =
+  if end > start && n /= 0
+    then insertPrim False (start, end) n
+    else id
 
 insertPrim :: (Num n, Eq n) => Bool -> Interval -> n -> IntervalSet n -> IntervalSet n
 insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis ignoreBefore (start, end) (IntervalSet xs) of
@@ -516,32 +519,41 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --     ├───────┤
     --         ├───────┤
     --         X       Y
-    IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert x (end, n + m) $ IntMap.insert start (x, n) xs
+    if n + m == 0
+      then IntervalSet $ IntMap.insert end (y, m) $ IntMap.delete x $ IntMap.insert start (x, n) xs
+      else IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert x (end, n + m) $ IntMap.insert start (x, n) xs
   CaseL4 m x ->
     --     A       B
     --     ├───────┤
     --         ├───┤
     --         X   Y
-    IntervalSet $ IntMap.insert x (end, n + m) $ IntMap.insert start (x, n) xs
+    if n + m == 0
+      then IntervalSet $ IntMap.delete x $ IntMap.insert start (x, n) xs
+      else IntervalSet $ IntMap.insert x (end, n + m) $ IntMap.insert start (x, n) xs
   CaseL5 m x y ->
     --     A           B
     --     ├───────────┤
     --         ├───┤
     --         X   Y
-    insertPrim True (y, end) n $ IntervalSet $ IntMap.insert x (y, n + m) $ IntMap.insert start (x, n) xs
-  -- IntervalSet $ IntMap.insert y (end, n) $ IntMap.insert x (y, n + m) $ IntMap.insert start (x, n) xs
+    if n + m == 0
+      then insertPrim True (y, end) n $ IntervalSet $ IntMap.delete x $ IntMap.insert start (x, n) xs
+      else insertPrim True (y, end) n $ IntervalSet $ IntMap.insert x (y, n + m) $ IntMap.insert start (x, n) xs
   CaseM1 m y ->
     --     A   B
     --     ├───┤
     --     ├───────┤
     --     X       Y
-    IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert start (end, m + n) xs
+    if n + m == 0
+      then IntervalSet $ IntMap.insert end (y, m) $ IntMap.delete start xs
+      else IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert start (end, m + n) xs
   CaseM2 m ->
     --     A       B
     --     ├───────┤
     --     ├───────┤
     --     X       Y
-    IntervalSet $ IntMap.insert start (end, m + n) xs
+    if n + m == 0
+      then IntervalSet $ IntMap.delete start xs
+      else IntervalSet $ IntMap.insert start (end, m + n) xs
   CaseM3 m y ->
     --     A       B
     --     ├───────┤
@@ -552,19 +564,25 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --     ├───┼───┤
     --     ├───┤
     --     X   Y
-    insertPrim True (y, end) n $ IntervalSet $ IntMap.insert start (y, m + n) xs
+    if n + m == 0
+      then insertPrim True (y, end) n $ IntervalSet $ IntMap.delete start xs
+      else insertPrim True (y, end) n $ IntervalSet $ IntMap.insert start (y, m + n) xs
   CaseR5 m x y ->
     --         A   B
     --         ├───┤
     --     ├───────────┤
     --     X           Y
-    IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert start (end, n + m) $ IntMap.insert x (start, m) xs
+    if n + m == 0
+      then IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert x (start, m) xs
+      else IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert start (end, n + m) $ IntMap.insert x (start, m) xs
   CaseR4 m x ->
     --         A   B
     --         ├───┤
     --     ├───────┤
     --     X       Y
-    IntervalSet $ IntMap.insert start (end, n + m) $ IntMap.insert x (start, m) xs
+    if n + m == 0
+      then IntervalSet $ IntMap.delete start $ IntMap.insert x (start, m) xs
+      else IntervalSet $ IntMap.insert start (end, n + m) $ IntMap.insert x (start, m) xs
   CaseR3 m x y ->
     --         A       B
     --         ├───────┤
@@ -575,7 +593,9 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --         ├───┼───┤
     --     ├───────┤
     --     X       Y
-    insertPrim True (y, end) n $ IntervalSet $ IntMap.insert start (y, n + m) $ IntMap.insert x (start, m) xs
+    if n + m == 0
+      then insertPrim True (y, end) n $ IntervalSet $ IntMap.insert x (start, m) xs
+      else insertPrim True (y, end) n $ IntervalSet $ IntMap.insert start (y, n + m) $ IntMap.insert x (start, m) xs
   CaseR2 ->
     --         A   B
     --         ├───┤
@@ -588,10 +608,6 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --     ├───┤
     --     X   Y
     insertPrim True (start, end) n $ IntervalSet xs
-
--- IntervalSet $ IntMap.insert start (end, n) xs
-
--- \$ IntMap.insert x (start, m) xs
 
 --------------------------------------------------------------------------------
 
