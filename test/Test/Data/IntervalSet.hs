@@ -537,48 +537,10 @@ tests = describe "Interval Sets" $ do
     it "should preserve invariants after applying randomized insertions" $ do
       property testInsertion
 
-    it "should handle other cases 1" $ do
+    it "should handle cases like these" $ do
       testInsertion [Insert (10, 20) (-10), Insert (10, 20) 10, Insert (0, 30) 20]
-
-    it "should handle other cases 2" $ do
-      testInsertion [Insert (24,28) (-24),Insert (24,29) 24,Insert (23,27) (-65)]
-
-    it "should merge adjecent intervals with the count" $ do
-      let operations = [Insert (0, 10) 1, Insert (10, 20) 1]
-      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
-      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
-      IntervalSet.validate intervals `shouldBe` Nothing
-
-    it "should merge adjecent intervals with the count" $ do
-      let operations = [Insert (10, 20) 1, Insert (0, 10) 1]
-      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
-      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
-      IntervalSet.validate intervals `shouldBe` Nothing
-
-    it "should merge adjecent intervals with the count" $ do
-      let operations = [Insert (10, 20) 10, Insert (0, 30) (-5), Insert (20, 30) 10]
-      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
-      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
-      IntervalSet.validate intervals `shouldBe` Nothing
-
-    it "should merge adjecent intervals with the count" $ do
-      let operations = [Insert (40, 60) 10, Insert (60, 100) 30, Insert (50, 60) 20]
-      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
-      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
-      IntervalSet.validate intervals `shouldBe` Nothing
-
-    it "should merge adjecent intervals with the count" $ do
-      let operations = [Insert (20, 30) 20, Insert (0, 20) 20, Insert (10, 40) 40]
-      -- 20 60 60 40
-      let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
-      IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
-      IntervalSet.validate intervals `shouldBe` Nothing
-
-    it "should preserve invariants after applying randomized insertions" $ do
-      property $ \operations -> do
-        let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])
-        IntervalSet.totalCount intervals `shouldBe` sum (map countOfOperation operations)
-        IntervalSet.validate intervals `shouldBe` Nothing
+      testInsertion [Insert (24, 28) (-24), Insert (24, 29) 24, Insert (23, 27) (-65)]
+      testInsertion [Insert (10, 40) 10, Insert (0, 30) 100, Insert (10, 20) (-10)]
 
   describe "singleton" $ do
     it "should result in a valid IntervalSet" $ do
@@ -616,6 +578,8 @@ tests = describe "Interval Sets" $ do
         let actual = IntervalSet.normalize (as <> bs)
         actual `shouldBe` expected
         IntervalSet.validate actual `shouldBe` Nothing
+
+-- ([-84$0, -48$1, -71$2, -82$3, -91$4, -34$5, -37$6, -9$7, 71$8, 47$9, 98$10, 38$11, 51($12 ~ $13), 32$14, 213$15, 181$16, 41($17 ~ $18), 9($19 ~ $20), -87$22, -120$23, -33$24, 36$25, 21$26, 100$27, 157$28, 205$29, 57$30, 115$31, 33($32 ~ $33), 58$34, -6$35, 7$36, 64$37, 21$38, 15$39, -92$40, -12$41, -53($42 ~ $43), -138($44 ~ $45), -75($46 ~ $47), 63($47 ~ $48), 115$49, 49($50 ~ $51), 79$52, 84$53, 167$54, 90$55, 146($56 ~ $57), 90$58, 74($61 ~ $63), 69($64 ~ $65), 12$67, -44($68 ~ $69), -98($70 ~ $71), 43($72 ~ $73), 83$74, 125$75, -53$76, 7$77, -175$78, 14($79 ~ $80), -104$81, -209$82, -124$83, -61$84, 77$85, 143($86 ~ $87), 41$88, -33$89, 3($90 ~ $91), 83($92 ~ $93), 80$94, 80$97, -91$99, -80($100 ~ $101), -42$102, 49$103],0)
 
 --------------------------------------------------------------------------------
 

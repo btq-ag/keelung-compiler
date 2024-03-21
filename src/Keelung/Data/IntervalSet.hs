@@ -434,84 +434,74 @@ data Case n
 
 -- | O(min(n, W)): Analyze the case of an interval in an interval set
 --
---   When the `ignoreBefore` flag is on, intervals before the given interval are ignored
---   That means `CaseR1` and `CaseR2` would become impossible and be replaced by other cases
+--   When the `ignoreBefore` flag is on, we don't have to look for the interval that starts before the given interval.
 caseAnalysis :: Bool -> Interval -> IntervalSet n -> Case n
-caseAnalysis ignoreBefore (a, b) (IntervalSet xs) = case IntMap.lookupLT a xs of
-  Nothing -> case IntMap.lookupGE a xs of
-    Nothing -> CaseEmpty
-    Just (x, (y, n)) ->
-      --         A   B
-      --         ├───┤
-      --     ├───────────┤
-      --     X           Y
-      if a == x
-        then handleM (y, n)
-        else handleL (x, (y, n))
-  Just (x, (y, n)) -> case a `compare` y of
-    LT -> case b `compare` y of
-      LT ->
-        --         A   B
-        --         ├───┤
-        --     ├───────────┤
-        --     X           Y
-        CaseR5 n x y
-      EQ -> case IntMap.lookup b xs of
-        Nothing ->
-          --         A   B
-          --         ├───┤
-          --     ├───────┤
-          --     X       Y
-          CaseR4 n x
-        Just (z, m) ->
-          --         A   B
-          --         ├───┤
-          --     ├───────┼───────┤
-          --     X       Y       Z
-          CaseR4Continous n m x z
-      GT ->
-        --         A       B
-        --         ├───────┤
-        --     ├───────┤
-        --     X       Y
-        CaseR3 n x y
-    EQ ->
-      if ignoreBefore
-        then case IntMap.lookupGE a xs of
-          Nothing -> CaseEmpty
-          Just (z, (w, m)) ->
-            if a == z
-              then handleM (w, m)
-              else handleL (z, (w, m))
-        else case IntMap.lookup a xs of
-          Nothing ->
-            --         A   B
-            --         ├───┤
-            --     ├───┤
-            --     X   Y
-            CaseR2 n x
-          Just (z, m) -> case b `compare` z of
+caseAnalysis ignoreBefore (a, b) (IntervalSet xs) =
+  if ignoreBefore
+    then case IntMap.lookupGE a xs of -- look what's after
+      Nothing -> CaseEmpty
+      Just (x, (y, n)) ->
+        if a == x
+          then handleM (y, n)
+          else handleL (x, (y, n))
+    else case IntMap.lookupLT a xs of
+      Nothing -> caseAnalysis True (a, b) (IntervalSet xs) -- look what's after
+      Just (x, (y, n)) ->
+        -- handle what's before
+        case a `compare` y of
+          LT -> case b `compare` y of
             LT ->
               --         A   B
               --         ├───┤
-              --     ├───┼───────┤
-              --     X   Y       Z
-              CaseR2Continous1 n m x z
-            EQ ->
-              --         A   B
-              --         ├───┤
-              --     ├───┼───┤
-              --     X   Y   Z
-              CaseR2Continous2 n m x
+              --     ├───────────┤
+              --     X           Y
+              CaseR5 n x y
+            EQ -> case IntMap.lookup b xs of
+              Nothing ->
+                --         A   B
+                --         ├───┤
+                --     ├───────┤
+                --     X       Y
+                CaseR4 n x
+              Just (z, m) ->
+                --         A   B
+                --         ├───┤
+                --     ├───────┼───────┤
+                --     X       Y       Z
+                CaseR4Continous n m x z
             GT ->
               --         A       B
               --         ├───────┤
-              --     ├───┼───┤
-              --     X   Y   Z
-              CaseR2Continous3 n m x z
-    GT -> case IntMap.lookupGE a xs of
-      Nothing -> CaseEmpty
-      Just (z, (w, m)) -> handleL (z, (w, m))
+              --     ├───────┤
+              --     X       Y
+              CaseR3 n x y
+          EQ -> case IntMap.lookup a xs of
+            Nothing ->
+              --         A   B
+              --         ├───┤
+              --     ├───┤
+              --     X   Y
+              CaseR2 n x
+            Just (z, m) -> case b `compare` z of
+              LT ->
+                --         A   B
+                --         ├───┤
+                --     ├───┼───────┤
+                --     X   Y       Z
+                CaseR2Continous1 n m x z
+              EQ ->
+                --         A   B
+                --         ├───┤
+                --     ├───┼───┤
+                --     X   Y   Z
+                CaseR2Continous2 n m x
+              GT ->
+                --         A       B
+                --         ├───────┤
+                --     ├───┼───┤
+                --     X   Y   Z
+                CaseR2Continous3 n m x z
+          GT -> caseAnalysis True (a, b) (IntervalSet xs) -- look what's after
   where
     handleL (x, (y, m)) = case b `compare` x of
       LT ->
@@ -574,7 +564,6 @@ caseAnalysis ignoreBefore (a, b) (IntervalSet xs) = case IntMap.lookupLT a xs of
           --     ├─m─┼─o─┤
           --     X   Y   Z
           CaseM2Continuous m o z
-      -- CaseM2 m
       GT ->
         --     A       B
         --     ├───────┤
@@ -638,7 +627,7 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --         ├───┤
     --         X   Y
     if n + m == 0
-      then insert (y, end) n $ IntervalSet $ IntMap.delete x $ IntMap.insert start (x, n) xs
+      then insertPrim True (y, end) n $ IntervalSet $ IntMap.delete x $ IntMap.insert start (x, n) xs
       else insertPrim True (y, end) n $ IntervalSet $ IntMap.insert x (y, n + m) $ IntMap.insert start (x, n) xs
   CaseM1 m y ->
     --     A   B
@@ -678,7 +667,7 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --     ├───┤
     --     X   Y
     if n + m == 0
-      then insert (y, end) n $ IntervalSet $ IntMap.delete start xs
+      then insertPrim True (y, end) n $ IntervalSet $ IntMap.delete start xs
       else insertPrim True (y, end) n $ IntervalSet $ IntMap.insert start (y, m + n) xs
   CaseR5 m x y ->
     --         A   B
@@ -718,7 +707,7 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --     ├─────m─┤
     --     X       Y
     if n + m == 0
-      then insert (y, end) n $ IntervalSet $ IntMap.insert x (start, m) xs
+      then insertPrim True (y, end) n $ IntervalSet $ IntMap.insert x (start, m) xs
       else insertPrim True (y, end) n $ IntervalSet $ IntMap.insert start (y, n + m) $ IntMap.insert x (start, m) xs
   CaseR2 m x ->
     --         A   B
@@ -726,7 +715,7 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --     ├─m─┤
     --     X   Y
     if m == n
-      then insert (x, end) n $ IntervalSet $ IntMap.delete x xs
+      then insertPrim True (x, end) n $ IntervalSet $ IntMap.delete x xs
       else insertPrim True (start, end) n $ IntervalSet xs
   CaseR2Continous1 m o x z ->
     --         A   B
@@ -745,7 +734,7 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --     ├─m─┼─o─┤
     --     X   Y   Z
     if m == n + o
-      then insert (x, end) m $ IntervalSet $ IntMap.delete start $ IntMap.delete x xs
+      then insertPrim True (x, end) m $ IntervalSet $ IntMap.delete start $ IntMap.delete x xs
       else insertPrim True (start, end) n $ IntervalSet xs
   CaseR2Continous3 m o x z ->
     --         A       B
@@ -753,7 +742,7 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     --     ├─m─┼─o─┤
     --     X   Y   Z
     if m == n + o
-      then insert (z, end) n $ insert (x, z) m $ IntervalSet $ IntMap.delete start $ IntMap.delete x xs
+      then insertPrim True (z, end) n $ IntervalSet $ IntMap.insert x (z, m) $ IntMap.delete start xs
       else insertPrim True (start, end) n $ IntervalSet xs
 
 -- CaseR1 ->
