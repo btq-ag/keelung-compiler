@@ -17,277 +17,277 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Interval Sets" $ do
   describe "insert" $ do
-    it "CaseL1" $ do
-      --     A   B
-      --     ├───┤
-      --             ├───┤
-      --             X   Y
-      testInsertion [Insert (0, 10) 10, Insert (20, 30) 1]
-    it "CaseL2" $ do
-      --   A   B
-      --   ├───┤
-      --       ├───┤
-      --       X   Y
-      testInsertion [Insert (0, 10) 10, Insert (10, 20) 1]
+    -- it "CaseL1" $ do
+    --   --     A   B
+    --   --     ├───┤
+    --   --             ├───┤
+    --   --             X   Y
+    --   testInsertion [Insert (0, 10) 10, Insert (20, 30) 1]
+    -- it "CaseL2" $ do
+    --   --   A   B
+    --   --   ├───┤
+    --   --       ├───┤
+    --   --       X   Y
+    --   testInsertion [Insert (0, 10) 10, Insert (10, 20) 1]
 
-    it "CaseL3" $ do
-      --     A       B
-      --     ├───────┤
-      --         ├───────┤
-      --         X       Y
-      testInsertion [Insert (0, 20) 10, Insert (10, 30) 1]
+    -- it "CaseL3" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --         ├───────┤
+    --   --         X       Y
+    --   testInsertion [Insert (0, 20) 10, Insert (10, 30) 1]
 
-    it "CaseL3 negating" $ do
-      --     A       B
-      --     ├───────┤
-      --         ├───────┤
-      --         X       Y
-      testInsertion [Insert (0, 20) (-10), Insert (10, 30) 10]
+    -- it "CaseL3 negating" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --         ├───────┤
+    --   --         X       Y
+    --   testInsertion [Insert (0, 20) (-10), Insert (10, 30) 10]
 
-    it "CaseL4 empty" $ do
-      --     A       B
-      --     ├───────┤
-      --         ├───┤
-      --         X   Y
-      testInsertion [Insert (0, 20) 10, Insert (10, 20) 1]
+    -- it "CaseL4 empty" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --         ├───┤
+    --   --         X   Y
+    --   testInsertion [Insert (0, 20) 10, Insert (10, 20) 1]
 
-    it "CaseL4 empty negating" $ do
-      --     A       B
-      --     ├───────┤
-      --         ├───┤
-      --         X   Y
-      testInsertion [Insert (0, 20) (-10), Insert (10, 20) 10]
+    -- it "CaseL4 empty negating" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --         ├───┤
+    --   --         X   Y
+    --   testInsertion [Insert (0, 20) (-10), Insert (10, 20) 10]
 
-    it "CaseL4 non-immediate" $ do
-      --     A       B
-      --     ├───────┤
-      --         ├───┤   ├───┤
-      --         X   Y   Z   W
-      testInsertion [Insert (0, 20) 10, Insert (30, 40) 2, Insert (10, 20) 1]
+    -- it "CaseL4 non-immediate" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --         ├───┤   ├───┤
+    --   --         X   Y   Z   W
+    --   testInsertion [Insert (0, 20) 10, Insert (30, 40) 2, Insert (10, 20) 1]
 
-    it "CaseL4 immediate" $ do
-      --     A       B
-      --     ├───────┤
-      --         ├───┼───┤
-      --         X   Y   W
-      testInsertion [Insert (0, 20) 10, Insert (20, 30) 2, Insert (10, 20) 1]
+    -- it "CaseL4 immediate" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --         ├───┼───┤
+    --   --         X   Y   W
+    --   testInsertion [Insert (0, 20) 10, Insert (20, 30) 2, Insert (10, 20) 1]
 
-    it "CaseL5 empty" $ do
-      --     A           B
-      --     ├───────────┤
-      --         ├───┤
-      --         X   Y
-      testInsertion [Insert (0, 30) 10, Insert (10, 20) 1]
+    -- it "CaseL5 empty" $ do
+    --   --     A           B
+    --   --     ├───────────┤
+    --   --         ├───┤
+    --   --         X   Y
+    --   testInsertion [Insert (0, 30) 10, Insert (10, 20) 1]
 
-    it "CaseL5 empty negating" $ do
-      --     A           B
-      --     ├───────────┤
-      --         ├───┤
-      --         X   Y
-      testInsertion [Insert (0, 30) (-10), Insert (10, 20) 10]
+    -- it "CaseL5 empty negating" $ do
+    --   --     A           B
+    --   --     ├───────────┤
+    --   --         ├───┤
+    --   --         X   Y
+    --   testInsertion [Insert (0, 30) (-10), Insert (10, 20) 10]
 
-    it "CaseL5 non-immediate 1" $ do
-      --     A           B
-      --     ├───────────┤
-      --         ├───┤       ├───┤
-      --         X   Y       Z   W
-      testInsertion [Insert (0, 30) 10, Insert (40, 50) 2, Insert (10, 20) 1]
+    -- it "CaseL5 non-immediate 1" $ do
+    --   --     A           B
+    --   --     ├───────────┤
+    --   --         ├───┤       ├───┤
+    --   --         X   Y       Z   W
+    --   testInsertion [Insert (0, 30) 10, Insert (40, 50) 2, Insert (10, 20) 1]
 
-    it "CaseL5 non-immediate 2" $ do
-      --     A           B
-      --     ├───────────┤
-      --         ├───┤   ├───┤
-      --         X   Y   Z   W
-      testInsertion [Insert (0, 30) 10, Insert (30, 40) 2, Insert (10, 20) 1]
+    -- it "CaseL5 non-immediate 2" $ do
+    --   --     A           B
+    --   --     ├───────────┤
+    --   --         ├───┤   ├───┤
+    --   --         X   Y   Z   W
+    --   testInsertion [Insert (0, 30) 10, Insert (30, 40) 2, Insert (10, 20) 1]
 
-    it "CaseL5 non-immediate 3" $ do
-      --     A               B
-      --     ├───────────────┤
-      --         ├───┤   ├───────┤
-      --         X   Y   Z       W
-      testInsertion [Insert (0, 40) 10, Insert (30, 50) 2, Insert (10, 20) 1]
+    -- it "CaseL5 non-immediate 3" $ do
+    --   --     A               B
+    --   --     ├───────────────┤
+    --   --         ├───┤   ├───────┤
+    --   --         X   Y   Z       W
+    --   testInsertion [Insert (0, 40) 10, Insert (30, 50) 2, Insert (10, 20) 1]
 
-    it "CaseL5 non-immediate 4" $ do
-      --     A               B
-      --     ├───────────────┤
-      --         ├───┤   ├───┤
-      --         X   Y   Z   W
-      testInsertion [Insert (0, 40) 10, Insert (30, 40) 2, Insert (10, 20) 1]
+    -- it "CaseL5 non-immediate 4" $ do
+    --   --     A               B
+    --   --     ├───────────────┤
+    --   --         ├───┤   ├───┤
+    --   --         X   Y   Z   W
+    --   testInsertion [Insert (0, 40) 10, Insert (30, 40) 2, Insert (10, 20) 1]
 
-    it "CaseL5 non-immediate 5" $ do
-      --     A                   B
-      --     ├───────────────────┤
-      --         ├───┤   ├───┤
-      --         X   Y   Z   W
-      testInsertion [Insert (0, 50) 10, Insert (30, 40) 2, Insert (10, 20) 1]
+    -- it "CaseL5 non-immediate 5" $ do
+    --   --     A                   B
+    --   --     ├───────────────────┤
+    --   --         ├───┤   ├───┤
+    --   --         X   Y   Z   W
+    --   testInsertion [Insert (0, 50) 10, Insert (30, 40) 2, Insert (10, 20) 1]
 
-    it "CaseL5 immediate 1" $ do
-      --     A           B
-      --     ├───────────┤
-      --         ├───┼───────┤
-      --         X   Y       W
-      testInsertion [Insert (0, 30) 10, Insert (20, 40) 2, Insert (10, 20) 1]
+    -- it "CaseL5 immediate 1" $ do
+    --   --     A           B
+    --   --     ├───────────┤
+    --   --         ├───┼───────┤
+    --   --         X   Y       W
+    --   testInsertion [Insert (0, 30) 10, Insert (20, 40) 2, Insert (10, 20) 1]
 
-    it "CaseL5 immediate 2" $ do
-      --     A           B
-      --     ├───────────┤
-      --         ├───┼───┤
-      --         X   Y   W
-      testInsertion [Insert (0, 30) 10, Insert (20, 30) 2, Insert (10, 20) 1]
+    -- it "CaseL5 immediate 2" $ do
+    --   --     A           B
+    --   --     ├───────────┤
+    --   --         ├───┼───┤
+    --   --         X   Y   W
+    --   testInsertion [Insert (0, 30) 10, Insert (20, 30) 2, Insert (10, 20) 1]
 
-    it "CaseL5 immediate 3" $ do
-      --     A               B
-      --     ├───────────────┤
-      --         ├───┼───┤
-      --         X   Y   W
-      testInsertion [Insert (0, 40) 10, Insert (20, 30) 2, Insert (10, 20) 1]
+    -- it "CaseL5 immediate 3" $ do
+    --   --     A               B
+    --   --     ├───────────────┤
+    --   --         ├───┼───┤
+    --   --         X   Y   W
+    --   testInsertion [Insert (0, 40) 10, Insert (20, 30) 2, Insert (10, 20) 1]
 
-    it "CaseM1" $ do
-      --     A   B
-      --     ├───┤
-      --     ├───────┤
-      --     X       Y
-      testInsertion [Insert (0, 10) 10, Insert (0, 20) 1]
+    -- it "CaseM1" $ do
+    --   --     A   B
+    --   --     ├───┤
+    --   --     ├───────┤
+    --   --     X       Y
+    --   testInsertion [Insert (0, 10) 10, Insert (0, 20) 1]
 
-    it "CaseM1 negating" $ do
-      --     A   B
-      --     ├───┤
-      --     ├───────┤
-      --     X       Y
-      testInsertion [Insert (0, 10) (-10), Insert (0, 20) 10]
+    -- it "CaseM1 negating" $ do
+    --   --     A   B
+    --   --     ├───┤
+    --   --     ├───────┤
+    --   --     X       Y
+    --   testInsertion [Insert (0, 10) (-10), Insert (0, 20) 10]
 
-    it "CaseM2 empty" $ do
-      --     A   B
-      --     ├───┤
-      --     ├───┤
-      --     X   Y
-      testInsertion [Insert (0, 10) 10, Insert (0, 10) 1]
+    -- it "CaseM2 empty" $ do
+    --   --     A   B
+    --   --     ├───┤
+    --   --     ├───┤
+    --   --     X   Y
+    --   testInsertion [Insert (0, 10) 10, Insert (0, 10) 1]
 
-    it "CaseM2 empty negating" $ do
-      --     A   B
-      --     ├───┤
-      --     ├───┤
-      --     X   Y
-      testInsertion [Insert (0, 10) (-10), Insert (0, 10) 10]
+    -- it "CaseM2 empty negating" $ do
+    --   --     A   B
+    --   --     ├───┤
+    --   --     ├───┤
+    --   --     X   Y
+    --   testInsertion [Insert (0, 10) (-10), Insert (0, 10) 10]
 
-    it "CaseM2 non-immediate" $ do
-      --     A   B
-      --     ├───┤
-      --     ├───┤    ├───┤
-      --     X   Y    Z   W
-      testInsertion [Insert (0, 10) 10, Insert (20, 30) 2, Insert (0, 10) 1]
+    -- it "CaseM2 non-immediate" $ do
+    --   --     A   B
+    --   --     ├───┤
+    --   --     ├───┤    ├───┤
+    --   --     X   Y    Z   W
+    --   testInsertion [Insert (0, 10) 10, Insert (20, 30) 2, Insert (0, 10) 1]
 
-    it "CaseM2 immediate" $ do
-      --     A   B
-      --     ├───┤
-      --     ├───┼───┤
-      --     X   Y   W
-      testInsertion [Insert (0, 10) 10, Insert (10, 20) 2, Insert (0, 10) 1]
+    -- it "CaseM2 immediate" $ do
+    --   --     A   B
+    --   --     ├───┤
+    --   --     ├───┼───┤
+    --   --     X   Y   W
+    --   testInsertion [Insert (0, 10) 10, Insert (10, 20) 2, Insert (0, 10) 1]
 
-    it "CaseM3 empty" $ do
-      --     A       B
-      --     ├───────┤
-      --     ├───┤
-      --     X   Y
-      testInsertion [Insert (0, 20) 10, Insert (0, 10) 1]
+    -- it "CaseM3 empty" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --     ├───┤
+    --   --     X   Y
+    --   testInsertion [Insert (0, 20) 10, Insert (0, 10) 1]
 
-    it "CaseM3 empty negating" $ do
-      --     A       B
-      --     ├───────┤
-      --     ├───┤
-      --     X   Y
-      testInsertion [Insert (0, 20) (-10), Insert (0, 10) 10]
+    -- it "CaseM3 empty negating" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --     ├───┤
+    --   --     X   Y
+    --   testInsertion [Insert (0, 20) (-10), Insert (0, 10) 10]
 
-    it "CaseM3 non-immediate 1" $ do
-      --     A       B
-      --     ├───────┤
-      --     ├───┤       ├───┤
-      --     X   Y       Z   W
-      testInsertion [Insert (0, 20) 10, Insert (30, 40) 2, Insert (0, 10) 1]
+    -- it "CaseM3 non-immediate 1" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --     ├───┤       ├───┤
+    --   --     X   Y       Z   W
+    --   testInsertion [Insert (0, 20) 10, Insert (30, 40) 2, Insert (0, 10) 1]
 
-    it "CaseM3 non-immediate 2" $ do
-      --     A       B
-      --     ├───────┤
-      --     ├───┤   ├───┤
-      --     X   Y   Z   W
-      testInsertion [Insert (0, 20) 10, Insert (20, 30) 2, Insert (0, 10) 1]
+    -- it "CaseM3 non-immediate 2" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --     ├───┤   ├───┤
+    --   --     X   Y   Z   W
+    --   testInsertion [Insert (0, 20) 10, Insert (20, 30) 2, Insert (0, 10) 1]
 
-    it "CaseM3 non-immediate 3" $ do
-      --     A           B
-      --     ├───────────┤
-      --     ├───┤   ├───────┤
-      --     X   Y   Z       W
-      testInsertion [Insert (0, 30) 10, Insert (20, 40) 2, Insert (0, 10) 1]
+    -- it "CaseM3 non-immediate 3" $ do
+    --   --     A           B
+    --   --     ├───────────┤
+    --   --     ├───┤   ├───────┤
+    --   --     X   Y   Z       W
+    --   testInsertion [Insert (0, 30) 10, Insert (20, 40) 2, Insert (0, 10) 1]
 
-    it "CaseM3 non-immediate 4" $ do
-      --     A           B
-      --     ├───────────┤
-      --     ├───┤   ├───┤
-      --     X   Y   Z   W
-      testInsertion [Insert (0, 30) 10, Insert (20, 30) 2, Insert (0, 10) 1]
+    -- it "CaseM3 non-immediate 4" $ do
+    --   --     A           B
+    --   --     ├───────────┤
+    --   --     ├───┤   ├───┤
+    --   --     X   Y   Z   W
+    --   testInsertion [Insert (0, 30) 10, Insert (20, 30) 2, Insert (0, 10) 1]
 
-    it "CaseM3 non-immediate 5" $ do
-      --     A               B
-      --     ├───────────────┤
-      --     ├───┤   ├───┤
-      --     X   Y   Z   W
-      testInsertion [Insert (0, 40) 10, Insert (20, 30) 2, Insert (0, 10) 1]
+    -- it "CaseM3 non-immediate 5" $ do
+    --   --     A               B
+    --   --     ├───────────────┤
+    --   --     ├───┤   ├───┤
+    --   --     X   Y   Z   W
+    --   testInsertion [Insert (0, 40) 10, Insert (20, 30) 2, Insert (0, 10) 1]
 
-    it "CaseM3 immediate 1" $ do
-      --     A       B
-      --     ├───────┤
-      --     ├───┼───────┤
-      --     X   Y       W
-      testInsertion [Insert (0, 20) 10, Insert (10, 30) 2, Insert (0, 10) 1]
+    -- it "CaseM3 immediate 1" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --     ├───┼───────┤
+    --   --     X   Y       W
+    --   testInsertion [Insert (0, 20) 10, Insert (10, 30) 2, Insert (0, 10) 1]
 
-    it "CaseM3 immediate 2" $ do
-      --     A       B
-      --     ├───────┤
-      --     ├───┼───┤
-      --     X   Y   W
-      testInsertion [Insert (0, 20) 10, Insert (10, 20) 2, Insert (0, 10) 1]
+    -- it "CaseM3 immediate 2" $ do
+    --   --     A       B
+    --   --     ├───────┤
+    --   --     ├───┼───┤
+    --   --     X   Y   W
+    --   testInsertion [Insert (0, 20) 10, Insert (10, 20) 2, Insert (0, 10) 1]
 
-    it "CaseM3 immediate 3" $ do
-      --     A           B
-      --     ├───────────┤
-      --     ├───┼───┤
-      --     X   Y   W
-      testInsertion [Insert (0, 30) 10, Insert (10, 20) 2, Insert (0, 10) 1]
+    -- it "CaseM3 immediate 3" $ do
+    --   --     A           B
+    --   --     ├───────────┤
+    --   --     ├───┼───┤
+    --   --     X   Y   W
+    --   testInsertion [Insert (0, 30) 10, Insert (10, 20) 2, Insert (0, 10) 1]
 
-    it "CaseR5" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───────────┤
-      --     X           Y
-      testInsertion [Insert (10, 20) 10, Insert (0, 30) 1]
+    -- it "CaseR5" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───────────┤
+    --   --     X           Y
+    --   testInsertion [Insert (10, 20) 10, Insert (0, 30) 1]
 
-    it "CaseR5 negating" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───────────┤
-      --     X           Y
-      testInsertion [Insert (10, 20) (-10), Insert (0, 30) 10]
+    -- it "CaseR5 negating" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───────────┤
+    --   --     X           Y
+    --   testInsertion [Insert (10, 20) (-10), Insert (0, 30) 10]
 
-    it "CaseR4 empty" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───────┤
-      --     X       Y
-      testInsertion [Insert (10, 20) 10, Insert (0, 20) 1]
+    -- it "CaseR4 empty" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───────┤
+    --   --     X       Y
+    --   testInsertion [Insert (10, 20) 10, Insert (0, 20) 1]
 
-    it "CaseR4 empty negating" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───────┤
-      --     X       Y
-      testInsertion [Insert (10, 20) (-10), Insert (0, 20) 10]
+    -- it "CaseR4 empty negating" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───────┤
+    --   --     X       Y
+    --   testInsertion [Insert (10, 20) (-10), Insert (0, 20) 10]
 
-    it "CaseR4 non-immediate" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───────┤   ├───┤
-      --     X       Y   Z   W
-      testInsertion [Insert (10, 20) 10, Insert (30, 40) 2, Insert (0, 20) 1]
+    -- it "CaseR4 non-immediate" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───────┤   ├───┤
+    --   --     X       Y   Z   W
+    --   testInsertion [Insert (10, 20) 10, Insert (30, 40) 2, Insert (0, 20) 1]
 
     it "CaseR4 immediate" $ do
       --         A   B
@@ -296,211 +296,253 @@ tests = describe "Interval Sets" $ do
       --     X       Y   W
       testInsertion [Insert (10, 20) 10, Insert (20, 30) 2, Insert (0, 20) 1]
 
-    it "CaseR3 empty" $ do
-      --         A       B
-      --         ├───────┤
-      --     ├───────┤
-      --     X       Y
-      testInsertion [Insert (10, 30) 10, Insert (0, 20) 1]
-
-    it "CaseR3 empty negating" $ do
-      --         A       B
-      --         ├───────┤
-      --     ├───────┤
-      --     X       Y
-      testInsertion [Insert (10, 30) (-10), Insert (0, 20) 10]
-
-    it "CaseR3 non-immediate 1" $ do
-      --         A       B
-      --         ├───────┤
-      --     ├───────┤       ├───┤
-      --     X       Y       Z   W
-      testInsertion [Insert (10, 30) 10, Insert (40, 50) 2, Insert (0, 20) 1]
-
-    it "CaseR3 non-immediate 2" $ do
-      --         A       B
-      --         ├───────┤
-      --     ├───────┤   ├───┤
-      --     X       Y   Z   W
-      testInsertion [Insert (10, 30) 10, Insert (30, 40) 2, Insert (0, 20) 1]
-
-    it "CaseR3 non-immediate 3" $ do
-      --         A           B
-      --         ├───────────┤
-      --     ├───────┤   ├───────┤
-      --     X       Y   Z       W
-      testInsertion [Insert (10, 40) 10, Insert (30, 50) 2, Insert (0, 20) 1]
-
-    it "CaseR3 non-immediate 4" $ do
-      --         A           B
-      --         ├───────────┤
-      --     ├───────┤   ├───┤
-      --     X       Y   Z   W
-      testInsertion [Insert (10, 40) 10, Insert (30, 40) 2, Insert (0, 20) 1]
-
-    it "CaseR3 non-immediate 5" $ do
-      --         A               B
-      --         ├───────────────┤
-      --     ├───────┤   ├───┤
-      --     X       Y   Z   W
-      testInsertion [Insert (10, 50) 10, Insert (30, 40) 2, Insert (0, 20) 1]
-
-    it "CaseR3 immediate 1" $ do
-      --         A       B
-      --         ├───────┤
-      --     ├───────┼───────┤
-      --     X       Y       W
-      testInsertion [Insert (10, 30) 10, Insert (20, 40) 2, Insert (0, 20) 1]
-
-    it "CaseR3 immediate 2" $ do
-      --         A       B
-      --         ├───────┤
+    it "CaseR4 immediate negating" $ do
+      --         A   B
+      --         ├───┤
       --     ├───────┼───┤
       --     X       Y   W
-      testInsertion [Insert (10, 30) 10, Insert (20, 30) 2, Insert (0, 20) 1]
+      testInsertion [Insert (10, 20) 10, Insert (20, 30) 20, Insert (0, 20) 10]
 
-    it "CaseR3 immediate 3" $ do
-      --         A           B
-      --         ├───────────┤
+    it "CaseR4 immediate negating 2" $ do
+      --         A   B
+      --         ├───┤
       --     ├───────┼───┤
       --     X       Y   W
-      testInsertion [Insert (10, 40) 10, Insert (20, 30) 2, Insert (0, 20) 1]
+      testInsertion [Insert (10, 20) (-10), Insert (20, 30) 20, Insert (0, 20) 10]
 
-    it "CaseR2 empty" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───┤
-      --     X   Y
-      testInsertion [Insert (10, 20) 10, Insert (0, 10) 1]
+    -- it "CaseR3 empty" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───────┤
+    --   --     X       Y
+    --   testInsertion [Insert (10, 30) 10, Insert (0, 20) 1]
 
-    it "CaseR2 empty merging" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───┤
-      --     X   Y
-      testInsertion [Insert (10, 20) 10, Insert (0, 10) 10]
+    -- it "CaseR3 empty negating" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───────┤
+    --   --     X       Y
+    --   testInsertion [Insert (10, 30) (-10), Insert (0, 20) 10]
 
-    it "CaseR2 non-immediate 1" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───┤       ├───┤
-      --     X   Y       Z   W
-      testInsertion [Insert (10, 20) 10, Insert (30, 40) 2, Insert (0, 10) 1]
+    -- it "CaseR3 non-immediate 1" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───────┤       ├───┤
+    --   --     X       Y       Z   W
+    --   testInsertion [Insert (10, 30) 10, Insert (40, 50) 2, Insert (0, 20) 1]
 
-    it "CaseR2 non-immediate 2" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───┤   ├───┤
-      --     X   Y   Z   W
-      testInsertion [Insert (10, 20) 10, Insert (20, 30) 2, Insert (0, 10) 1]
+    -- it "CaseR3 non-immediate 2" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───────┤   ├───┤
+    --   --     X       Y   Z   W
+    --   testInsertion [Insert (10, 30) 10, Insert (30, 40) 2, Insert (0, 20) 1]
 
-    it "CaseR2 non-immediate 3" $ do
-      --         A       B
-      --         ├───────┤
-      --     ├───┤   ├───────┤
-      --     X   Y   Z       W
-      testInsertion [Insert (10, 30) 10, Insert (20, 40) 2, Insert (0, 10) 1]
+    -- it "CaseR3 non-immediate 3" $ do
+    --   --         A           B
+    --   --         ├───────────┤
+    --   --     ├───────┤   ├───────┤
+    --   --     X       Y   Z       W
+    --   testInsertion [Insert (10, 40) 10, Insert (30, 50) 2, Insert (0, 20) 1]
 
-    it "CaseR2 non-immediate 4" $ do
-      --         A       B
-      --         ├───────┤
-      --     ├───┤   ├───┤
-      --     X   Y   Z   W
-      testInsertion [Insert (10, 30) 10, Insert (20, 30) 2, Insert (0, 10) 1]
+    -- it "CaseR3 non-immediate 4" $ do
+    --   --         A           B
+    --   --         ├───────────┤
+    --   --     ├───────┤   ├───┤
+    --   --     X       Y   Z   W
+    --   testInsertion [Insert (10, 40) 10, Insert (30, 40) 2, Insert (0, 20) 1]
 
-    it "CaseR2 non-immediate 5" $ do
-      --         A           B
-      --         ├───────────┤
-      --     ├───┤   ├───┤
-      --     X   Y   Z   W
-      testInsertion [Insert (10, 40) 10, Insert (20, 30) 2, Insert (0, 10) 1]
+    -- it "CaseR3 non-immediate 5" $ do
+    --   --         A               B
+    --   --         ├───────────────┤
+    --   --     ├───────┤   ├───┤
+    --   --     X       Y   Z   W
+    --   testInsertion [Insert (10, 50) 10, Insert (30, 40) 2, Insert (0, 20) 1]
 
-    it "CaseR2 immediate 1" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───┼───────┤
-      --     X   Y       W
-      testInsertion [Insert (10, 20) 10, Insert (10, 30) 2, Insert (0, 10) 1]
+    -- it "CaseR3 immediate 1" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───────┼───────┤
+    --   --     X       Y       W
+    --   testInsertion [Insert (10, 30) 10, Insert (20, 40) 2, Insert (0, 20) 1]
 
-    it "CaseR2 immediate 1 merging 1" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───┼───────┤
-      --     X   Y       W
-      testInsertion [Insert (10, 20) 10, Insert (10, 30) 10, Insert (0, 10) 20]
+    -- it "CaseR3 immediate 2" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───────┼───┤
+    --   --     X       Y   W
+    --   testInsertion [Insert (10, 30) 10, Insert (20, 30) 2, Insert (0, 20) 1]
 
-    it "CaseR2 immediate 1 merging 2" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───┼───┤
-      --     X   Y   W
-      testInsertion [Insert (10, 20) 10, Insert (10, 20) 10, Insert (0, 10) 20]
+    -- it "CaseR3 immediate 3" $ do
+    --   --         A           B
+    --   --         ├───────────┤
+    --   --     ├───────┼───┤
+    --   --     X       Y   W
+    --   testInsertion [Insert (10, 40) 10, Insert (20, 30) 2, Insert (0, 20) 1]
 
-    it "CaseR2 immediate 1 merging 3" $ do
-      --         A       B
-      --         ├───────┤
-      --     ├───┼───┤
-      --     X   Y   W
-      testInsertion [Insert (10, 30) 10, Insert (10, 20) 10, Insert (0, 10) 20]
+    -- it "CaseR2 empty" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───┤
+    --   --     X   Y
+    --   testInsertion [Insert (10, 20) 10, Insert (0, 10) 1]
 
-    it "CaseR2 immediate 2" $ do
-      --         A   B
-      --         ├───┤
-      --     ├───┼───┤
-      --     X   Y   W
-      testInsertion [Insert (10, 20) 10, Insert (10, 20) 2, Insert (0, 10) 1]
+    -- it "CaseR2 empty merging" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───┤
+    --   --     X   Y
+    --   testInsertion [Insert (10, 20) 10, Insert (0, 10) 10]
 
-    it "CaseR2 immediate 3" $ do
-      --         A       B
-      --         ├───────┤
-      --     ├───┼───┤
-      --     X   Y   W
-      testInsertion [Insert (10, 30) 10, Insert (10, 20) 2, Insert (0, 10) 1]
+    -- it "CaseR2 non-immediate 1" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───┤       ├───┤
+    --   --     X   Y       Z   W
+    --   testInsertion [Insert (10, 20) 10, Insert (30, 40) 2, Insert (0, 10) 1]
 
-    it "CaseR1 empty" $ do
-      --             A   B
-      --             ├───┤
-      --     ├───┤
-      --     X   Y
-      testInsertion [Insert (20, 30) 10, Insert (0, 10) 1]
+    -- it "CaseR2 non-immediate 2" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───┤   ├───┤
+    --   --     X   Y   Z   W
+    --   testInsertion [Insert (10, 20) 10, Insert (20, 30) 2, Insert (0, 10) 1]
 
-    it "CaseR1 non-immediate 1" $ do
-      --             A   B
-      --             ├───┤
-      --     ├───┤           ├───┤
-      --     X   Y           Z   W
-      testInsertion [Insert (20, 30) 10, Insert (40, 50) 2, Insert (0, 10) 1]
+    -- it "CaseR2 non-immediate 3" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───┤   ├───────┤
+    --   --     X   Y   Z       W
+    --   testInsertion [Insert (10, 30) 10, Insert (20, 40) 2, Insert (0, 10) 1]
 
-    it "CaseR1 non-immediate 2" $ do
-      --             A   B
-      --             ├───┤
-      --     ├───┤       ├───┤
-      --     X   Y       Z   W
-      testInsertion [Insert (20, 30) 10, Insert (30, 40) 2, Insert (0, 10) 1]
+    -- it "CaseR2 non-immediate 4" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───┤   ├───┤
+    --   --     X   Y   Z   W
+    --   testInsertion [Insert (10, 30) 10, Insert (20, 30) 2, Insert (0, 10) 1]
 
-    it "CaseR1 non-immediate 3" $ do
-      --             A       B
-      --             ├───────┤
-      --     ├───┤       ├───────┤
-      --     X   Y       Z       W
-      testInsertion [Insert (20, 40) 10, Insert (30, 50) 2, Insert (0, 10) 1]
+    -- it "CaseR2 non-immediate 5" $ do
+    --   --         A           B
+    --   --         ├───────────┤
+    --   --     ├───┤   ├───┤
+    --   --     X   Y   Z   W
+    --   testInsertion [Insert (10, 40) 10, Insert (20, 30) 2, Insert (0, 10) 1]
 
-    it "CaseR1 non-immediate 4" $ do
-      --             A       B
-      --             ├───────┤
-      --     ├───┤       ├───┤
-      --     X   Y       Z   W
-      testInsertion [Insert (20, 40) 10, Insert (30, 40) 2, Insert (0, 10) 1]
+    -- it "CaseR2 immediate 1" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───┼───────┤
+    --   --     X   Y       W
+    --   testInsertion [Insert (10, 20) 10, Insert (10, 30) 2, Insert (0, 10) 1]
 
-    it "CaseR1 non-immediate 5" $ do
-      --             A           B
-      --             ├───────────┤
-      --     ├───┤       ├───┤
-      --     X   Y       Z   W
-      testInsertion [Insert (20, 50) 10, Insert (30, 40) 2, Insert (0, 10) 1]
+    -- it "CaseR2 immediate 1 merging 1" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───┼───────┤
+    --   --     X   Y       W
+    --   testInsertion [Insert (10, 20) 10, Insert (10, 30) 10, Insert (0, 10) 20]
+
+    -- it "CaseR2 immediate 1 merging 2" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───┼───┤
+    --   --     X   Y   W
+    --   testInsertion [Insert (10, 20) 10, Insert (10, 20) 10, Insert (0, 10) 20]
+
+    -- it "CaseR2 immediate 1 merging 3" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───┼───┤
+    --   --     X   Y   W
+    --   testInsertion [Insert (10, 30) 10, Insert (10, 20) 10, Insert (0, 10) 20]
+
+    -- it "CaseR2 immediate 2" $ do
+    --   --         A   B
+    --   --         ├───┤
+    --   --     ├───┼───┤
+    --   --     X   Y   W
+    --   testInsertion [Insert (10, 20) 10, Insert (10, 20) 2, Insert (0, 10) 1]
+
+    -- it "CaseR2 immediate 3" $ do
+    --   --         A       B
+    --   --         ├───────┤
+    --   --     ├───┼───┤
+    --   --     X   Y   W
+    --   testInsertion [Insert (10, 30) 10, Insert (10, 20) 2, Insert (0, 10) 1]
+
+    -- it "CaseR1 empty" $ do
+    --   --             A   B
+    --   --             ├───┤
+    --   --     ├───┤
+    --   --     X   Y
+    --   testInsertion [Insert (20, 30) 10, Insert (0, 10) 1]
+
+    -- it "CaseR1 non-immediate 1" $ do
+    --   --             A   B
+    --   --             ├───┤
+    --   --     ├───┤           ├───┤
+    --   --     X   Y           Z   W
+    --   testInsertion [Insert (20, 30) 10, Insert (40, 50) 2, Insert (0, 10) 1]
+
+    -- it "CaseR1 non-immediate 2" $ do
+    --   --             A   B
+    --   --             ├───┤
+    --   --     ├───┤       ├───┤
+    --   --     X   Y       Z   W
+    --   testInsertion [Insert (20, 30) 10, Insert (30, 40) 2, Insert (0, 10) 1]
+
+    -- it "CaseR1 non-immediate 3" $ do
+    --   --             A       B
+    --   --             ├───────┤
+    --   --     ├───┤       ├───────┤
+    --   --     X   Y       Z       W
+    --   testInsertion [Insert (20, 40) 10, Insert (30, 50) 2, Insert (0, 10) 1]
+
+    -- it "CaseR1 non-immediate 4" $ do
+    --   --             A       B
+    --   --             ├───────┤
+    --   --     ├───┤       ├───┤
+    --   --     X   Y       Z   W
+    --   testInsertion [Insert (20, 40) 10, Insert (30, 40) 2, Insert (0, 10) 1]
+
+    -- it "CaseR1 non-immediate 5" $ do
+    --   --             A           B
+    --   --             ├───────────┤
+    --   --     ├───┤       ├───┤
+    --   --     X   Y       Z   W
+    --   testInsertion [Insert (20, 50) 10, Insert (30, 40) 2, Insert (0, 10) 1]
 
     -- it "should preserve invariants after applying randomized insertions" $ do
     --   property testInsertion
+
+    -- it "1" $ do -- M3
+    --   --        -10
+    --   --     ├───────┤
+    --   --     ├───┤───┤───┤
+    --   --      100 110 100
+    --   testInsertion [Insert (0, 20) (-10), Insert (0, 30) 100, Insert (10, 20) 10]
+
+    -- it "2" $ do -- L4
+    --   --        -10
+    --   --     ├───────┤
+    --   --         ├───┤───┤
+    --   --          110 100
+    --   testInsertion [Insert (0, 20) (-10), Insert (20, 30) 100, Insert (10, 20) 110]
+
+    -- it "3" $ do -- M2
+    --   --          -10
+    --   --         ├───┤
+    --   --         ├───┤───┤
+    --   --          110 100
+    --   testInsertion [Insert (10, 20) (-10), Insert (20, 30) 100, Insert (10, 20) 110]
+
+    -- it "4" $ do
+    --   --          -10
+    --   --         ├───┤
+    --   --     ├───────┤───┤
+    --   --        110   100
+    --   testInsertion [Insert (10, 20) (-10), Insert (20, 30) 100, Insert (0, 20) 110]
 
     it "should merge adjecent intervals with the count" $ do
       let operations = [Insert (0, 10) 1, Insert (10, 20) 1]

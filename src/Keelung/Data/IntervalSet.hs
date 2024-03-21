@@ -40,6 +40,7 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.List qualified as List
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
+import Debug.Trace
 import GHC.Generics (Generic)
 import Keelung.Compiler.Util (showList')
 import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
@@ -378,6 +379,12 @@ data Case n
     --     ├───────┤
     --     X       Y
     CaseR4 n Int -- X
+  | -- A > X, A < Y, B > X, B = Y
+    --         A   B
+    --         ├───┤
+    --     ├───────┼───────┤
+    --     X       Y       Z
+    CaseR4Continous n n Int Int -- X & Z
   | -- A > X, A < Y, B > X, B > Y
     --         A       B
     --         ├───────┤
@@ -443,7 +450,19 @@ caseAnalysis ignoreBefore (a, b) (IntervalSet xs) = case IntMap.lookupLT a xs of
   Just (x, (y, n)) -> case a `compare` y of
     LT -> case b `compare` y of
       LT -> CaseR5 n x y
-      EQ -> CaseR4 n x
+      EQ -> case IntMap.lookup b xs of
+        Nothing ->
+          --         A   B
+          --         ├───┤
+          --     ├───────┤
+          --     X       Y
+          CaseR4 n x
+        Just (z, m) ->
+          --         A   B
+          --         ├───┤
+          --     ├───────┼───────┤
+          --     X       Y       Z
+          CaseR4Continous n m x z
       GT -> CaseR3 n x y
     EQ ->
       if ignoreBefore
@@ -563,13 +582,14 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
       then IntervalSet $ IntMap.insert end (y, m) $ IntMap.delete x $ IntMap.insert start (x, n) xs
       else IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert x (end, n + m) $ IntMap.insert start (x, n) xs
   CaseL4 m x ->
-    --     A       B
-    --     ├───────┤
-    --         ├───┤
-    --         X   Y
-    if n + m == 0
-      then IntervalSet $ IntMap.delete x $ IntMap.insert start (x, n) xs
-      else IntervalSet $ IntMap.insert x (end, n + m) $ IntMap.insert start (x, n) xs
+    traceShow "L4" $
+      --     A       B
+      --     ├───────┤
+      --         ├───┤
+      --         X   Y
+      if n + m == 0
+        then IntervalSet $ IntMap.delete x $ IntMap.insert start (x, n) xs
+        else IntervalSet $ IntMap.insert x (end, n + m) $ IntMap.insert start (x, n) xs
   CaseL5 m x y ->
     --     A           B
     --     ├───────────┤
@@ -587,26 +607,28 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
       then IntervalSet $ IntMap.insert end (y, m) $ IntMap.delete start xs
       else IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert start (end, m + n) xs
   CaseM2 m ->
-    --     A       B
-    --     ├───────┤
-    --     ├───────┤
-    --     X       Y
-    if n + m == 0
-      then IntervalSet $ IntMap.delete start xs
-      else IntervalSet $ IntMap.insert start (end, m + n) xs
+    traceShow "M2" $
+      --     A       B
+      --     ├───────┤
+      --     ├───────┤
+      --     X       Y
+      if n + m == 0
+        then IntervalSet $ IntMap.delete start xs
+        else IntervalSet $ IntMap.insert start (end, m + n) xs
   CaseM3 m y ->
-    --     A       B
-    --     ├───────┤
-    --     ├───┤
-    --     X   Y
-    --   =>
-    --     A   C   B
-    --     ├───┼───┤
-    --     ├───┤
-    --     X   Y
-    if n + m == 0
-      then insertPrim True (y, end) n $ IntervalSet $ IntMap.delete start xs
-      else insertPrim True (y, end) n $ IntervalSet $ IntMap.insert start (y, m + n) xs
+    traceShow "M3" $
+      --     A       B
+      --     ├───────┤
+      --     ├───┤
+      --     X   Y
+      --   =>
+      --     A   C   B
+      --     ├───┼───┤
+      --     ├───┤
+      --     X   Y
+      if n + m == 0
+        then insertPrim True (y, end) n $ IntervalSet $ IntMap.delete start xs
+        else insertPrim True (y, end) n $ IntervalSet $ IntMap.insert start (y, m + n) xs
   CaseR5 m x y ->
     --         A   B
     --         ├───┤
@@ -623,6 +645,17 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
     if n + m == 0
       then IntervalSet $ IntMap.delete start $ IntMap.insert x (start, m) xs
       else IntervalSet $ IntMap.insert start (end, n + m) $ IntMap.insert x (start, m) xs
+  CaseR4Continous m o x z ->
+    --         A   B
+    --         ├─n─┤
+    --     ├─────m─┼─o─────┤
+    --     X       Y       Z
+    if n + m == 0
+      then IntervalSet $ IntMap.delete start $ IntMap.insert x (start, m) xs
+      else
+        if m + n == o
+          then IntervalSet $ IntMap.insert start (z, o) $ IntMap.delete end $ IntMap.insert x (start, m) xs
+          else IntervalSet $ IntMap.insert start (end, n + m) $ IntMap.insert x (start, m) xs
   CaseR3 m x y ->
     --         A       B
     --         ├───────┤
