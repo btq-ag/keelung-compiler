@@ -537,20 +537,6 @@ tests = describe "Interval Sets" $ do
     it "should preserve invariants after applying randomized insertions" $ do
       property testInsertion
 
-    -- it "1" $ do -- M3
-    --   --        -10
-    --   --     ├───────┤
-    --   --     ├───┤───┤───┤
-    --   --      100 110 100
-    --   testInsertion [Insert (0, 20) (-10), Insert (0, 30) 100, Insert (10, 20) 10]
-
-    -- it "2" $ do -- M2
-    --   --      -10
-    --   --     ├───┤
-    --   --     ├───┤───┤
-    --   --      110 100
-    --   testInsertion [Insert (0, 10) (-10), Insert (0, 10) 110, Insert (10, 20) 100]
-
     it "should merge adjecent intervals with the count" $ do
       let operations = [Insert (0, 10) 1, Insert (10, 20) 1]
       let intervals = foldr applyOperation IntervalSet.new (operations :: [Operation Int])

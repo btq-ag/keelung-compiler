@@ -436,6 +436,7 @@ data Case n
     --             A   B
     --             ├───┤
     CaseEmpty
+  deriving (Show)
 
 -- | O(min(n, W)): Analyze the case of an interval in an interval set
 --
@@ -545,9 +546,9 @@ caseAnalysis ignoreBefore (a, b) (IntervalSet xs) = case IntMap.lookupLT a xs of
                   Nothing ->
                     --         A   B
                     --         ├───┤
-                    --     ├───┼───┤
+                    --     ├───┼─m─┤
                     --     X   Y   W
-                    CaseM2 n
+                    CaseM2 m
                   Just (q, o) ->
                     --         A   B
                     --         ├───┤
