@@ -537,8 +537,11 @@ tests = describe "Interval Sets" $ do
     it "should preserve invariants after applying randomized insertions" $ do
       property testInsertion
 
-    it "CaseR1 non-immediate 5" $ do
+    it "should handle other cases 1" $ do
       testInsertion [Insert (10, 20) (-10), Insert (10, 20) 10, Insert (0, 30) 20]
+
+    it "should handle other cases 2" $ do
+      testInsertion [Insert (24,28) (-24),Insert (24,29) 24,Insert (23,27) (-65)]
 
     it "should merge adjecent intervals with the count" $ do
       let operations = [Insert (0, 10) 1, Insert (10, 20) 1]
