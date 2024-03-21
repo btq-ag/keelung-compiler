@@ -538,9 +538,23 @@ tests = describe "Interval Sets" $ do
       property testInsertion
 
     it "should handle cases like these" $ do
-      testInsertion [Insert (10, 20) (-10), Insert (10, 20) 10, Insert (0, 30) 20]
       testInsertion [Insert (24, 28) (-24), Insert (24, 29) 24, Insert (23, 27) (-65)]
       testInsertion [Insert (10, 40) 10, Insert (0, 30) 100, Insert (10, 20) (-10)]
+
+      --    ├─  20 ─┼─  30 ─┼─  20 ─┤
+      --            ├─ -10 ─┤
+      testInsertion [Insert (10, 20) (-10), Insert (10, 20) 10, Insert (0, 30) 20]
+      --    ├─  10 ─┤
+      --            ├─  20 ─┤
+      --            ├─ -20 ─┤
+      testInsertion [Insert (10, 20) (-20), Insert (10, 20) 20, Insert (0, 10) 10]
+      --    ├─  10 ─┤
+      --            ├─  20 ─┤
+      --            ├─ -10 ─┤
+      testInsertion [Insert (10, 20) (-10), Insert (10, 20) 20, Insert (0, 10) 10]
+      --    ├─  10 ─┼─  20 ─┼─  30 ─┤
+      --            ├─ -10 ─┤
+      testInsertion [Insert (10, 20) (-10), Insert (20, 30) 30, Insert (10, 20) 20, Insert (0, 10) 10]
 
   describe "singleton" $ do
     it "should result in a valid IntervalSet" $ do
