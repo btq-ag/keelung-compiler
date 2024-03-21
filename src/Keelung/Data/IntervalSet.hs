@@ -343,6 +343,12 @@ data Case n
     --         ├───┤
     --         X   Y
     CaseL4 n Int -- X
+  | -- A < X, A < Y, B > X, B = Y
+    --     A       B
+    --     ├───────┤
+    --         ├───┼───┤
+    --         X   Y   Z
+    CaseL4Continuous n n Int Int -- X & Z
   | -- A < X, A < Y, B > X, B > Y
     --     A           B
     --     ├───────────┤
@@ -361,6 +367,12 @@ data Case n
     --     ├───────┤
     --     X       Y
     CaseM2 n
+  | -- A = X, A < Y, B > X, B = Y
+    --     A   B
+    --     ├───┤
+    --     ├───┼───┤
+    --     X   Y   Z
+    CaseM2Continuous n n Int -- Z
   | -- A = X, A < Y, B > X, B > Y
     --     A       B
     --     ├───────┤
@@ -438,14 +450,39 @@ caseAnalysis ignoreBefore (a, b) (IntervalSet xs) = case IntMap.lookupLT a xs of
       if a == x
         then case b `compare` y of
           LT -> CaseM1 n y
-          EQ -> CaseM2 n
+          EQ ->
+            case IntMap.lookup b xs of
+              Nothing ->
+                --     A       B
+                --     ├───────┤
+                --     ├───────┤
+                --     X       Y
+                CaseM2 n
+              Just (z, m) ->
+                --     A   B
+                --     ├───┤
+                --     ├───┼───┤
+                --     X   Y   Z
+                CaseM2Continuous n m z
           GT -> CaseM3 n y
         else case b `compare` x of
           LT -> CaseL1
           EQ -> CaseL2 n x y
           GT -> case b `compare` y of
             LT -> CaseL3 n x y
-            EQ -> CaseL4 n x
+            EQ ->
+              case IntMap.lookup b xs of
+                --     A       B
+                --     ├───────┤
+                --         ├───┤
+                --         X   Y
+                Nothing -> CaseL4 n x
+                Just (z, m) ->
+                  --     A       B
+                  --     ├───────┤
+                  --         ├───┼───┤
+                  --         X   Y   Z
+                  CaseL4Continuous n m x z
             GT -> CaseL5 n x y
   Just (x, (y, n)) -> case a `compare` y of
     LT -> case b `compare` y of
@@ -584,12 +621,24 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
   CaseL4 m x ->
     traceShow "L4" $
       --     A       B
-      --     ├───────┤
-      --         ├───┤
+      --     ├─────n─┤
+      --         ├─m─┤
       --         X   Y
       if n + m == 0
         then IntervalSet $ IntMap.delete x $ IntMap.insert start (x, n) xs
         else IntervalSet $ IntMap.insert x (end, n + m) $ IntMap.insert start (x, n) xs
+  CaseL4Continuous m o x z ->
+    traceShow "L4C" $
+      --     A       B
+      --     ├─────n─┤
+      --         ├─m─┼─o─┤
+      --         X   Y   Z
+      if n + m == 0
+        then IntervalSet $ IntMap.delete x $ IntMap.insert start (x, n) xs
+        else
+          if m + n == o
+            then IntervalSet $ IntMap.insert x (z, n + m) $ IntMap.delete end $ IntMap.insert start (x, n) xs
+            else IntervalSet $ IntMap.insert x (end, n + m) $ IntMap.insert start (x, n) xs
   CaseL5 m x y ->
     --     A           B
     --     ├───────────┤
@@ -607,14 +656,24 @@ insertPrim ignoreBefore (start, end) n (IntervalSet xs) = case caseAnalysis igno
       then IntervalSet $ IntMap.insert end (y, m) $ IntMap.delete start xs
       else IntervalSet $ IntMap.insert end (y, m) $ IntMap.insert start (end, m + n) xs
   CaseM2 m ->
-    traceShow "M2" $
-      --     A       B
-      --     ├───────┤
-      --     ├───────┤
-      --     X       Y
-      if n + m == 0
-        then IntervalSet $ IntMap.delete start xs
-        else IntervalSet $ IntMap.insert start (end, m + n) xs
+    --     A       B
+    --     ├───────┤
+    --     ├───────┤
+    --     X       Y
+    if n + m == 0
+      then IntervalSet $ IntMap.delete start xs
+      else IntervalSet $ IntMap.insert start (end, m + n) xs
+  CaseM2Continuous m o z ->
+    --     A   B
+    --     ├─n─┤
+    --     ├─m─┼─o─┤
+    --     X   Y   Z
+    if n + m == 0
+      then IntervalSet $ IntMap.delete start xs
+      else
+        if m + n == o
+          then IntervalSet $ IntMap.insert start (z, o) $ IntMap.delete end xs
+          else IntervalSet $ IntMap.insert start (end, m + n) xs
   CaseM3 m y ->
     traceShow "M3" $
       --     A       B
