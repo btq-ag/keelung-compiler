@@ -169,65 +169,95 @@ split (IntervalSet xs) pos =
 
 -- | O(n): Merge two interval maps
 merge :: (Num n, Eq n) => IntervalSet n -> IntervalSet n -> IntervalSet n
-merge (IntervalSet xs) (IntervalSet ys) = normalize $ IntervalSet $ IntMap.fromDistinctAscList $ mergeIntervalList (IntMap.toAscList xs) (IntMap.toAscList ys)
+merge (IntervalSet xs) (IntervalSet ys) = IntervalSet $ IntMap.fromDistinctAscList $ mergeIntervalList (IntMap.toAscList xs) (IntMap.toAscList ys)
 
 -- | O(n): Merge two interval lists
-mergeIntervalList :: (Num n) => [(Int, (Int, n))] -> [(Int, (Int, n))] -> [(Int, (Int, n))]
+mergeIntervalList :: (Num n, Eq n) => [(Int, (Int, n))] -> [(Int, (Int, n))] -> [(Int, (Int, n))]
 mergeIntervalList [] [] = []
 mergeIntervalList [] ys = ys
 mergeIntervalList xs [] = xs
 mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : yss) = case start1 `compare` start2 of
   LT -> case end1 `compare` end2 of
     LT ->
-      if end1 <= start2
-        then --
-        --  xs  ├───┤
-        --  ys          ├───┤
+      case end1 `compare` start2 of
+        LT ->
+          --  xs  ├───┤
+          --  ys          ├───┤
           (start1, (end1, count1)) : mergeIntervalList xss ((start2, (end2, count2)) : yss)
-        else --
-        --  xs  ├───┼───┤
-        --  ys      ├───┼───┤
-          (start1, (start2, count1)) : (start2, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
+        EQ ->
+          --  xs  ├───┤
+          --  ys      ├───┤
+          if count1 == count2
+            then mergeIntervalList ((start1, (end2, count1)) : xss) yss
+            else (start1, (end1, count1)) : mergeIntervalList xss ((start2, (end2, count2)) : yss)
+        GT ->
+          --  xs  ├───────┤
+          --  ys      ├───────┤
+          if count1 + count2 == 0
+            then (start1, (start2, count1)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
+            else (start1, (start2, count1)) : (start2, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
     EQ ->
-      --  xs  ├───┼───┤
+      --  xs  ├───────┤
       --  ys      ├───┤
-      (start1, (start2, count1)) : (start2, (end2, count1 + count2)) : mergeIntervalList xss yss
+      if count1 + count2 == 0
+        then (start1, (start2, count1)) : mergeIntervalList xss yss
+        else (start1, (start2, count1)) : (start2, (end2, count1 + count2)) : mergeIntervalList xss yss
     GT ->
-      --  xs  ├───┼───┼───┤
+      --  xs  ├───────────┤
       --  ys      ├───┤
-      (start1, (start2, count1)) : (start2, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
+      if count1 + count2 == 0
+        then (start1, (start2, count1)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
+        else (start1, (start2, count1)) : (start2, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
   EQ -> case end1 `compare` end2 of
     LT ->
       --  xs  ├───┤
-      --  ys  ├───┼───┤
-      (start1, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
+      --  ys  ├───────┤
+      if count1 + count2 == 0
+        then mergeIntervalList xss ((end1, (end2, count2)) : yss)
+        else (start1, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
     EQ ->
       --  xs  ├───────┤
       --  ys  ├───────┤
-      (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
+      if count1 + count2 == 0
+        then mergeIntervalList xss yss
+        else (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
     GT ->
-      --  xs  ├───┼───┤
+      --  xs  ├───────┤
       --  ys  ├───┤
-      (start2, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
+      if count1 + count2 == 0
+        then mergeIntervalList ((end2, (end1, count1)) : xss) yss
+        else (start2, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
   GT -> case end1 `compare` end2 of
     LT ->
       --  xs      ├───┤
-      --  ys  ├───┼───┼───┤
-      (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
+      --  ys  ├───────────┤
+      if count1 + count2 == 0
+        then (start2, (start1, count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
+        else (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
     EQ ->
       --  xs      ├───┤
-      --  ys  ├───┼───┤
-      (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
+      --  ys  ├───────┤
+      if count1 + count2 == 0
+        then (start2, (start1, count2)) : mergeIntervalList xss yss
+        else (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
     GT ->
-      if end2 <= start1
-        then --
-        --  xs          ├───┤
-        --  ys  ├───┤
+      case end2 `compare` start1 of
+        LT ->
+          --  xs          ├───┤
+          --  ys  ├───┤
           (start2, (end2, count2)) : mergeIntervalList ((start1, (end1, count1)) : xss) yss
-        else --
-        --  xs      ├───┼───┤
-        --  ys  ├───┼───┤
-          (start2, (start1, count2)) : (start1, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
+        EQ ->
+          --  xs      ├───┤
+          --  ys  ├───┤
+          if count1 == count2
+            then mergeIntervalList ((start2, (end1, count1)) : xss) yss
+            else (start2, (end2, count2)) : mergeIntervalList ((start1, (end1, count1)) : xss) yss
+        GT ->
+          --  xs      ├───────┤
+          --  ys  ├───────┤
+          if count1 + count2 == 0
+            then (start2, (start1, count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
+            else (start2, (start1, count2)) : (start1, (end2, count1 + count2)) : mergeIntervalList ((end2, (end1, count1)) : xss) yss
 
 -- | O(n): Normalizes an interval set by:
 --      1. concatenating adjacent intervals with the same count
@@ -428,13 +458,6 @@ data Case n
   | --
     --             A   B
     --             ├───┤
-
-    -- | -- A > X, A > Y, B > X, B > Y
-    --   --             A   B
-    --   --             ├───┤
-    --   --     ├───┤
-    --   --     X   Y
-    --   CaseR1
     CaseEmpty
   deriving (Show)
 
