@@ -40,30 +40,44 @@ tests = describe "Interval Sets" $ do
       testInsertion [Insert (10, 20) (-10), Insert (20, 30) 30, Insert (10, 20) 20, Insert (0, 10) 10]
 
   describe "merge" $ do
-    it "1" $ do
-      -- ([Insert (19,20) 56],[Insert (18,21) 7,Insert (19,21) (-56)])
-      --         ├─1─┤
-      --     ├─3─├─2─────┤
-      testMerging ([Insert (10, 20) 10], [Insert (0, 30) 30, Insert (10, 30) (-10)])
+    -- it "should result in a valid IntervalSet" $ do
+    --   property testMerging
 
-    -- -- it "should result in a valid IntervalSet" $ do
-    -- --   property testMerging
+    it "1" $ do
+      --  ys       ├ -10 ┤
+      --  xs ├  30 ┤  40 ┤  30 ┤
+      testMerging ([Insert (10, 20) (-10)], [Insert (10, 20) 10, Insert (0, 30) 30])
+
     -- it "LT LT LT" $ do
     --   --    ├───┤
     --   --             ├───┤
     --   testMerging ([Insert (0, 10) 10], [Insert (20, 30) 10])
-    -- it "LT LT EQ" $ do
+
+    -- it "LT LT EQ nil" $ do
     --   --    ├───┤
     --   --        ├───┤
     --   testMerging ([Insert (0, 10) 10], [Insert (10, 20) 10])
+
+    -- it "LT LT EQ adjc" $ do
+    --   --  xs  ├─3─┼─2────┤
+    --   --  ys      ├─1─┤
+    --   testMerging ([Insert (10, 30) 20, Insert (0, 10) 30], [Insert (10, 20) 10])
+
+    -- it "LT LT EQ disj" $ do
+    --   --  xs  ├─3─┤   ├───────┤
+    --   --  ys      ├─1─────┤
+    --   testMerging ([Insert (20, 40) 20, Insert (0, 10) 30], [Insert (10, 30) 30])
+
     -- it "LT LT GT" $ do
     --   --    ├───────┤
     --   --        ├────────┤
     --   testMerging ([Insert (0, 20) 10], [Insert (10, 30) (-10)])
+
     -- it "LT EQ" $ do
     --   --  xs  ├───────┤
     --   --  ys      ├───┤
     --   testMerging ([Insert (0, 20) 10], [Insert (10, 20) (-10)])
+
     -- it "LT GT" $ do
     --   --  xs  ├───────────┤
     --   --  ys      ├───┤
@@ -72,35 +86,141 @@ tests = describe "Interval Sets" $ do
     --   --  xs  ├───┤
     --   --  ys  ├───────┤
     --   testMerging ([Insert (0, 10) 10], [Insert (0, 20) (-10)])
-    -- it "EQ EQ" $ do
-    --   --  xs  ├───┤
-    --   --  ys  ├───┤
-    --   testMerging ([Insert (0, 10) 10], [Insert (0, 10) (-10)])
-    -- it "EQ GT" $ do
-    --   --  xs  ├───────┤
-    --   --  ys  ├───┤
-    --   testMerging ([Insert (0, 20) 10], [Insert (0, 10) (-10)])
-    -- it "GT LT" $ do
-    --   --  xs      ├───┤
-    --   --  ys  ├───────────┤
-    --   testMerging ([Insert (10, 20) 10], [Insert (0, 30) (-10)])
-    -- it "GT EQ" $ do
-    --   --  xs      ├───┤
-    --   --  ys  ├───────┤
-    --   testMerging ([Insert (10, 20) 10], [Insert (0, 20) (-10)])
-    -- it "GT GT LT" $ do
-    --   --  xs          ├───┤
-    --   --  ys  ├───┤
-    --   testMerging ([Insert (20, 30) 10], [Insert (0, 10) 10])
-    -- it "GT GT EQ" $ do
-    --   --  xs      ├───┤
-    --   --  ys  ├───┤
-    --   testMerging ([Insert (10, 20) 10], [Insert (0, 10) 10])
-    -- it "GT GT GT" $ do
-    --   --  xs      ├───────┤
-    --   --  ys  ├───────┤
-    --   testMerging ([Insert (10, 30) 10], [Insert (0, 20) (-10)])
 
+    it "EQ EQ nil nil" $ do
+      --  xs  ├───┤
+      --  ys  ├───┤
+      testMerging ([Insert (0, 10) 10], [Insert (0, 10) (-10)])
+
+    it "EQ EQ nil adjc" $ do
+      --  xs  ├───┤
+      --  ys  ├───┼───┤
+      testMerging ([Insert (0, 10) 10], [Insert (0, 10) 20, Insert (10, 20) 40])
+      testMerging ([Insert (0, 10) 10], [Insert (0, 10) (-10), Insert (10, 20) 30]) -- negating
+      testMerging ([Insert (0, 10) 10], [Insert (0, 10) 20, Insert (10, 20) 30]) -- merging
+    it "EQ EQ nil disj" $ do
+      --  xs  ├───┤
+      --  ys  ├───┤    ├───┤
+      testMerging ([Insert (0, 10) 10], [Insert (0, 10) 20, Insert (20, 30) 40])
+    -- testMerging ([Insert (0, 10) 10], [Insert (0, 10) (-10), Insert (20, 30) 40]) -- negating
+    it "EQ EQ adjc adjc" $ do
+      --  xs  ├───┼──..
+      --  ys  ├───┼──..
+      testMerging ([Insert (0, 10) 10, Insert (10, 20) 20], [Insert (0, 10) 40, Insert (10, 20) 80])
+      testMerging ([Insert (0, 10) 10, Insert (10, 20) 20], [Insert (0, 10) (-10), Insert (10, 20) 80]) -- negating
+      testMerging ([Insert (0, 10) 10, Insert (10, 20) 20], [Insert (0, 10) 40, Insert (10, 20) (-20)]) -- negating
+      testMerging ([Insert (0, 10) 10, Insert (10, 20) 20], [Insert (0, 10) 40, Insert (10, 20) 30]) -- merging
+    it "EQ EQ adjc disj" $ do
+      --  xs  ├───┼──..
+      --  ys  ├───┤   ├──..
+      testMerging ([Insert (0, 10) 10, Insert (10, 20) 20], [Insert (0, 10) 40, Insert (20, 30) 80])
+      testMerging ([Insert (0, 10) 10, Insert (10, 20) 20], [Insert (0, 10) (-10), Insert (20, 30) 80]) -- negating
+      testMerging ([Insert (0, 10) 10, Insert (10, 20) 20], [Insert (0, 10) 10, Insert (20, 30) 80]) -- merging
+    it "EQ EQ disj adjc" $ do
+      --  xs  ├───┤   ├──..
+      --  ys  ├───┼──..
+      testMerging ([Insert (0, 10) 10, Insert (20, 30) 20], [Insert (0, 10) 40, Insert (10, 20) 80])
+      testMerging ([Insert (0, 10) 10, Insert (20, 30) 20], [Insert (0, 10) (-10), Insert (10, 20) 80]) -- negating
+      testMerging ([Insert (0, 10) 10, Insert (20, 30) 20], [Insert (0, 10) 10, Insert (10, 20) 80]) -- merging
+    it "EQ EQ disj disj" $ do
+      --  xs  ├───┤   ├──..
+      --  ys  ├───┤   ├──..
+      testMerging ([Insert (0, 10) 10, Insert (20, 30) 20], [Insert (0, 10) 40, Insert (20, 30) 80])
+      testMerging ([Insert (0, 10) 10, Insert (20, 30) 20], [Insert (0, 10) (-10), Insert (20, 30) 80]) -- negating
+      testMerging ([Insert (0, 10) 10, Insert (20, 30) 20], [Insert (0, 10) 10, Insert (20, 30) (-20)]) -- negating
+
+-- it "EQ GT" $ do
+--   --  xs  ├───────┤
+--   --  ys  ├───┤
+--   testMerging ([Insert (0, 20) 10], [Insert (0, 10) (-10)])
+-- it "GT LT" $ do
+--   --  xs      ├───┤
+--   --  ys  ├───────────┤
+--   testMerging ([Insert (10, 20) 10], [Insert (0, 30) (-10)])
+-- it "GT EQ" $ do
+--   --  xs      ├───┤
+--   --  ys  ├───────┤
+--   testMerging ([Insert (10, 20) 10], [Insert (0, 20) (-10)])
+-- it "GT GT LT" $ do
+--   --  xs          ├───┤
+--   --  ys  ├───┤
+--   testMerging ([Insert (20, 30) 10], [Insert (0, 10) 10])
+--
+
+-- it "GT GT EQ nil" $ do
+--   --  xs      ├───┤
+--   --  ys  ├───┤
+--   testMerging ([Insert (10, 20) 10], [Insert (0, 10) 10])
+-- --
+-- it "GT GT EQ adjc LT negating" $ do
+--   --  xs      ├───┤
+--   --  ys  ├───┼───────┤
+--   testMerging ([Insert (10, 20) 10], [Insert (0, 10) 20, Insert (10, 30) (-10)])
+
+-- it "GT GT EQ adjc EQ negating" $ do
+--   --  xs      ├───┤
+--   --  ys  ├───┼───┤
+--   testMerging ([Insert (10, 20) 10], [Insert (0, 10) 20, Insert (10, 20) (-10)])
+
+-- it "GT GT EQ adjc GT negating" $ do
+--   --  xs      ├───────┤
+--   --  ys  ├───┼───┤
+--   testMerging ([Insert (10, 30) 10], [Insert (0, 10) 20, Insert (10, 20) (-10)])
+
+-- it "GT GT EQ adjc LT merging" $ do
+--   --  xs      ├───┤
+--   --  ys  ├───┼───────┤
+--   testMerging ([Insert (10, 20) 10], [Insert (0, 10) 20, Insert (10, 30) 10])
+
+-- it "GT GT EQ adjc EQ merging" $ do
+--   --  xs      ├───┤
+--   --  ys  ├───┼───┤
+--   testMerging ([Insert (10, 20) 10], [Insert (0, 10) 20, Insert (10, 20) 10])
+
+-- it "GT GT EQ adjc GT merging" $ do
+--   --  xs      ├───────┤
+--   --  ys  ├───┼───┤
+--   testMerging ([Insert (10, 30) 10], [Insert (0, 10) 20, Insert (10, 20) 10])
+
+-- it "GT GT EQ disj LT" $ do
+--   --  xs      ├───┤
+--   --  ys  ├───┤       ├───┤
+--   testMerging ([Insert (10, 20) 10], [Insert (0, 10) 20, Insert (30, 40) 40])
+
+-- it "GT GT EQ disj EQ" $ do
+--   --  xs      ├───┤
+--   --  ys  ├───┤   ├───┤
+--   testMerging ([Insert (10, 20) 10], [Insert (0, 10) 20, Insert (20, 30) 40])
+
+-- it "GT GT EQ disj GT" $ do
+--   --  xs      ├───────┤
+--   --  ys  ├───┤   ├───┤
+--   testMerging ([Insert (10, 30) 10], [Insert (0, 10) 20, Insert (20, 30) 40])
+
+-- it "GT GT GT nil" $ do
+--   --  xs      ├───────┤
+--   --  ys  ├───────┤
+--   testMerging ([Insert (10, 30) 10], [Insert (0, 20) (-10)])
+
+-- it "GT GT GT adjc negating LT" $ do
+--   --  xs      ├───────┤
+--   --  ys  ├───────┼───────┤
+--   testMerging ([Insert (10, 30) 10], [Insert (0, 20) (-10), Insert (20, 40) 10])
+
+-- it "GT GT GT adjc negating EQ" $ do
+--   --  xs      ├───────┤
+--   --  ys  ├───────┼───┤
+--   testMerging ([Insert (10, 30) 10], [Insert (0, 20) (-10), Insert (20, 30) 10])
+
+-- it "GT GT GT adjc negating GT" $ do
+--   --  xs      ├───────────┤
+--   --  ys  ├───────┼───┤
+--   testMerging ([Insert (10, 40) 10], [Insert (0, 20) (-10), Insert (20, 30) 10])
+
+-- it "GT GT GT disc" $ do
+--   --  xs      ├───────────┤
+--   --  ys  ├───────┤   ├───┤
+--   testMerging ([Insert (10, 40) 10], [Insert (0, 20) (-10), Insert (30, 40) 10])
 
 -- describe "singleton" $ do
 --   it "should result in a valid IntervalSet" $ do
@@ -169,10 +289,8 @@ testMerging :: ([Operation Int], [Operation Int]) -> IO ()
 testMerging (xs, ys) = do
   let x = foldr applyOperation IntervalSet.new xs
   let y = foldr applyOperation IntervalSet.new ys
-  print x 
-  print y
   let result = x <> y
-  IntervalSet.totalCount x + IntervalSet.totalCount y `shouldBe` IntervalSet.totalCount result
+  IntervalSet.totalCount result `shouldBe` IntervalSet.totalCount x + IntervalSet.totalCount y
   IntervalSet.validate result `shouldBe` Nothing
 
 --------------------------------------------------------------------------------

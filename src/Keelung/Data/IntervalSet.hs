@@ -3,6 +3,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use guards" #-}
+{-# HLINT ignore "Use list comprehension" #-}
 
 module Keelung.Data.IntervalSet
   ( -- * Construction
@@ -43,6 +44,7 @@ import GHC.Generics (Generic)
 import Keelung.Compiler.Util (showList')
 import Keelung.Data.IntervalTable (IntervalTable (IntervalTable))
 import Prelude hiding (lookup, null)
+import Prelude qualified
 
 -- | Key: start of an interval
 --   Value: (end of the interval, count of the interval)
@@ -184,12 +186,12 @@ mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : y
           --  xs  ├───┤
           --  ys          ├───┤
           (start1, (end1, count1)) : mergeIntervalList xss ((start2, (end2, count2)) : yss)
-        EQ ->
-          --  xs  ├───┤
-          --  ys      ├───┤
-          if count1 == count2
-            then mergeIntervalList ((start1, (end2, count1)) : xss) yss
-            else (start1, (end1, count1)) : mergeIntervalList xss ((start2, (end2, count2)) : yss)
+        EQ -> mergeIntervalList ((start2, (end2, count2)) : yss) ((start1, (end1, count1)) : xss) -- JUMP
+        --  xs  ├───┤
+        --  ys      ├───┤
+        -- if count1 == count2
+        --   then mergeIntervalList ((start1, (end2, count1)) : xss) yss
+        --   else (start1, (end1, count1)) : mergeIntervalList xss ((start2, (end2, count2)) : yss)
         GT ->
           --  xs  ├───────┤
           --  ys      ├───────┤
@@ -201,7 +203,7 @@ mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : y
       --  ys      ├───┤
       if count1 + count2 == 0
         then (start1, (start2, count1)) : mergeIntervalList xss yss
-        else (start1, (start2, count1)) : (start2, (end2, count1 + count2)) : mergeIntervalList xss yss
+        else (start1, (start2, count1)) : mergeIntervalList ((start2, (end2, count1)) : xss) ((start2, (end2, count2)) : yss)
     GT ->
       --  xs  ├───────────┤
       --  ys      ├───┤
@@ -216,11 +218,59 @@ mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : y
         then mergeIntervalList xss ((end1, (end2, count2)) : yss)
         else (start1, (end1, count1 + count2)) : mergeIntervalList xss ((end1, (end2, count2)) : yss)
     EQ ->
-      --  xs  ├───────┤
-      --  ys  ├───────┤
-      if count1 + count2 == 0
-        then mergeIntervalList xss yss
-        else (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
+      case (xss, yss) of
+        ([], []) ->
+          --  xs  ├───┤
+          --  ys  ├───┤
+          if count1 + count2 == 0
+            then []
+            else [(start1, (end1, count1 + count2))]
+        ([], (start4, (end4, count4)) : yss') ->
+          if end2 == start4
+            then --
+            --  xs  ├───┤
+            --  ys  ├───┼───┤
+
+              if count1 + count2 == 0
+                then (start4, (end4, count4)) : yss'
+                else
+                  if count1 + count2 == count4
+                    then (start1, (end4, count4)) : yss'
+                    else (start1, (end1, count1 + count2)) : yss
+            else --
+            --  xs  ├───┤
+            --  ys  ├───┤    ├───┤
+
+              if count1 + count2 == 0
+                then yss
+                else (start1, (end1, count1 + count2)) : yss
+        (_, []) -> mergeIntervalList ((start2, (end2, count2)) : yss) ((start1, (end1, count1)) : xss) -- JUMP
+        ((start3, (end3, count3)) : xss', (start4, (_, count4)) : _) -> case (end1 == start3, end2 == start4) of
+          (True, True) ->
+            --  xs  ├───┼──..
+            --  ys  ├───┼──..
+            if count1 + count2 == 0
+              then mergeIntervalList xss yss -- JUMP
+              else
+                if count1 + count2 == count3 + count4
+                  then mergeIntervalList xss ((start2, (end2, count1 + count2)) : yss) -- JUMP
+                  else (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
+          (True, False) ->
+            --  xs  ├───┼──..
+            --  ys  ├───┤   ├──..
+            if count1 + count2 == 0
+              then mergeIntervalList xss yss
+              else
+                if count1 + count2 == count3
+                  then mergeIntervalList ((start1, (end3, count3)) : xss') yss
+                  else (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
+          (False, True) -> mergeIntervalList ((start2, (end2, count2)) : yss) ((start1, (end1, count1)) : xss)
+          (False, False) ->
+            --  xs  ├───┤   ├──..
+            --  ys  ├───┤   ├──..
+            if count1 + count2 == 0
+              then mergeIntervalList xss yss
+              else (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
     GT ->
       --  xs  ├───────┤
       --  ys  ├───┤
@@ -239,19 +289,63 @@ mergeIntervalList ((start1, (end1, count1)) : xss) ((start2, (end2, count2)) : y
       --  ys  ├───────┤
       if count1 + count2 == 0
         then (start2, (start1, count2)) : mergeIntervalList xss yss
-        else (start2, (start1, count2)) : (start1, (end1, count1 + count2)) : mergeIntervalList xss yss
+        else (start2, (start1, count2)) : mergeIntervalList ((start1, (end1, count1)) : xss) ((start1, (end1, count2)) : yss)
     GT ->
       case end2 `compare` start1 of
         LT ->
           --  xs          ├───┤
           --  ys  ├───┤
           (start2, (end2, count2)) : mergeIntervalList ((start1, (end1, count1)) : xss) yss
-        EQ ->
-          --  xs      ├───┤
-          --  ys  ├───┤
-          if count1 == count2
-            then mergeIntervalList ((start2, (end1, count1)) : xss) yss
-            else (start2, (end2, count2)) : mergeIntervalList ((start1, (end1, count1)) : xss) yss
+        EQ -> case yss of
+          [] ->
+            --  xs      ├───┤
+            --  ys  ├───┤
+            if count1 == count2
+              then (start2, (end1, count1)) : xss
+              else (start2, (end2, count2)) : (start1, (end1, count1)) : xss
+          ((start3, (end3, count3)) : yss') ->
+            if start3 == end2
+              then case end1 `compare` end3 of
+                LT ->
+                  --  xs      ├───┤
+                  --  ys  ├───┼───────┤
+                  let rest = mergeIntervalList xss ((end1, (end3, count3)) : yss')
+                   in if count1 + count3 == 0
+                        then (start2, (start1, count2)) : rest
+                        else
+                          if count2 == count1 + count3
+                            then (start2, (end1, count2)) : rest
+                            else (start2, (start1, count2)) : (start1, (end1, count1 + count3)) : rest
+                EQ ->
+                  --  xs      ├───┤
+                  --  ys  ├───┼───┤
+                  if count1 + count3 == 0
+                    then (start2, (start1, count2)) : mergeIntervalList xss yss'
+                    else
+                      if count2 == count1 + count3
+                        then case (Prelude.null xss, Prelude.null yss') of
+                          (True, True) -> [(start2, (end1, count2))]
+                          (True, False) -> mergeIntervalList [(start2, (end1, count2))] yss'
+                          (False, True) -> mergeIntervalList xss [(start2, (end1, count2))]
+                          (False, False) -> mergeIntervalList xss ((start2, (end1, count2)) : yss')
+                        else (start2, (end2, count2)) : mergeIntervalList ((start1, (end1, count1)) : xss) yss
+                GT ->
+                  --  xs      ├───────┤
+                  --  ys  ├───┼───┤
+                  let rest = mergeIntervalList ((end3, (end1, count1)) : xss) yss'
+                   in if count1 + count3 == 0
+                        then (start2, (start1, count2)) : rest
+                        else
+                          if count2 == count1 + count3
+                            then (start2, (end3, count2)) : rest
+                            else (start2, (start1, count2)) : (start1, (end3, count1 + count3)) : rest
+              else --
+              --  xs      ├──────..
+              --  ys  ├───┤   ├──..
+
+                if count1 == count2
+                  then mergeIntervalList ((start2, (end1, count1)) : xss) ((start3, (end3, count3)) : yss')
+                  else (start2, (end2, count2)) : mergeIntervalList ((start1, (end1, count1)) : xss) ((start3, (end3, count3)) : yss')
         GT ->
           --  xs      ├───────┤
           --  ys  ├───────┤
