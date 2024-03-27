@@ -17,6 +17,7 @@ import Data.Serialize (Serialize, decode, encode)
 import Data.Vector (Vector)
 import Data.Vector qualified as Vector
 import Encode
+import Keelung.CircuitFormat
 import Keelung.Compiler
   ( Error (..),
     compileO0Elab,
@@ -29,13 +30,12 @@ import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.FieldInfo
 import Keelung.Field
-import Keelung.CircuitFormat
 import Keelung.Syntax.Counters
 import Keelung.Syntax.Encode.Syntax
 import Main.Utf8 (withUtf8)
 import Option
 
-convert :: Integral n => Either String (R1CS n) -> Either String (R1CS Integer)
+convert :: (Integral n) => Either String (R1CS n) -> Either String (R1CS Integer)
 convert (Left err) = Left err
 convert (Right cs) = Right (fmap toInteger cs)
 
@@ -85,16 +85,16 @@ main = withUtf8 $ do
       case decoded of
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
-          where 
+          where
             handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
             handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
     Protocol (GenCircuitBin filepath) -> do
-       blob <- getContents
-       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
-       case decoded of
-         Left err -> print err
-         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
-          where 
+      blob <- getContents
+      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
+      case decoded of
+        Left err -> print err
+        Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
+          where
             handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Snarkjs filepath (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
             handleBinary _ _ = error "Binary R1CS format doesn't support binary fields."
     Protocol (GenWitness filepath) -> do
@@ -120,7 +120,7 @@ main = withUtf8 $ do
             handleBinary _ _ = error "wtns format doesn't support binary fields."
     Version -> putStrLn $ "Keelung v" ++ versionString
   where
-    outputCircuit :: Serialize a => a -> IO ()
+    outputCircuit :: (Serialize a) => a -> IO ()
     outputCircuit = putStrLn . BSC.unpack . encode
 
     outputCircuitAndWriteFile :: (Serialize n, GaloisField n, Integral n) => Format -> FilePath -> Either String (R1CS n) -> IO ()
@@ -141,7 +141,7 @@ main = withUtf8 $ do
         Right (counters, _, witness) -> do
           outputInterpretedResult (fmap (\(_, outputs, _) -> outputs) result)
           case format of
-            Aurora  -> BS.writeFile filepath (serializeInputAndWitness counters witness)
+            Aurora -> BS.writeFile filepath (serializeInputAndWitness counters witness)
             Snarkjs -> BS.writeFile filepath (serializeInputAndWitnessToBin p witness)
 
 run :: (GaloisField n, Integral n) => ExceptT (Error n) IO () -> IO ()

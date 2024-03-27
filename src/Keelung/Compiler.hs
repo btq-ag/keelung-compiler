@@ -13,27 +13,33 @@ module Keelung.Compiler
     numberOfConstraints,
     Internal (..),
     module Keelung.Compiler.R1CS,
-    --
-    convertToInternal,
-    elaborateAndEncode,
+    -- interpret
     interpret,
+    interpretElab,
+    -- generate witness
     generateWitness,
-    -- results in ConstraintModule
+    generateWitnessElab,
+    -- compile
     compileWithOpts,
+    compileElabWithOpts,
     compileO0,
+    compileO0Elab,
     compileO1,
-    -- results in ConstraintSystem
+    compileO1Elab,
+    -- compile and link
     compileAndLinkWithOpts,
     compileAndLink,
     compileAndLinkO0,
     compileAndLinkO1,
-    -- takes elaborated programs as input
-    compileElabWithOpts,
-    compileO0Elab,
-    compileO1Elab,
-    interpretElab,
-    generateWitnessElab,
-    --
+    -- solve R1CS and return output
+    solveOutputWithOpts,
+    solveOutput,
+    solveOutputO0,
+    -- solve R1CS and return output with logs
+    solveOutputAndCollectLogWithOpts,
+    -- helper functions
+    convertToInternal,
+    elaborateAndEncode,
     asGF181N,
     asGF181,
   )
@@ -42,6 +48,7 @@ where
 import Control.Arrow (left)
 import Control.Monad ((>=>))
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.Semiring (Semiring (one, zero))
 import Data.Vector (Vector)
 import Keelung (Encode, N (..))
@@ -136,9 +143,37 @@ compileAndLink ::
   Either (Error n) (ConstraintSystem n)
 compileAndLink = compileAndLinkO1
 
+-- | R1CS witness solver
+solveOutputWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveOutputWithOpts options prog rawPublicInputs rawPrivateInputs = do
+  r1cs <- toR1CS <$> compileAndLinkWithOpts options prog
+  inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+  case Solver.run options r1cs inputs of
+    Left err -> Left (SolverError err)
+    Right (outputs, _) -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
+
+solveOutput :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveOutput fieldInfo = solveOutputWithOpts (defaultOptions {optFieldInfo = fieldInfo})
+
+-- | R1CS witness solver (on unoptimized R1CS)
+solveOutputO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveOutputO0 fieldInfo = solveOutputWithOpts (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False})
+
+-- | Generate R1CS witness solver report (on optimized R1CS)
+solveOutputAndCollectLogWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
+solveOutputAndCollectLogWithOpts options prog rawPublicInputs rawPrivateInputs = case do
+  r1cs <- toR1CS <$> compileAndLinkWithOpts options prog
+  inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+  return (r1cs, inputs) of
+  Left err -> (Just err, Nothing)
+  Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
+    (Left err, logs) -> (Just (SolverError err), logs)
+    (Right _, logs) -> (Nothing, logs)
+
 --------------------------------------------------------------------------------
 -- Top-level functions that accepts elaborated programs
 
+-- | Interpret an elaborated program with given inputs
 interpretElab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 interpretElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   let counters = Encoded.compCounters (Encoded.elabComp elab)
