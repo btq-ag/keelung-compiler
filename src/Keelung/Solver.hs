@@ -9,6 +9,7 @@ module Keelung.Solver
   )
 where
 
+import Control.Monad qualified as Monad
 import Control.Monad.Except
 import Control.Monad.RWS
 import Data.Bits qualified
@@ -61,42 +62,44 @@ run' debugMode _options r1cs inputs = do
 --   1. ordinary constraints
 --   2. Boolean input variable constraints
 --   3. binary representation constraints
---   4. CNEQ constraints
+--   4. constraints from all hints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Either (Error n) (Seq (Constraint n))
 fromOrdinaryConstraints (R1CS _ ordinaryConstraints counters eqZeros divMods clDivMods modInvs) = do
-  constraints <- concat <$> mapM differentiate ordinaryConstraints
+  differentiated <- mapM differentiate ordinaryConstraints
+  let constraints = Monad.join differentiated
   return $
-    Seq.fromList constraints
-      <> Seq.fromList (map BooleanConstraint booleanInputVarConstraints)
-      <> Seq.fromList (map EqZeroConstraint eqZeros)
-      <> Seq.fromList (map DivModConstaint divMods)
-      <> Seq.fromList (map CLDivModConstaint clDivMods)
-      <> Seq.fromList (map ModInvConstraint modInvs)
+    constraints
+      <> fmap BooleanConstraint booleanInputVarConstraints
+      <> fmap EqZeroConstraint eqZeros
+      <> fmap DivModConstaint divMods
+      <> fmap CLDivModConstaint clDivMods
+      <> fmap ModInvConstraint modInvs
   where
+    booleanInputVarConstraints :: Seq Int
     booleanInputVarConstraints =
-      let generateRange (start, end) = [start .. end - 1]
-       in concatMap generateRange (IntMap.toList (getBooleanConstraintRanges counters))
+      let generateRange (start, size) = Seq.fromList [start .. start + size - 1]
+       in Seq.fromList (IntMap.toList (getBooleanConstraintRanges counters)) >>= generateRange
 
-    differentiate :: (GaloisField n, Integral n) => R1C n -> Either (Error n) [Constraint n]
-    differentiate (R1C (Left a) (Left b) (Left c)) = if a * b == c then Right [] else Left (ConflictingValues "multplicative R1C with all constants")
-    differentiate (R1C (Left a) (Left b) (Right c)) = Right [AddConstraint $ Poly.addConstant (-a * b) c]
+    differentiate :: (GaloisField n, Integral n) => R1C n -> Either (Error n) (Seq (Constraint n))
+    differentiate (R1C (Left a) (Left b) (Left c)) = if a * b == c then Right mempty else Left (ConflictingValues "multplicative R1C with all constants")
+    differentiate (R1C (Left a) (Left b) (Right c)) = Right (Seq.fromList [AddConstraint $ Poly.addConstant (-a * b) c])
     differentiate (R1C (Left a) (Right b) (Left c)) = case Poly.multiplyBy a b of
       Left constant ->
         if constant == c
-          then Right []
+          then Right mempty
           else Left (ConflictingValues "multplicative R1C with constant on the left")
-      Right poly -> Right [AddConstraint $ Poly.addConstant (-c) poly]
+      Right poly -> Right (Seq.fromList [AddConstraint $ Poly.addConstant (-c) poly])
     differentiate (R1C (Left a) (Right b) (Right c)) = case Poly.multiplyBy (-a) b of
-      Left constant -> Right [AddConstraint $ Poly.addConstant constant c]
+      Left constant -> Right (Seq.fromList [AddConstraint $ Poly.addConstant constant c])
       Right poly -> case Poly.merge poly c of
         Left constant ->
           if constant == 0
-            then Right []
+            then Right mempty
             else Left (ConflictingValues "multplicative R1C with constant on the right")
-        Right poly' -> Right [AddConstraint poly']
+        Right poly' -> Right (Seq.fromList [AddConstraint poly'])
     differentiate (R1C (Right a) (Left b) (Left c)) = differentiate (R1C (Left b) (Right a) (Left c))
     differentiate (R1C (Right a) (Left b) (Right c)) = differentiate (R1C (Left b) (Right a) (Right c))
-    differentiate (R1C (Right a) (Right b) c) = Right [MulConstraint a b c]
+    differentiate (R1C (Right a) (Right b) c) = Right (Seq.fromList [MulConstraint a b c])
 
 goThroughManyTimes :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n ()
 goThroughManyTimes constraints = do

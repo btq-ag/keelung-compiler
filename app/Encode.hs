@@ -13,7 +13,7 @@ import Data.Binary qualified as B
 import Data.ByteString.Builder
 import Data.ByteString.Lazy (ByteString)
 import Data.ByteString.Lazy qualified as BS
-import Data.Foldable (Foldable (toList))
+import Data.Foldable (toList)
 import Data.Int (Int64)
 import Data.IntMap qualified as IntMap
 import Data.List (intercalate)
@@ -95,7 +95,7 @@ serializeR1CS Aurora r1cs =
       header : toAurora r1cConstraints
   where
     -- the constraints are reindexed and all field numbers are converted to Integer
-    r1cConstraints = map (fmap toInteger . reindexR1C r1cs) (toR1Cs r1cs)
+    r1cConstraints = map (fmap toInteger . reindexR1C r1cs) (toList (toR1Cs r1cs))
 
     counters = r1csCounters r1cs
 
@@ -134,7 +134,7 @@ serializeR1CS Snarkjs r1cs =
                     nPubIn = getCount counters PublicInput,
                     nPrvIn = getCount counters PrivateInput,
                     nLabels = getTotalCount counters,
-                    mConstraints = length $ r1csConstraints r1cs
+                    mConstraints = length $ toR1Cs r1cs
                   }
               (primeLen, header) = encodeHeader binHeader
               constraints = toSnarkjsBin r1cConstraints p primeLen
@@ -150,7 +150,7 @@ serializeR1CS Snarkjs r1cs =
                 <> secLength labels
                 <> labels
   where
-    r1cConstraints = map (fmap toInteger) (toR1Cs r1cs)
+    r1cConstraints = map (fmap toInteger) (toList (toR1Cs r1cs))
     secLength = toLazyByteString . word64LE . fromIntegral . BS.length
 
     -- "r1cs, version 1, 3 sections"
