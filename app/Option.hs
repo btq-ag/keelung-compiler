@@ -35,6 +35,7 @@ data ProtocolOptions
   | CompileO1
   | CompileO2
   | Interpret
+  | SolveOutput
   | GenCircuit String
   | GenWitness String
   | GenWtns String
@@ -49,7 +50,7 @@ protocol =
         ( info
             (pure CompileO0 <**> helper)
             ( fullDesc
-                <> progDesc "Compile a Keelung program to R1CS (-O0)"
+                <> progDesc "Compiles a Keelung program to R1CS (-O0)"
             )
         )
         <> command
@@ -57,7 +58,7 @@ protocol =
           ( info
               (pure CompileO1 <**> helper)
               ( fullDesc
-                  <> progDesc "Compile a Keelung program to R1CS (-O1)"
+                  <> progDesc "Compiles a Keelung program to R1CS (-O1)"
               )
           )
         <> command
@@ -65,7 +66,7 @@ protocol =
           ( info
               (pure CompileO2 <**> helper)
               ( fullDesc
-                  <> progDesc "Compile a Keelung program to R1CS (-O2)"
+                  <> progDesc "Compiles a Keelung program to R1CS (-O2)"
               )
           )
         <> command
@@ -73,7 +74,15 @@ protocol =
           ( info
               (pure Interpret <**> helper)
               ( fullDesc
-                  <> progDesc "Interpret a Keelung program with given inputs"
+                  <> progDesc "Interprets a Keelung program with given inputs"
+              )
+          )
+        <> command
+          "solveOutput"
+          ( info
+              (pure SolveOutput <**> helper)
+              ( fullDesc
+                  <> progDesc "Solves the R1CS of a Keelung program with given inputs and outputs the result"
               )
           )
         <> command
@@ -81,7 +90,7 @@ protocol =
           ( info
               (GenCircuit <$> pathArg "circuit.jsonl" <**> helper)
               ( fullDesc
-                  <> progDesc "Compile (-O1) a Keelung program to R1CS and output it as \"circuit.jsonl\""
+                  <> progDesc "Compiles (-O1) a Keelung program to R1CS and outputs it as \"circuit.jsonl\""
               )
           )
         <> command
@@ -89,7 +98,7 @@ protocol =
           ( info
               (GenCircuit <$> pathArg "circuit.jsonl" <**> helper)
               ( fullDesc
-                  <> progDesc "Compile (-O1) a Keelung program to R1CS and output it as \"circuit.jsonl\""
+                  <> progDesc "Compiles (-O1) a Keelung program to R1CS and outputs it as \"circuit.jsonl\""
               )
           )
         <> command
@@ -97,7 +106,7 @@ protocol =
           ( info
               (GenCircuitBin <$> pathArg "circuit.r1cs" <**> helper)
               ( fullDesc
-                  <> progDesc "Compile (-O1) a Keelung program to R1CS binary (for Snarkjs and such) and output it as \"circuit.r1cs\""
+                  <> progDesc "Compiles (-O1) a Keelung program to R1CS binary (for Snarkjs and such) and outputs it as \"circuit.r1cs\""
               )
           )
         <> command
@@ -105,7 +114,7 @@ protocol =
           ( info
               (GenWitness <$> pathArg "witness.jsonl" <**> helper)
               ( fullDesc
-                  <> progDesc "Interpret (-O1) a Keelung program with inputs and output the witnesses it as \"witness.jsonl\""
+                  <> progDesc "Interprets (-O1) a Keelung program with inputs and outputs the witnesses it as \"witness.jsonl\""
               )
           )
         <> command
@@ -113,11 +122,12 @@ protocol =
           ( info
               (GenWtns <$> pathArg "witness.wtns" <**> helper)
               ( fullDesc
-                  <> progDesc "Interpret (-O1) a Keelung program with inputs and output the witnesses it as Snarkjs' binary format \"witness.wtns\""
+                  <> progDesc "Interprets (-O1) a Keelung program with inputs and outputs the witnesses it as Snarkjs' binary format \"witness.wtns\""
               )
           )
     )
 
 pathArg :: String -> Parser String
-pathArg defaultPath = strOption
-  (long "filepath" <> value defaultPath <> metavar "FILEPATH" <> help "File path to store the circuit or witness")
+pathArg defaultPath =
+  strOption
+    (long "filepath" <> value defaultPath <> metavar "FILEPATH" <> help "File path to store the circuit or witness")

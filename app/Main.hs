@@ -11,7 +11,7 @@ import Data.ByteString.Lazy qualified as BS
 import Data.Data (Proxy (..))
 -- import Data.Field.Galois (Binary, GaloisField (order), Prime)
 
-import Data.Field.Galois (Binary, GaloisField, Prime)
+import Data.Field.Galois (Binary, Prime)
 import Data.Foldable (toList)
 import Data.Serialize (Serialize, decode, encode)
 import Data.Vector (Vector)
@@ -19,14 +19,8 @@ import Data.Vector qualified as Vector
 import Encode
 import Keelung.CircuitFormat
 import Keelung.Compiler
-  ( Error (..),
-    compileO0Elab,
-    compileO1Elab,
-    generateWitnessElab,
-    interpretElab,
-    toR1CS,
-  )
 import Keelung.Compiler.Linker qualified as Linker
+import Keelung.Compiler.Options (Options (optFieldInfo), defaultOptions)
 import Keelung.Constraint.R1CS (R1CS)
 import Keelung.Data.FieldInfo
 import Keelung.Field
@@ -79,6 +73,15 @@ main = withUtf8 $ do
           where
             handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretElab fieldInfo elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer]))
             handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretElab fieldInfo elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer]))
+    Protocol SolveOutput -> do
+      blob <- getContents
+      let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
+      case decoded of
+        Left err -> print err
+        Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> caseFieldType fieldType handlePrime handleBinary
+          where
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (solveOutputElabWithOpts (defaultOptions {optFieldInfo = fieldInfo}) elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer]))
+            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (solveOutputElabWithOpts (defaultOptions {optFieldInfo = fieldInfo}) elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer]))
     Protocol (GenCircuit filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)

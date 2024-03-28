@@ -32,6 +32,7 @@ module Keelung.Compiler
     compileAndLinkO0,
     compileAndLinkO1,
     -- solve R1CS and return output
+    solveOutputElabWithOpts,
     solveOutputWithOpts,
     solveOutput,
     solveOutputO0,
@@ -144,13 +145,18 @@ compileAndLink ::
 compileAndLink = compileAndLinkO1
 
 -- | R1CS witness solver
-solveOutputWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-solveOutputWithOpts options prog rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS <$> compileAndLinkWithOpts options prog
+solveOutputElabWithOpts :: (GaloisField n, Integral n) => Options -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveOutputElabWithOpts options elab rawPublicInputs rawPrivateInputs = do
+  r1cs <- toR1CS . Linker.linkConstraintModule <$> compileElabWithOpts options elab
   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case Solver.run options r1cs inputs of
     Left err -> Left (SolverError err)
     Right (outputs, _) -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
+
+solveOutputWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveOutputWithOpts options prog rawPublicInputs rawPrivateInputs = do
+  elab <- elaborateAndEncode prog
+  solveOutputElabWithOpts options elab rawPublicInputs rawPrivateInputs
 
 solveOutput :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 solveOutput fieldInfo = solveOutputWithOpts (defaultOptions {optFieldInfo = fieldInfo})
