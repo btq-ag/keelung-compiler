@@ -53,7 +53,6 @@ runM options compilers counters program =
             mempty
             mempty
             mempty
-            mempty
         )
     )
 
@@ -271,19 +270,6 @@ writeSliceEq x y =
 
 --------------------------------------------------------------------------------
 
--- | TODO: examine whether we should modify the occurrences of EqZero hints
-addEqZeroHint :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> RefF -> M n ()
-addEqZeroHint c xs m = case PolyL.fromRefs c xs of
-  Left 0 -> writeRefFVal m 0
-  Left constant -> writeRefFVal m (recip constant)
-  Right poly -> modify' $ \cs -> cs {cmEqZeros = (poly, m) Seq.<| cmEqZeros cs}
-
--- | TODO: examine whether we should modify the occurrences of EqZero hints
-addEqZeroHintWithPoly :: (GaloisField n, Integral n) => Either n (PolyL n) -> RefF -> M n ()
-addEqZeroHintWithPoly (Left 0) m = writeRefFVal m 0
-addEqZeroHintWithPoly (Left constant) m = writeRefFVal m (recip constant)
-addEqZeroHintWithPoly (Right poly) m = modify' $ \cs -> cs {cmEqZeros = (poly, m) Seq.<| cmEqZeros cs}
-
 addDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
 addDivModHint x y q r = modify' $ \cs ->
   addOccurrences (Set.fromList [Hint x, Hint y, Hint q, Hint r]) $
@@ -336,7 +322,6 @@ eqZero isEq (Polynomial polynomial) = do
         (Constant 1 <> neg (1 @ B out))
         (Constant 0)
   --  keep track of the relation between (x - y) and m
-  addEqZeroHintWithPoly (Right polynomial) m
   return (Left out)
 
 --------------------------------------------------------------------------------

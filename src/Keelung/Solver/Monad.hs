@@ -84,7 +84,6 @@ data Constraint n
   = MulConstraint (Poly n) (Poly n) (Either n (Poly n))
   | AddConstraint (Poly n)
   | BooleanConstraint Var
-  | EqZeroConstraint (Poly n, Var)
   | -- | Dividend, Divisor, Quotient, Remainder
     DivModConstaint (Limbs, Limbs, Limbs, Limbs)
   | CLDivModConstaint (Limbs, Limbs, Limbs, Limbs)
@@ -98,7 +97,6 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
   show (MulConstraint a b (Right c)) = "(Mul)       (" <> show a <> ") * (" <> show b <> ") = (" <> show c <> ")"
   show (AddConstraint a) = "(Add)       " <> show a
   show (BooleanConstraint var) = "(Boolean)   $" <> show var <> " = $" <> show var <> " * $" <> show var
-  show (EqZeroConstraint eqZero) = "(EqZero)     " <> show eqZero
   show (DivModConstaint (dividend, divisor, quotient, remainder)) =
     "(DivMod)    $"
       <> show dividend
@@ -125,7 +123,6 @@ instance Functor Constraint where
   fmap f (MulConstraint a b (Right c)) = MulConstraint (fmap f a) (fmap f b) (Right (fmap f c))
   fmap f (AddConstraint a) = AddConstraint (fmap f a)
   fmap _ (BooleanConstraint var) = BooleanConstraint var
-  fmap f (EqZeroConstraint (xs, m)) = EqZeroConstraint (fmap f xs, m)
   fmap _ (DivModConstaint (a, b, q, r)) = DivModConstaint (a, b, q, r)
   fmap _ (CLDivModConstaint (a, b, q, r)) = CLDivModConstaint (a, b, q, r)
   fmap _ (ModInvConstraint (a, output, n, p)) = ModInvConstraint (a, output, n, p)

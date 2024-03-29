@@ -13,7 +13,7 @@ module Keelung.Compiler.Linker
   )
 where
 
-import Data.Bifunctor (Bifunctor (bimap, first))
+import Data.Bifunctor (Bifunctor (first))
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
@@ -55,7 +55,6 @@ linkConstraintModule cm =
     { csOptions = cmOptions cm,
       csCounters = envCounters env,
       csConstraints = constraints >>= linkConstraint env,
-      csEqZeros = eqZeros,
       csDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
       csCLDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) clDivMods,
       csModInvs = fmap (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
@@ -66,7 +65,6 @@ linkConstraintModule cm =
     constraints = toConstraints cm env
 
     -- constraints extracted from hints
-    eqZeros = bimap (linkPolyLUnsafe env) (reindexRefF env) <$> cmEqZeros cm
     divMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmDivMods cm
     clDivMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmCLDivMods cm
     modInvs = (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, toInteger p)) <$> cmModInvs cm

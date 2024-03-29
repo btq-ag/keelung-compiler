@@ -92,7 +92,6 @@ data ConstraintSystem n = ConstraintSystem
     -- | Constraints
     csConstraints :: !(Seq (Constraint n)),
     csCounters :: Counters,
-    csEqZeros :: Seq (Poly n, Var),
     csDivMods :: Seq (Limbs, Limbs, Limbs, Limbs),
     csCLDivMods :: Seq (Limbs, Limbs, Limbs, Limbs),
     csModInvs :: Seq (Limbs, Limbs, Limbs, Integer)
@@ -101,11 +100,11 @@ data ConstraintSystem n = ConstraintSystem
 
 -- | return the number of constraints (including constraints of boolean input vars)
 numberOfConstraints :: ConstraintSystem n -> Int
-numberOfConstraints (ConstraintSystem _ cs counters _eqs _divMods _clDivMods _modInvs) =
+numberOfConstraints (ConstraintSystem _ cs counters _divMods _clDivMods _modInvs) =
   length cs + getBooleanConstraintCount counters
 
 instance (GaloisField n, Integral n) => Show (ConstraintSystem n) where
-  show (ConstraintSystem _ constraints counters _eqs _divMods _clDivMods _modInvs) =
+  show (ConstraintSystem _ constraints counters _divMods _clDivMods _modInvs) =
     "ConstraintSystem {\n"
       <> prettyConstraints counters (toList constraints)
       <> prettyVariables counters

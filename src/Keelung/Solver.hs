@@ -64,13 +64,12 @@ run' debugMode _options r1cs inputs = do
 --   3. binary representation constraints
 --   4. constraints from all hints
 fromOrdinaryConstraints :: (GaloisField n, Integral n) => R1CS n -> Either (Error n) (Seq (Constraint n))
-fromOrdinaryConstraints (R1CS _ ordinaryConstraints counters eqZeros divMods clDivMods modInvs) = do
+fromOrdinaryConstraints (R1CS _ ordinaryConstraints counters _ divMods clDivMods modInvs) = do
   differentiated <- mapM differentiate ordinaryConstraints
   let constraints = Monad.join differentiated
   return $
     constraints
       <> fmap BooleanConstraint booleanInputVarConstraints
-      <> fmap EqZeroConstraint eqZeros
       <> fmap DivModConstaint divMods
       <> fmap CLDivModConstaint clDivMods
       <> fmap ModInvConstraint modInvs
@@ -155,7 +154,6 @@ shrink (AddConstraint as) = do
   as' <- shrinkAdd as >>= shrinkBinRep
   return $ fmap Seq.singleton as'
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
-shrink (EqZeroConstraint eqZero) = fmap (pure . EqZeroConstraint) <$> shrinkEqZero eqZero
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod False divModTuple
 shrink (CLDivModConstaint divModTuple) = fmap (pure . CLDivModConstaint) <$> shrinkDivMod True divModTuple
 shrink (ModInvConstraint modInvHint) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInvHint
@@ -425,24 +423,3 @@ shrinkModInv (aLimbs, outLimbs, nLimbs, p) = do
           return Eliminated
         Nothing -> throwError $ ModInvError aLimbs p
     Nothing -> return $ Stuck (aLimbs, outLimbs, nLimbs, p)
-
--- if (x - y) = 0 then m = 0 else m = recip (x - y)
-shrinkEqZero :: (GaloisField n, Integral n) => (Poly n, Var) -> M n (Result (Poly n, Var))
-shrinkEqZero eqZero@(xs, m) = do
-  bindings <- get
-  case substAndView bindings xs of
-    Constant 0 -> do
-      bindVar "=0 0" m 0
-      return Eliminated
-    Constant c -> do
-      bindVar "=0 recip c" m (recip c)
-      return Eliminated
-    Uninomial changed xs' _ _ ->
-      -- only consider the polynomial shrinked if it's size has been reduced
-      if changed
-        then return $ Shrinked (xs', m)
-        else return $ Stuck eqZero
-    Polynomial changed xs' ->
-      if changed
-        then return $ Shrinked (xs', m)
-        else return $ Stuck eqZero

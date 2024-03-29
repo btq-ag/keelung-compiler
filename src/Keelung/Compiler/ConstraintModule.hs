@@ -59,8 +59,6 @@ data ConstraintModule n = ConstraintModule
     cmAddL :: Seq (PolyL n),
     -- multiplicative constraints
     cmMulL :: Seq (PolyL n, PolyL n, Either n (PolyL n)),
-    -- hits for computing equality
-    cmEqZeros :: Seq (PolyL n, RefF),
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     cmDivMods :: Seq (Either RefU U, Either RefU U, Either RefU U, Either RefU U),
@@ -79,7 +77,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showRelations
       <> showAddL
       <> showMulL
-      <> showEqs
       <> showDivModHints
       <> showCLDivModHints
       <> showModInvHints
@@ -121,9 +118,6 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
 
       showAddL = adapt "AddL" (cmAddL cm) $ \xs -> "0 = " <> show xs
       showMulL = adapt "MulL" (cmMulL cm) showMulL'
-
-      showEqs = adapt "EqZeros" (cmEqZeros cm) $ \(poly, m) ->
-        "EqZeros " <> show poly <> " / " <> show m
 
       showMulL' (aV, bV, cV) = showVecWithParen aV ++ " * " ++ showVecWithParen bV ++ " = " ++ showVec cV
         where
@@ -182,7 +176,6 @@ sizeOfConstraintModule cm =
   Relations.size (cmRelations cm)
     + length (cmAddL cm)
     + length (cmMulL cm)
-    + length (cmEqZeros cm)
     + length (cmDivMods cm)
     + length (cmModInvs cm)
 

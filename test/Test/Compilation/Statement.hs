@@ -3,12 +3,12 @@
 
 module Test.Compilation.Statement where
 
+import Control.Monad
 import Data.Bits qualified
 import Keelung
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck
-import Control.Monad
 
 run :: IO ()
 run = hspec tests
@@ -91,12 +91,6 @@ tests = describe "Statement" $ do
             fromBools [x !!! 0, x !!! 1] :: Comp (UInt 2)
       property $ \(x :: Word) -> do
         let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
-            expected = foldr set (0 :: Word) $ [ (i, Data.Bits.testBit x i) | i <- [0 .. 1] ]
+            expected = foldr set (0 :: Word) $ [(i, Data.Bits.testBit x i) | i <- [0 .. 1]]
         forM_ [gf181, Prime 5, Binary 7] $ \field -> do
           testCompiler field program [fromIntegral (x `mod` 4)] [] [fromIntegral expected]
-
-      -- let x = 2 :: Word
-      -- let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
-      --     expected = foldr set (0 :: Word) $ [ (i, Data.Bits.testBit x i) | i <- [0 .. 1] ]
-      -- debug (Prime 17) program
-      -- -- testCompiler (Prime 17) program [fromIntegral x] [] [fromIntegral expected]

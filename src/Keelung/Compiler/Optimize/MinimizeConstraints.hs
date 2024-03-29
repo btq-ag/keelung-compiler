@@ -4,10 +4,8 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as Map
-import Data.Maybe (mapMaybe)
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Set (Set)
@@ -43,7 +41,7 @@ import Keelung.Data.U (U)
 run :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (ConstraintModule n)
 run cm = do
   cm' <- runStateMachine cm ShouldRunAddL
-  return $ (goThroughEqZeros . goThroughModInvs) cm'
+  return $ goThroughModInvs cm'
 
 -- | Next optimization pass to run
 data Action
@@ -110,17 +108,6 @@ optimizeCLDivMod :: (GaloisField n, Integral n) => ConstraintModule n -> Either 
 optimizeCLDivMod cm = runOptiM cm $ runRoundM $ do
   result <- foldMaybeM reduceDivMod mempty (cmCLDivMods cm)
   modify' $ \cm' -> cm' {cmCLDivMods = result}
-
-goThroughEqZeros :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
-goThroughEqZeros cm =
-  let relations = cmRelations cm
-   in cm {cmEqZeros = Seq.fromList $ mapMaybe (reduceEqZeros relations) (toList $ cmEqZeros cm)}
-  where
-    reduceEqZeros :: (GaloisField n, Integral n) => Relations n -> (PolyL n, RefF) -> Maybe (PolyL n, RefF)
-    reduceEqZeros relations (polynomial, m) = case substPolyL relations polynomial of
-      Nothing -> Just (polynomial, m) -- nothing changed
-      Just (Left _constant, _) -> Nothing
-      Just (Right reducePolynomial, _) -> Just (reducePolynomial, m)
 
 goThroughModInvs :: (GaloisField n, Integral n) => ConstraintModule n -> ConstraintModule n
 goThroughModInvs cm =
