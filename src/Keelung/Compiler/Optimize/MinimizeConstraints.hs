@@ -24,8 +24,8 @@ import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (SliceLookup (..))
-import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
+import qualified Keelung.Data.Segment as Segment
 
 -- | Order of optimization, if any of the former optimization pass changed the constraint system,
 -- the later optimization pass will be run again at that level
@@ -258,10 +258,10 @@ reduceDivMod (a, b, q, r) = do
     lookupRefU relations (Left var) =
       let SliceLookup _ segments = SliceRelations.lookup (Slice.fromRefU var) relations
        in case IntMap.elems segments of
-            [SliceLookup.ChildOf root] -> Left (Slice.sliceRefU root)
-            [SliceLookup.Constant value] -> Right value
-            [SliceLookup.Parent _ _] -> Left var
-            [SliceLookup.Empty _] -> Left var
+            [Segment.ChildOf root] -> Left (Slice.sliceRefU root)
+            [Segment.Constant value] -> Right value
+            [Segment.Parent _ _] -> Left var
+            [Segment.Empty _] -> Left var
             _ -> Left var
 
 ------------------------------------------------------------------------------
@@ -500,7 +500,7 @@ substSlice ::
 substSlice relations initState (sliceWhole, multiplier) =
   let SliceLookup _ segments = SliceRelations.lookup sliceWhole relations
       tagWithSlice = map (\(index, segment) -> (Slice.Slice (Slice.sliceRefU sliceWhole) index (index + widthOf segment), segment))
-      removeNullSegment = filter (not . SliceLookup.nullSegment . snd)
+      removeNullSegment = filter (not . Segment.null . snd)
       segmentsWithSlices = tagWithSlice $ removeNullSegment (IntMap.toList segments)
    in foldl step initState segmentsWithSlices
   where
@@ -508,17 +508,17 @@ substSlice relations initState (sliceWhole, multiplier) =
       let offset = Slice.sliceStart slice - Slice.sliceStart sliceWhole
           coefficient = multiplier * 2 ^ offset
        in case segment of
-            SliceLookup.Constant constant -> case accPoly of
+            Segment.Constant constant -> case accPoly of
               Left c -> (Left (fromIntegral constant * coefficient + c), removeSlice slice changes)
               Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral coefficient) xs, removeSlice slice changes)
-            SliceLookup.ChildOf root -> case accPoly of
+            Segment.ChildOf root -> case accPoly of
               -- replace `slice` with `root`
               Left c -> (PolyL.new c [] [(root, coefficient)], (addSlice root . removeSlice slice) changes)
               Right accPoly' -> (PolyL.insertSlices [(root, coefficient)] accPoly', (addSlice root . removeSlice slice) changes)
-            SliceLookup.Parent _ _ -> case accPoly of
+            Segment.Parent _ _ -> case accPoly of
               Left c -> (PolyL.new c [] [(slice, coefficient)], changes)
               Right xs -> (PolyL.insertSlices [(slice, coefficient)] xs, changes)
-            SliceLookup.Empty _ -> case accPoly of
+            Segment.Empty _ -> case accPoly of
               Left c -> (PolyL.new c [] [(slice, coefficient)], changes)
               Right xs -> (PolyL.insertSlices [(slice, coefficient)] xs, changes)
 

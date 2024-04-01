@@ -35,9 +35,9 @@ import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.Constraint
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup (SliceLookup (SliceLookup))
-import Keelung.Data.SliceLookup qualified as SliceLookup
 import Prelude hiding (lookup)
 
 type RefRelations n = EquivClass.EquivClass Ref n (LinRel n)
@@ -117,10 +117,10 @@ lookup relationsS (B (RefUBit refU index)) relationsR =
          in case IntMap.lookupMax segments of
               Nothing -> lookupRefRelations
               Just (_, segment) -> case segment of
-                SliceLookup.Constant value -> Value (if Data.Bits.testBit value 0 then 1 else 0)
-                SliceLookup.ChildOf parent -> ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (Slice.sliceStart parent))) 0
-                SliceLookup.Parent _ _ -> lookupRefRelations
-                SliceLookup.Empty _ -> lookupRefRelations
+                Segment.Constant value -> Value (if Data.Bits.testBit value 0 then 1 else 0)
+                Segment.ChildOf parent -> ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (Slice.sliceStart parent))) 0
+                Segment.Parent _ _ -> lookupRefRelations
+                Segment.Empty _ -> lookupRefRelations
       -- look in the RefRelations later if we cannot find any result in the SliceRelations
       lookupRefRelations = case EquivClass.lookup (B (RefUBit refU index)) relationsR of
         EquivClass.IsConstant value -> Value value

@@ -74,6 +74,7 @@ library
       Keelung.Data.Limb
       Keelung.Data.PolyL
       Keelung.Data.Reference
+      Keelung.Data.Segment
       Keelung.Data.Slice
       Keelung.Data.SliceLookup
       Keelung.Data.SlicePolynomial
@@ -165,6 +166,7 @@ executable keelungc
       Keelung.Data.Limb
       Keelung.Data.PolyL
       Keelung.Data.Reference
+      Keelung.Data.Segment
       Keelung.Data.Slice
       Keelung.Data.SliceLookup
       Keelung.Data.SlicePolynomial
@@ -317,6 +319,7 @@ test-suite keelung-test
       Keelung.Data.Limb
       Keelung.Data.PolyL
       Keelung.Data.Reference
+      Keelung.Data.Segment
       Keelung.Data.Slice
       Keelung.Data.SliceLookup
       Keelung.Data.SlicePolynomial

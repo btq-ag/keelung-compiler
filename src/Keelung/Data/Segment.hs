@@ -1,0 +1,130 @@
+{-# LANGUAGE DeriveGeneric #-}
+
+-- | Value referenced by a Slice
+module Keelung.Data.Segment
+  ( -- * Construction
+    Segment (..),
+
+    -- * Properties
+    null,
+    sameKind,
+
+    -- * Splitting and slicing
+    unsafeSplit,
+    merge,
+
+    -- * Testing
+    isValid,
+  )
+where
+
+import Control.DeepSeq (NFData)
+import Data.Either qualified as Either
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import Data.Set (Set)
+import Data.Set qualified as Set
+import GHC.Generics (Generic)
+import Keelung (HasWidth, widthOf)
+import Keelung.Data.Reference (RefU)
+import Keelung.Data.Slice (Slice (..))
+import Keelung.Data.Slice qualified as Slice
+import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
+import Prelude hiding (map, null)
+
+--------------------------------------------------------------------------------
+
+-- | Either a constant value, or a part of an RefU, or a parent itself
+data Segment
+  = Constant U
+  | ChildOf Slice -- part of some RefU
+  | Parent
+      Int -- length of this segment
+      (Map RefU (Set Slice)) -- children
+  | Empty
+      Int -- length of this segment
+  deriving (Eq, Generic)
+
+instance NFData Segment
+
+instance Show Segment where
+  show (Constant u) = "Constant[" <> show (widthOf u) <> "] " <> show u
+  show (ChildOf limb) = "ChildOf[" <> show (widthOf limb) <> "] " <> show limb
+  show (Parent len children) =
+    "Parent["
+      <> show len
+      <> "] "
+      <> show (fmap Set.toList (Map.elems children))
+  show (Empty len) = "Empty[" <> show len <> "]"
+
+instance HasWidth Segment where
+  widthOf (Constant u) = widthOf u
+  widthOf (ChildOf limb) = widthOf limb
+  widthOf (Parent len _) = len
+  widthOf (Empty len) = len
+
+-- | Check if two Segments are of the same kind
+sameKind :: Segment -> Segment -> Bool
+sameKind (Constant _) (Constant _) = True
+sameKind (ChildOf _) (ChildOf _) = True
+sameKind (Empty _) (Empty _) = True
+sameKind (Parent {}) (Parent {}) = False
+sameKind _ _ = False
+
+-- | Check if the width of a `Segment` is 0
+null :: Segment -> Bool
+null = (== 0) . widthOf
+
+-- | Check if a `Segment` is valid
+isValid :: Segment -> Bool
+isValid (Constant val) = widthOf val > 0
+isValid (ChildOf _) = True
+isValid (Parent len children) = len > 0 && not (Map.null children)
+isValid (Empty len) = len > 0
+
+--------------------------------------------------------------------------------
+
+-- | Split a `Segment` into two at a given index (relative to the starting offset of the Segement)
+--   May result in invalid empty segments!
+unsafeSplit :: Int -> Segment -> (Segment, Segment)
+unsafeSplit index segment = case segment of
+  Constant val -> (Constant (U.slice val (0, index)), Constant (U.slice val (index, widthOf val)))
+  ChildOf slice -> let (slice1, slice2) = Slice.split index slice in (ChildOf slice1, ChildOf slice2)
+  Parent len children ->
+    let splittedChildren = fmap (Set.map (Slice.split index)) children
+        children1 = fmap (Set.map fst) splittedChildren
+        children2 = fmap (Set.map snd) splittedChildren
+     in (Parent index children1, Parent (len - index) children2)
+  Empty len -> (Empty index, Empty (len - index))
+
+-- | See if 2 Segments can be glued together. Returns `Nothing` the result is empty.
+merge :: Segment -> Segment -> Either Slice.MergeError (Maybe Segment)
+merge xs ys = case (xs, ys) of
+  (Constant val1, Constant val2) -> Right (Just (Constant (val2 <> val1)))
+  (ChildOf slice1, ChildOf slice2) -> case Slice.safeMerge slice1 slice2 of
+    Left err -> Left err
+    Right slice -> Right (Just (ChildOf slice))
+  (Parent len1 children1, Parent len2 children2) ->
+    -- TODO: REVISIST THIS!!!
+    -- intersection children by zipping them together with `Slice.safeMerge`, ignoring all errors
+    let childrenIntersection =
+          Map.intersectionWith
+            (\xss yss -> Set.fromList (Either.rights (zipWith Slice.safeMerge (Set.toList xss) (Set.toList yss))))
+            children1
+            children2
+     in if len1 + len2 == 0
+          || Map.size childrenIntersection /= Map.size children1
+          then Right Nothing
+          else Right (Just (Parent (len1 + len2) childrenIntersection))
+  (Empty len1, Empty len2) ->
+    if len1 + len2 == 0
+      then Right Nothing
+      else Right (Just (Empty (len1 + len2)))
+  _ ->
+    if null xs
+      then Right (Just ys)
+      else
+        if null ys
+          then Right (Just xs)
+          else Right Nothing
