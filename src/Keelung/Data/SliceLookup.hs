@@ -224,9 +224,9 @@ normalize (SliceLookup (Slice ref start end) xs) =
       if Segment.null segment
         then (acc, Nothing) -- drop null segments
         else (IntMap.insert index segment acc, Just (index, segment))
-    glue (acc, Just (prevIndex, prevSliceLookup)) index segment = case Segment.merge prevSliceLookup segment of
-      Right (Just result) -> (acc, Just (prevIndex, result))
-      _ -> (IntMap.insert prevIndex prevSliceLookup acc, Just (index, segment))
+    glue (acc, Just (prevIndex, prevSliceLookup)) index segment = case Segment.tryMerge prevSliceLookup segment of
+      Just result -> (acc, Just (prevIndex, result))
+      Nothing -> (IntMap.insert prevIndex prevSliceLookup acc, Just (index, segment))
 
 --------------------------------------------------------------------------------
 

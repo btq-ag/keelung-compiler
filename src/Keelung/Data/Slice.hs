@@ -177,9 +177,9 @@ data MergeError = NotSameRefU | NotAdjacent | Overlapping
   deriving (Eq, Ord)
 
 instance Show MergeError where
-  show NotSameRefU = "Slice.MergeError: two slices are not of the same RefU"
-  show NotAdjacent = "Slice.MergeError: two slices are not adjacent with each other"
-  show Overlapping = "Slice.MergeError: two slices are overlapping with each other"
+  show NotSameRefU = "[ panic ] Slice.MergeError: two slices are not of the same RefU"
+  show NotAdjacent = "[ panic ] Slice.MergeError: two slices are not adjacent with each other"
+  show Overlapping = "[ panic ] Slice.MergeError: two slices are overlapping with each other"
 
 -- | Merge two Slices into one, throwing MergeError if:
 --    1. the two Slices are not of the same `RefU`

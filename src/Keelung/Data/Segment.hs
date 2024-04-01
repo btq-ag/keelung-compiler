@@ -11,7 +11,7 @@ module Keelung.Data.Segment
 
     -- * Splitting and slicing
     unsafeSplit,
-    merge,
+    tryMerge,
 
     -- * Testing
     isValid,
@@ -19,7 +19,6 @@ module Keelung.Data.Segment
 where
 
 import Control.DeepSeq (NFData)
-import Data.Either qualified as Either
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
@@ -76,13 +75,6 @@ sameKind _ _ = False
 null :: Segment -> Bool
 null = (== 0) . widthOf
 
--- | Check if a `Segment` is valid
-isValid :: Segment -> Bool
-isValid (Constant val) = widthOf val > 0
-isValid (ChildOf _) = True
-isValid (Parent len children) = len > 0 && not (Map.null children)
-isValid (Empty len) = len > 0
-
 --------------------------------------------------------------------------------
 
 -- | Split a `Segment` into two at a given index (relative to the starting offset of the Segement)
@@ -98,33 +90,33 @@ unsafeSplit index segment = case segment of
      in (Parent index children1, Parent (len - index) children2)
   Empty len -> (Empty index, Empty (len - index))
 
--- | See if 2 Segments can be glued together. Returns `Nothing` the result is empty.
-merge :: Segment -> Segment -> Either Slice.MergeError (Maybe Segment)
-merge xs ys = case (xs, ys) of
-  (Constant val1, Constant val2) -> Right (Just (Constant (val2 <> val1)))
+--------------------------------------------------------------------------------
+
+-- | See if 2 Segments can be glued together.
+tryMerge :: Segment -> Segment -> Maybe Segment
+tryMerge xs ys = case (xs, ys) of
+  (Constant val1, Constant val2) -> Just (Constant (val2 <> val1))
   (ChildOf slice1, ChildOf slice2) -> case Slice.safeMerge slice1 slice2 of
-    Left err -> Left err
-    Right slice -> Right (Just (ChildOf slice))
-  (Parent len1 children1, Parent len2 children2) ->
-    -- TODO: REVISIST THIS!!!
-    -- intersection children by zipping them together with `Slice.safeMerge`, ignoring all errors
-    let childrenIntersection =
-          Map.intersectionWith
-            (\xss yss -> Set.fromList (Either.rights (zipWith Slice.safeMerge (Set.toList xss) (Set.toList yss))))
-            children1
-            children2
-     in if len1 + len2 == 0
-          || Map.size childrenIntersection /= Map.size children1
-          then Right Nothing
-          else Right (Just (Parent (len1 + len2) childrenIntersection))
+    Left _ -> Nothing
+    Right slice -> Just (ChildOf slice)
+  (Parent _ _, Parent _ _) -> Nothing -- dunno how to merge parents together
   (Empty len1, Empty len2) ->
     if len1 + len2 == 0
-      then Right Nothing
-      else Right (Just (Empty (len1 + len2)))
+      then Nothing
+      else Just (Empty (len1 + len2))
   _ ->
     if null xs
-      then Right (Just ys)
+      then Just ys
       else
         if null ys
-          then Right (Just xs)
-          else Right Nothing
+          then Just xs
+          else Nothing
+
+--------------------------------------------------------------------------------
+
+-- | Check if a `Segment` is valid
+isValid :: Segment -> Bool
+isValid (Constant val) = widthOf val > 0
+isValid (ChildOf _) = True
+isValid (Parent len children) = len > 0 && not (Map.null children)
+isValid (Empty len) = len > 0

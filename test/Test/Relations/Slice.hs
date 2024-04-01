@@ -5,6 +5,7 @@ import Keelung (widthOf)
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.Reference
+import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SliceLookup qualified as SliceLookup
@@ -25,7 +26,7 @@ tests = describe "SliceRelations" $ do
             value <- arbitraryUOfWidth (widthOf slice)
             pure (slice, value)
       forAll genParam $ \(slice, val) -> do
-        let expected = SliceLookup.normalize $ SliceLookup.SliceLookup slice (IntMap.singleton (sliceStart slice) (SliceLookup.Constant val)) -- SliceLookup.mapInterval (const (SliceLookup.Constant val)) interval (SliceLookup.fromRefU ref)
+        let expected = SliceLookup.normalize $ SliceLookup.SliceLookup slice (IntMap.singleton (sliceStart slice) (Segment.Constant val)) -- SliceLookup.mapInterval (const (SliceLookup.Constant val)) interval (SliceLookup.fromRefU ref)
         let relations' = SliceRelations.assign slice val relations
         let actual = SliceRelations.lookup slice relations'
         actual `shouldBe` expected

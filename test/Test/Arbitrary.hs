@@ -14,9 +14,11 @@ import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Segment (Segment)
+import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
-import Keelung.Data.SliceLookup (Segment, SliceLookup)
+import Keelung.Data.SliceLookup (SliceLookup)
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
@@ -79,12 +81,12 @@ arbitrarySegmentOfSlice :: Slice -> Gen Segment
 arbitrarySegmentOfSlice (Slice.Slice _ start end) =
   let width = end - start
    in oneof
-        [ SliceLookup.Constant <$> arbitraryUOfWidth width,
-          SliceLookup.ChildOf <$> arbitrarySliceOfWidth width,
+        [ Segment.Constant <$> arbitraryUOfWidth width,
+          Segment.ChildOf <$> arbitrarySliceOfWidth width,
           do
             childrenCount <- defaultWidth
             children <- vectorOf childrenCount $ arbitrarySliceOfWidth width
-            pure $ SliceLookup.Parent width (Map.fromList (map (\child -> (Slice.sliceRefU child, Set.singleton child)) children))
+            pure $ Segment.Parent width (Map.fromList (map (\child -> (Slice.sliceRefU child, Set.singleton child)) children))
         ]
 
 instance Arbitrary Slice where
@@ -117,7 +119,7 @@ instance Arbitrary SliceLookup where
         foldr
           ( \segment acc -> case acc of
               [] -> [segment]
-              (segment' : acc') -> if SliceLookup.sameKindOfSegment segment segment' then acc' else segment : acc
+              (segment' : acc') -> if Segment.sameKind segment segment' then acc' else segment : acc
           )
           []
 
