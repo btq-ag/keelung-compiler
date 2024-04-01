@@ -78,8 +78,8 @@ instance Show SliceRelations where
           else unlines (map showSliceLookup (IntMap.elems varMap))
 
       showSliceLookup :: SliceLookup -> String
-      showSliceLookup (SliceLookup slice segments) =
-        show (sliceRefU slice)
+      showSliceLookup (SliceLookup ref segments) =
+        show ref
           <> ": "
           <> show (IntMap.elems segments)
 
@@ -129,7 +129,7 @@ size (SliceRelations refO refI refP refX) = sum (map sizeMapping [refO, refI, re
     sizeMapping (Mapping xs) = sum (map sizeVarMap (IntMap.elems xs))
 
     sizeVarMap :: IntMap SliceLookup -> Int
-    sizeVarMap = sum . map (\x -> if SliceLookup.null x then 0 else 1) . IntMap.elems
+    sizeVarMap = IntMap.size
 
 -- | Given a Slice, return the SliceLookup of the Slice
 lookup :: Slice -> SliceRelations -> SliceLookup
@@ -143,7 +143,7 @@ lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
 
     lookupMapping :: Mapping -> SliceLookup
     lookupMapping (Mapping xs) =
-      let whenNotFound = SliceLookup (Slice ref start end) (IntMap.singleton start (Segment.Unknown (end - start)))
+      let whenNotFound = SliceLookup ref (IntMap.singleton start (Segment.Unknown (end - start)))
        in case IntMap.lookup (widthOf ref) xs of
             Nothing -> whenNotFound
             Just varMap -> case IntMap.lookup (refUVar ref) varMap of
@@ -216,7 +216,7 @@ fold f acc relations =
   where
     foldMapping a (Mapping xs) = foldl foldVarMap a xs
     foldVarMap = foldl foldSliceLookup
-    foldSliceLookup a (SliceLookup slice segments) = foldl (\b (index, segment) -> f b (Slice (sliceRefU slice) index (index + widthOf segment)) segment) a (IntMap.toList segments)
+    foldSliceLookup a (SliceLookup ref segments) = foldl (\b (index, segment) -> f b (Slice ref index (index + widthOf segment)) segment) a (IntMap.toList segments)
 
 -- | FOR TESTING: A SliceRelations is valid if:
 --    1. all existing SliceLookups cover the entire width of the variable
@@ -227,8 +227,7 @@ isValid = null . collectFailure
 --------------------------------------------------------------------------------
 
 data Failure
-  = InvalidSliceLookupNotCoveringAll SliceLookup
-  | InvalidSliceLookup SliceLookup.Failure
+  = InvalidSliceLookup SliceLookup.Failure
   | InvalidKinship Kinship
   deriving (Eq, Show)
 
@@ -243,13 +242,7 @@ collectFailure relations = fromKinshipConstruction <> fromInvalidSliceLookup
     isValidMapping (Mapping xs) = mconcat $ map (mconcat . map isValidSliceLookup . IntMap.elems) (IntMap.elems xs)
 
     isValidSliceLookup :: SliceLookup -> [Failure]
-    isValidSliceLookup x =
-      if isCoveringAll x
-        then map InvalidSliceLookup (SliceLookup.collectFailure False x)
-        else [InvalidSliceLookupNotCoveringAll x]
-
-    isCoveringAll :: SliceLookup -> Bool
-    isCoveringAll (SliceLookup slice _) = sliceStart slice == 0 && sliceEnd slice == widthOf (sliceRefU slice)
+    isValidSliceLookup x = map InvalidSliceLookup (SliceLookup.collectFailure False x)
 
     fromKinshipConstruction :: [Failure]
     fromKinshipConstruction = case nullKinship (destroyKinshipWithParent relations (constructKinshipWithChildOf relations)) of
@@ -326,12 +319,12 @@ relateRootToSegment root child = do
     addChildToRoot (Just (Segment.Unknown _)) = Segment.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
 
     modifySegment :: (Maybe Segment -> Segment) -> Slice -> M ()
-    modifySegment f slice =
+    modifySegment f (Slice ref start end) =
       modify $
         modifySliceLookup
-          slice
-          (SliceLookup.fromSegment slice (f Nothing)) -- what to do if the SliceLookup does not exist
-          (SliceLookup.mapIntervalWithSlice (const (f . Just)) slice)
+          (Slice ref start end)
+          (SliceLookup.fromSegment (Slice ref start end) (f Nothing)) -- what to do if the SliceLookup does not exist
+          (SliceLookup.mapInterval (f . Just) (start, end))
 
 relateRootToFamily :: Slice -> FamilyLookup -> M ()
 relateRootToFamily _ (FamilyLookup []) = return ()
@@ -382,7 +375,7 @@ modifySliceLookup (Slice var _ _) e f relations = case var of
 
 -- | Convert a SliceRelations to a list of SliceSegmentPairs
 sliceLookupToPairs :: SliceLookup -> [SliceSegmentPair]
-sliceLookupToPairs (SliceLookup slice segments) = map (\(offset, segment) -> (slice {Slice.sliceStart = offset, Slice.sliceEnd = offset + widthOf segment}, segment)) (IntMap.toList segments)
+sliceLookupToPairs (SliceLookup ref segments) = map (\(offset, segment) -> (Slice ref offset (offset + widthOf segment), segment)) (IntMap.toList segments)
 
 --------------------------------------------------------------------------------
 
@@ -432,7 +425,7 @@ lookupFamilyWithSliceSegmentPairM = gets . lookupFamilyWithSliceSegmentPair
 --      pairs        ├──B──┼──B──┼──A──┤
 --      pairs        ├──A──┼──C──┼──C──┤
 toAlignedSegmentPairs :: SliceLookup -> SliceLookup -> [(SliceSegmentPair, SliceSegmentPair)]
-toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segments2) =
+toAlignedSegmentPairs (SliceLookup ref1 segments1) (SliceLookup ref2 segments2) =
   step (IntMap.toList segments1) (IntMap.toList segments2)
   where
     step :: [(Int, Segment)] -> [(Int, Segment)] -> [(SliceSegmentPair, SliceSegmentPair)]
@@ -441,22 +434,22 @@ toAlignedSegmentPairs (SliceLookup slice1 segments1) (SliceLookup slice2 segment
           width2 = widthOf segment2
        in case width1 `compare` width2 of
             EQ ->
-              ( (Slice (sliceRefU slice1) index1 (index1 + width1), segment1),
-                (Slice (sliceRefU slice2) index2 (index2 + width2), segment2)
+              ( (Slice ref1 index1 (index1 + width1), segment1),
+                (Slice ref2 index2 (index2 + width2), segment2)
               )
                 : step xs1 xs2
             LT ->
               -- segment1 is shorter, so we split segment2 into two
               let (segment21, segment22) = Segment.unsafeSplit width1 segment2
-               in ( (Slice (sliceRefU slice1) index1 (index1 + width1), segment1),
-                    (Slice (sliceRefU slice2) index2 (index2 + widthOf segment21), segment21)
+               in ( (Slice ref1 index1 (index1 + width1), segment1),
+                    (Slice ref2 index2 (index2 + widthOf segment21), segment21)
                   )
                     : step xs1 ((index2 + width1, segment22) : xs2)
             GT ->
               -- segment2 is shorter, so we split segment1 into two
               let (segment11, segment12) = Segment.unsafeSplit width2 segment1
-               in ( (Slice (sliceRefU slice1) index1 (index1 + widthOf segment11), segment11),
-                    (Slice (sliceRefU slice2) index2 (index2 + width2), segment2)
+               in ( (Slice ref1 index1 (index1 + widthOf segment11), segment11),
+                    (Slice ref2 index2 (index2 + width2), segment2)
                   )
                     : step ((index1 + width2, segment12) : xs1) xs2
     step _ _ = []

@@ -8,7 +8,6 @@ where
 
 import Data.IntMap qualified as IntMap
 import Keelung (widthOf)
-import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.SliceLookup (SliceLookup (..))
 import Keelung.Data.SliceLookup qualified as SliceLookup
 import Test.Arbitrary
@@ -38,10 +37,10 @@ tests = describe "SliceLookup" $ do
             index <- chooseInt (0, widthOf sliceLookup - 1)
             pure (sliceLookup, index)
       forAll genParam $ \(sliceLookup, index) -> do
-        let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
-        SliceLookup.isValid sliceLookup1 `shouldBe` True
-        SliceLookup.isValid sliceLookup2 `shouldBe` True
-        SliceLookup.isValid (SliceLookup.normalize (sliceLookup1 <> sliceLookup2)) `shouldBe` True
+        let (ref, sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
+        SliceLookup.isValid (SliceLookup ref sliceLookup1) `shouldBe` True
+        SliceLookup.isValid (SliceLookup ref sliceLookup2) `shouldBe` True
+        SliceLookup.isValid (SliceLookup.normalize (SliceLookup ref (sliceLookup1 <> sliceLookup2))) `shouldBe` True
 
     it "should preserve lengths of segments (`(+) . widthOf . split = widthOf`)" $ do
       let genParam = do
@@ -49,16 +48,16 @@ tests = describe "SliceLookup" $ do
             index <- chooseInt (0, widthOf sliceLookup - 1)
             pure (sliceLookup, index)
       forAll genParam $ \(sliceLookup, index) -> do
-        let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
-        widthOf sliceLookup1 + widthOf sliceLookup2 `shouldBe` widthOf sliceLookup
+        let (ref, sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
+        widthOf (SliceLookup ref sliceLookup1) + widthOf (SliceLookup ref sliceLookup2) `shouldBe` widthOf sliceLookup
 
   describe "splice" $ do
     it "should result in a SliceLookup of the same width as of the interval" $ do
       let genParam = do
             sliceLookup <- arbitrary
-            let slice = lookupSlice sliceLookup
-            start <- chooseInt (sliceStart slice, (sliceEnd slice - 1) `max` sliceStart slice)
-            end <- chooseInt (start, (sliceEnd slice - 1) `max` sliceStart slice)
+            let ref = lookupRefU sliceLookup
+            start <- chooseInt (0, widthOf ref)
+            end <- chooseInt (start, widthOf ref)
             pure (sliceLookup, (start, end))
       forAll genParam $ \(sliceLookup, (start, end)) -> do
         let result = SliceLookup.splice (start, end) sliceLookup
@@ -71,50 +70,12 @@ tests = describe "SliceLookup" $ do
             index <- chooseInt (0, (widthOf sliceLookup - 1) `max` 0)
             pure (sliceLookup, index)
       forAll genParam $ \(sliceLookup, index) -> do
-        let (sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
-        SliceLookup.normalize (sliceLookup1 <> sliceLookup2) `shouldBe` SliceLookup.normalize sliceLookup
+        let (ref, sliceLookup1, sliceLookup2) = SliceLookup.split index sliceLookup
+        SliceLookup.normalize (SliceLookup ref (sliceLookup1 <> sliceLookup2)) `shouldBe` SliceLookup.normalize sliceLookup
 
     it "should result in valid SliceLookups" $ do
       property $ \sliceLookup -> do
         SliceLookup.isValid (SliceLookup.normalize sliceLookup) `shouldBe` True
-
-  describe "map" $ do
-    it "`map id = id`" $ do
-      property $ \sliceLookup -> do
-        let mapped = SliceLookup.map id sliceLookup
-        SliceLookup.isValid mapped `shouldBe` True
-        mapped `shouldBe` sliceLookup
-
-  describe "mapInterval" $ do
-    it "`mapInterval id = id`" $ do
-      let genParam = do
-            sliceLookup <- arbitrary
-            start <- chooseInt (0, widthOf sliceLookup - 1)
-            end <- chooseInt (start, widthOf sliceLookup)
-            pure (sliceLookup, (start, end))
-      forAll genParam $ \(sliceLookup, interval) -> do
-        let mapped = SliceLookup.mapInterval id interval sliceLookup
-        SliceLookup.isValid (SliceLookup.normalize mapped) `shouldBe` True
-        SliceLookup.normalize mapped `shouldBe` SliceLookup.normalize sliceLookup
-
-  describe "mapIntervalWithSlice" $ do
-    it "`mapIntervalWithSlice (\\_ x -> x) = id`" $ do
-      let genParam = do
-            sliceLookup <- arbitrary
-            start <- chooseInt (0, widthOf sliceLookup - 1)
-            end <- chooseInt (start, widthOf sliceLookup)
-            let slice = Slice (sliceRefU $ lookupSlice sliceLookup) start end
-            pure (sliceLookup, slice)
-      forAll genParam $ \(sliceLookup, slice) -> do
-        let mapped = SliceLookup.mapIntervalWithSlice (\_ x -> x) slice sliceLookup
-        SliceLookup.isValid (SliceLookup.normalize mapped) `shouldBe` True
-        SliceLookup.normalize mapped `shouldBe` SliceLookup.normalize sliceLookup
-
-  describe "pad" $ do
-    it "should result in valid SliceLookups" $ do
-      property $ \sliceLookup -> do
-        let padded = SliceLookup.pad sliceLookup
-        SliceLookup.isValid (SliceLookup.normalize padded) `shouldBe` True
 
   describe "fromSegment" $ do
     it "should result in valid SliceLookups" $ do

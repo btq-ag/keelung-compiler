@@ -22,13 +22,13 @@ tests = describe "SliceRelations" $ do
     it "should return the assigned value on lookup" $ do
       let relations = SliceRelations.new
       let genParam = do
-            slice <- arbitrary
-            value <- arbitraryUOfWidth (widthOf slice)
-            pure (slice, value)
-      forAll genParam $ \(slice, val) -> do
-        let expected = SliceLookup.normalize $ SliceLookup.SliceLookup slice (IntMap.singleton (sliceStart slice) (Segment.Constant val)) -- SliceLookup.mapInterval (const (SliceLookup.Constant val)) interval (SliceLookup.fromRefU ref)
-        let relations' = SliceRelations.assign slice val relations
-        let actual = SliceRelations.lookup slice relations'
+            ref <- arbitrary
+            value <- arbitraryUOfWidth (widthOf ref)
+            pure (ref, value)
+      forAll genParam $ \(ref, val) -> do
+        let expected = SliceLookup.normalize $ SliceLookup.SliceLookup ref (IntMap.singleton 0 (Segment.Constant val))
+        let relations' = SliceRelations.assign (Slice.fromRefU ref) val relations
+        let actual = SliceRelations.lookup (Slice.fromRefU ref) relations'
         actual `shouldBe` expected
 
   describe "SliceRelations.lookup" $ do

@@ -110,7 +110,7 @@ instance Arbitrary SliceLookup where
     pure $
       SliceLookup.normalize $
         SliceLookup.SliceLookup
-          (Slice.Slice var start (start + width))
+          var
           (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (start, mempty) segments)
     where
       -- prevent segments of the same kind from being adjacent

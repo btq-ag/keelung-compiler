@@ -247,15 +247,15 @@ reduceDivMod (a, b, q, r) = do
   relationsS <- gets (Relations.relationsS . cmRelations)
   return $
     Just
-      ( lookupRefU relationsS a,
-        lookupRefU relationsS b,
-        lookupRefU relationsS q,
-        lookupRefU relationsS r
+      ( go relationsS a,
+        go relationsS b,
+        go relationsS q,
+        go relationsS r
       )
   where
-    lookupRefU :: SliceRelations -> Either RefU U -> Either RefU U
-    lookupRefU _ (Right val) = Right val
-    lookupRefU relations (Left var) =
+    go :: SliceRelations -> Either RefU U -> Either RefU U
+    go _ (Right val) = Right val
+    go relations (Left var) =
       let SliceLookup _ segments = SliceRelations.lookup (Slice.fromRefU var) relations
        in case IntMap.elems segments of
             [Segment.ChildOf root] -> Left (Slice.sliceRefU root)
