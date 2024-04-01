@@ -109,7 +109,7 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       showModInvHints =
         if null $ cmModInvs cm
           then ""
-          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, _aainv, _n, p) -> show a <> "⁻¹ = (mod " <> show p <> ")") (toList $ cmModInvs cm))))
+          else "  ModInv hints:\n" <> indent (indent (showList' (map (\(a, inv, n, p) -> show a <> " * " <> show inv <> " = " <> show p <> " * " <> show n <> " + 1") (toList $ cmModInvs cm))))
 
       showRelations =
         if Relations.size (cmRelations cm) == 0
