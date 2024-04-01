@@ -261,7 +261,7 @@ reduceDivMod (a, b, q, r) = do
             [Segment.ChildOf root] -> Left (Slice.sliceRefU root)
             [Segment.Constant value] -> Right value
             [Segment.Parent _ _] -> Left var
-            [Segment.Empty _] -> Left var
+            [Segment.Unknown _] -> Left var
             _ -> Left var
 
 ------------------------------------------------------------------------------
@@ -518,7 +518,7 @@ substSlice relations initState (sliceWhole, multiplier) =
             Segment.Parent _ _ -> case accPoly of
               Left c -> (PolyL.new c [] [(slice, coefficient)], changes)
               Right xs -> (PolyL.insertSlices [(slice, coefficient)] xs, changes)
-            Segment.Empty _ -> case accPoly of
+            Segment.Unknown _ -> case accPoly of
               Left c -> (PolyL.new c [] [(slice, coefficient)], changes)
               Right xs -> (PolyL.insertSlices [(slice, coefficient)] xs, changes)
 

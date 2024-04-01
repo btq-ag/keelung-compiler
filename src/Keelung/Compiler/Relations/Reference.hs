@@ -120,7 +120,7 @@ lookup relationsS (B (RefUBit refU index)) relationsR =
                 Segment.Constant value -> Value (if Data.Bits.testBit value 0 then 1 else 0)
                 Segment.ChildOf parent -> ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (Slice.sliceStart parent))) 0
                 Segment.Parent _ _ -> lookupRefRelations
-                Segment.Empty _ -> lookupRefRelations
+                Segment.Unknown _ -> lookupRefRelations
       -- look in the RefRelations later if we cannot find any result in the SliceRelations
       lookupRefRelations = case EquivClass.lookup (B (RefUBit refU index)) relationsR of
         EquivClass.IsConstant value -> Value value

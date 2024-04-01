@@ -41,7 +41,7 @@ data Segment
   | Parent
       Int -- length of this segment
       (Map RefU (Set Slice)) -- children
-  | Empty
+  | Unknown
       Int -- length of this segment
   deriving (Eq, Generic)
 
@@ -55,19 +55,19 @@ instance Show Segment where
       <> show len
       <> "] "
       <> show (fmap Set.toList (Map.elems children))
-  show (Empty len) = "Empty[" <> show len <> "]"
+  show (Unknown len) = "Unknown[" <> show len <> "]"
 
 instance HasWidth Segment where
   widthOf (Constant u) = widthOf u
   widthOf (ChildOf limb) = widthOf limb
   widthOf (Parent len _) = len
-  widthOf (Empty len) = len
+  widthOf (Unknown len) = len
 
 -- | Check if two Segments are of the same kind
 sameKind :: Segment -> Segment -> Bool
 sameKind (Constant _) (Constant _) = True
 sameKind (ChildOf _) (ChildOf _) = True
-sameKind (Empty _) (Empty _) = True
+sameKind (Unknown _) (Unknown _) = True
 sameKind (Parent {}) (Parent {}) = False
 sameKind _ _ = False
 
@@ -88,7 +88,7 @@ unsafeSplit index segment = case segment of
         children1 = fmap (Set.map fst) splittedChildren
         children2 = fmap (Set.map snd) splittedChildren
      in (Parent index children1, Parent (len - index) children2)
-  Empty len -> (Empty index, Empty (len - index))
+  Unknown len -> (Unknown index, Unknown (len - index))
 
 --------------------------------------------------------------------------------
 
@@ -100,10 +100,10 @@ tryMerge xs ys = case (xs, ys) of
     Left _ -> Nothing
     Right slice -> Just (ChildOf slice)
   (Parent _ _, Parent _ _) -> Nothing -- dunno how to merge parents together
-  (Empty len1, Empty len2) ->
+  (Unknown len1, Unknown len2) ->
     if len1 + len2 == 0
       then Nothing
-      else Just (Empty (len1 + len2))
+      else Just (Unknown (len1 + len2))
   _ ->
     if null xs
       then Just ys
@@ -119,4 +119,4 @@ isValid :: Segment -> Bool
 isValid (Constant val) = widthOf val > 0
 isValid (ChildOf _) = True
 isValid (Parent len children) = len > 0 && not (Map.null children)
-isValid (Empty len) = len > 0
+isValid (Unknown len) = len > 0

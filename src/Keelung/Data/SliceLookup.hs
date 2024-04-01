@@ -76,28 +76,28 @@ null (SliceLookup slice _) = Slice.null slice
 
 -- | Constructs a `SliceLookup` with a `RefU` as its own parent
 fromRefU :: RefU -> SliceLookup
-fromRefU ref = SliceLookup (Slice ref 0 (widthOf ref)) (IntMap.singleton 0 (Segment.Empty (widthOf ref)))
+fromRefU ref = SliceLookup (Slice ref 0 (widthOf ref)) (IntMap.singleton 0 (Segment.Unknown (widthOf ref)))
 
 -- | Constructs a `SliceLookup` from a `Segment` and its `Slice`
 fromSegment :: Slice -> Segment -> SliceLookup
 fromSegment (Slice ref start end) segment =
   let refUWidth = widthOf ref
       isEmpty = case segment of
-        Segment.Empty _ -> True
+        Segment.Unknown _ -> True
         _ -> False
    in SliceLookup (Slice ref 0 refUWidth) $
         IntMap.fromList $
           if isEmpty
-            then [(0, Segment.Empty refUWidth)]
+            then [(0, Segment.Unknown refUWidth)]
             else
               if start > 0
                 then
                   if refUWidth > end
-                    then [(0, Segment.Empty start), (start, segment), (end, Segment.Empty (refUWidth - end))]
-                    else [(0, Segment.Empty start), (start, segment)]
+                    then [(0, Segment.Unknown start), (start, segment), (end, Segment.Unknown (refUWidth - end))]
+                    else [(0, Segment.Unknown start), (start, segment)]
                 else
                   if refUWidth > end
-                    then [(0, segment), (end, Segment.Empty (refUWidth - end))]
+                    then [(0, segment), (end, Segment.Unknown (refUWidth - end))]
                     else [(0, segment)]
 
 -- | Split a `SliceLookup` into two at a given absolute index
@@ -169,7 +169,7 @@ padStart :: SliceLookup -> SliceLookup
 padStart (SliceLookup (Slice ref start end) xs) =
   SliceLookup (Slice ref 0 end) $
     if start > 0
-      then IntMap.insert 0 (Segment.Empty start) xs
+      then IntMap.insert 0 (Segment.Unknown start) xs
       else xs
 
 -- | Pad the ending end of a SliceLookup with empty Segment (Parent) so that the whole SliceLookup ends at the width of the RefU
@@ -177,7 +177,7 @@ padEnd :: SliceLookup -> SliceLookup
 padEnd (SliceLookup (Slice ref start end) xs) =
   SliceLookup (Slice ref start (widthOf ref)) $
     if end < widthOf ref
-      then IntMap.insert end (Segment.Empty (widthOf ref - end)) xs
+      then IntMap.insert end (Segment.Unknown (widthOf ref - end)) xs
       else xs
 
 --------------------------------------------------------------------------------
