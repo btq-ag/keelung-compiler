@@ -19,10 +19,8 @@ where
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Except
-import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
-import Data.IntMap.Strict qualified as IntMap
 import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
@@ -35,9 +33,6 @@ import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.Constraint
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import Keelung.Data.Segment qualified as Segment
-import Keelung.Data.Slice qualified as Slice
-import Keelung.Data.SliceLookup (SliceLookup (SliceLookup))
 import Prelude hiding (lookup)
 
 type RefRelations n = EquivClass.EquivClass Ref n (LinRel n)
@@ -110,17 +105,10 @@ data Lookup n = Root | Value n | ChildOf n Ref n
 lookup :: (GaloisField n) => SliceRelations -> Ref -> RefRelations n -> Lookup n
 lookup relationsS (B (RefUBit refU index)) relationsR =
   let -- look in the SliceRelations first
-      lookupSliceRelations =
-        -- TODO: specialized `SliceRelations.lookup` to `SliceRelations.lookupBit`
-        let sliceOfRefUBit = Slice.Slice refU index (index + 1)
-            SliceLookup _ segments = SliceRelations.lookup sliceOfRefUBit relationsS
-         in case IntMap.lookupMax segments of
-              Nothing -> lookupRefRelations
-              Just (_, segment) -> case segment of
-                Segment.Constant value -> Value (if Data.Bits.testBit value 0 then 1 else 0)
-                Segment.ChildOf parent -> ChildOf 1 (B (RefUBit (Slice.sliceRefU parent) (Slice.sliceStart parent))) 0
-                Segment.Parent _ _ -> lookupRefRelations
-                Segment.Free _ -> lookupRefRelations
+      lookupSliceRelations = case SliceRelations.lookupRefUBit refU index relationsS of
+        Nothing -> lookupRefRelations
+        Just (Left (parent, index')) -> ChildOf 1 (B (RefUBit parent index')) 0
+        Just (Right bitVal) -> Value (if bitVal then 1 else 0)
       -- look in the RefRelations later if we cannot find any result in the SliceRelations
       lookupRefRelations = case EquivClass.lookup (B (RefUBit refU index)) relationsR of
         EquivClass.IsConstant value -> Value value

@@ -10,6 +10,9 @@ module Keelung.Data.SliceLookup
     fromRefU,
     fromSegment,
 
+    -- * Query
+    lookupAt,
+
     -- * Modification
     mapInterval,
 
@@ -28,6 +31,7 @@ module Keelung.Data.SliceLookup
 where
 
 import Control.DeepSeq (NFData)
+import Data.Bits qualified as Bits
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import GHC.Generics (Generic)
@@ -36,6 +40,7 @@ import Keelung.Data.Reference (RefU)
 import Keelung.Data.Segment (Segment)
 import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice (Slice (..))
+import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (map, null)
 
 --------------------------------------------------------------------------------
@@ -111,6 +116,18 @@ splice :: (Int, Int) -> SliceLookup -> SliceLookup
 splice (start, end) lookups = case split start lookups of
   (ref, _, afterStart) -> case split end (SliceLookup ref afterStart) of
     (_, mid, _) -> SliceLookup ref mid
+
+--------------------------------------------------------------------------------
+
+-- | Lookup the value at a given index
+lookupAt :: Int -> SliceLookup -> Maybe (Either (RefU, Int) Bool)
+lookupAt index (SliceLookup _ xs) = do
+  (start, segment) <- IntMap.lookupLE index xs
+  case segment of
+    Segment.Constant val -> Just $ Right (Bits.testBit val (index - start))
+    Segment.ChildOf slice -> Just $ Left (Slice.sliceRefU slice, Slice.sliceStart slice + index - start)
+    Segment.Parent _ _ -> Nothing
+    Segment.Free _ -> Nothing
 
 --------------------------------------------------------------------------------
 

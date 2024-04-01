@@ -11,6 +11,7 @@ module Keelung.Compiler.Relations.Slice
     relate,
     size,
     lookup,
+    lookupRefUBit,
     toConstraints,
     -- Testing
     isValid,
@@ -149,6 +150,23 @@ lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
             Just varMap -> case IntMap.lookup (refUVar ref) varMap of
               Nothing -> whenNotFound
               Just lookups -> SliceLookup.splice (start, end) lookups
+
+-- | Given a RefUBit, return the Segment of the RefUBit
+lookupRefUBit :: RefU -> Int -> SliceRelations -> Maybe (Either (RefU, Int) Bool)
+lookupRefUBit ref index relations = lookupMapping (getMapping ref)
+  where
+    getMapping :: RefU -> Mapping
+    getMapping (RefUO _ _) = srRefO relations
+    getMapping (RefUI _ _) = srRefI relations
+    getMapping (RefUP _ _) = srRefP relations
+    getMapping (RefUX _ _) = srRefX relations
+
+    lookupMapping :: Mapping -> Maybe (Either (RefU, Int) Bool)
+    lookupMapping (Mapping xs) = case IntMap.lookup (widthOf ref) xs of
+      Nothing -> Nothing
+      Just varMap -> case IntMap.lookup (refUVar ref) varMap of
+        Nothing -> Nothing
+        Just lookups -> SliceLookup.lookupAt index lookups
 
 -- | Convert relations to specialized constraints
 toConstraints :: FieldInfo -> OccurU -> (Slice -> Bool) -> SliceRelations -> Seq (Constraint n)
