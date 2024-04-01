@@ -59,28 +59,28 @@ instance HasWidth SliceLookup where
 
 -- | Constructs a `SliceLookup` with a `RefU` as its own parent
 fromRefU :: RefU -> SliceLookup
-fromRefU ref = SliceLookup ref (IntMap.singleton 0 (Segment.Unknown (widthOf ref)))
+fromRefU ref = SliceLookup ref (IntMap.singleton 0 (Segment.Free (widthOf ref)))
 
 -- | Constructs a `SliceLookup` from a `Segment` and its `Slice`
 fromSegment :: Slice -> Segment -> SliceLookup
 fromSegment (Slice ref start end) segment =
   let refUWidth = widthOf ref
       isEmpty = case segment of
-        Segment.Unknown _ -> True
+        Segment.Free _ -> True
         _ -> False
    in SliceLookup ref $
         IntMap.fromList $
           if isEmpty
-            then [(0, Segment.Unknown refUWidth)]
+            then [(0, Segment.Free refUWidth)]
             else
               if start > 0
                 then
                   if refUWidth > end
-                    then [(0, Segment.Unknown start), (start, segment), (end, Segment.Unknown (refUWidth - end))]
-                    else [(0, Segment.Unknown start), (start, segment)]
+                    then [(0, Segment.Free start), (start, segment), (end, Segment.Free (refUWidth - end))]
+                    else [(0, Segment.Free start), (start, segment)]
                 else
                   if refUWidth > end
-                    then [(0, segment), (end, Segment.Unknown (refUWidth - end))]
+                    then [(0, segment), (end, Segment.Free (refUWidth - end))]
                     else [(0, segment)]
 
 -- | Split a `SliceLookup` into two at a given absolute index

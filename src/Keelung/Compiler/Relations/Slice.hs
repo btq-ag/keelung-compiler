@@ -143,7 +143,7 @@ lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
 
     lookupMapping :: Mapping -> SliceLookup
     lookupMapping (Mapping xs) =
-      let whenNotFound = SliceLookup ref (IntMap.singleton start (Segment.Unknown (end - start)))
+      let whenNotFound = SliceLookup ref (IntMap.singleton start (Segment.Free (end - start)))
        in case IntMap.lookup (widthOf ref) xs of
             Nothing -> whenNotFound
             Just varMap -> case IntMap.lookup (refUVar ref) varMap of
@@ -177,7 +177,7 @@ toConstraints fieldInfo occurrence sliceShouldBeKept = fold step mempty
             then buildSliceEq slice root
             else mempty
         Segment.Parent _ _ -> mempty
-        Segment.Unknown _ -> mempty
+        Segment.Free _ -> mempty
 
     -- Slices will be chopped into pieces no longer than `fieldWidth`
     buildSliceEq :: Slice -> Slice -> Seq (Constraint n)
@@ -267,7 +267,7 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
     if root1 > slice2
       then lookupFamilyWithSliceSegmentPairM (slice2, segment2) >>= relateRootToFamily root1
       else lookupFamilyWithSliceSegmentPairM (slice1, segment1) >>= relateRootToFamily slice2
-  (Segment.ChildOf root1, Segment.Unknown _) -> relateRootToSegment root1 slice2
+  (Segment.ChildOf root1, Segment.Free _) -> relateRootToSegment root1 slice2
   (Segment.Parent {}, Segment.ChildOf root2) ->
     if slice1 > root2
       then lookupFamilyWithSliceSegmentPairM (slice2, segment2) >>= relateRootToFamily slice1
@@ -276,19 +276,19 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
     if slice1 > slice2
       then lookupFamilyWithSliceSegmentPairM (slice2, segment2) >>= relateRootToFamily slice1
       else lookupFamilyWithSliceSegmentPairM (slice1, segment1) >>= relateRootToFamily slice2
-  (Segment.Parent {}, Segment.Unknown _) -> relateRootToSegment slice1 slice2
-  (Segment.Unknown _, Segment.ChildOf root2) -> relateRootToSegment root2 slice1
-  (Segment.Unknown _, Segment.Parent {}) -> relateRootToSegment slice2 slice1
-  (Segment.Unknown _, Segment.Unknown _) ->
+  (Segment.Parent {}, Segment.Free _) -> relateRootToSegment slice1 slice2
+  (Segment.Free _, Segment.ChildOf root2) -> relateRootToSegment root2 slice1
+  (Segment.Free _, Segment.Parent {}) -> relateRootToSegment slice2 slice1
+  (Segment.Free _, Segment.Free _) ->
     if slice1 > slice2
       then relateRootToSegment slice1 slice2
       else relateRootToSegment slice2 slice1
 
 assignValueToSegment :: U -> Slice -> M ()
-assignValueToSegment val slice@(Slice ref start end) =
+assignValueToSegment val (Slice ref start end) =
   modify $
     modifySliceLookup
-      slice
+      ref
       (mapSliceLookup (SliceLookup.fromRefU ref)) -- insert this SliceLookup if it does not exist
       mapSliceLookup -- else modify the existing SliceLookup
   where
@@ -316,13 +316,13 @@ relateRootToSegment root child = do
     addChildToRoot (Just (Segment.Parent width children)) = Segment.Parent width (Map.insertWith (<>) (sliceRefU child) (Set.singleton child) children)
     addChildToRoot (Just (Segment.ChildOf _)) = error "[ panic ] relateRootToSegment: the root already has a parent"
     addChildToRoot (Just (Segment.Constant _)) = error "[ panic ] relateRootToSegment: the root already has a value"
-    addChildToRoot (Just (Segment.Unknown _)) = Segment.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
+    addChildToRoot (Just (Segment.Free _)) = Segment.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
 
     modifySegment :: (Maybe Segment -> Segment) -> Slice -> M ()
     modifySegment f (Slice ref start end) =
       modify $
         modifySliceLookup
-          (Slice ref start end)
+          ref
           (SliceLookup.fromSegment (Slice ref start end) (f Nothing)) -- what to do if the SliceLookup does not exist
           (SliceLookup.mapInterval (f . Just) (start, end))
 
@@ -356,18 +356,18 @@ instance Show Mapping where
           then ""
           else unlines (map (\(_, slice) -> "    " <> show slice) (IntMap.toList varMap))
 
--- | Given a Slice, modify the SliceLookup referenced by the Slice
+-- | Given a RefU, modify the SliceLookup referenced by the RefU
 --   Insert a new SliceLookup if it does not exist
-modifySliceLookup :: Slice -> SliceLookup -> (SliceLookup -> SliceLookup) -> SliceRelations -> SliceRelations
-modifySliceLookup (Slice var _ _) e f relations = case var of
+modifySliceLookup :: RefU -> SliceLookup -> (SliceLookup -> SliceLookup) -> SliceRelations -> SliceRelations
+modifySliceLookup ref e f relations = case ref of
   RefUO width _ -> relations {srRefO = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefO relations)))}
   RefUI width _ -> relations {srRefI = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefI relations)))}
   RefUP width _ -> relations {srRefP = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefP relations)))}
   RefUX width _ -> relations {srRefX = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefX relations)))}
   where
     alterSliceLookups :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
-    alterSliceLookups Nothing = Just (IntMap.singleton (refUVar var) e) -- insert a new SliceLookup if it does not exist
-    alterSliceLookups (Just x) = Just (IntMap.alter alterSliceLookup (refUVar var) x)
+    alterSliceLookups Nothing = Just (IntMap.singleton (refUVar ref) e) -- insert a new SliceLookup if it does not exist
+    alterSliceLookups (Just x) = Just (IntMap.alter alterSliceLookup (refUVar ref) x)
 
     alterSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
     alterSliceLookup Nothing = Just e -- insert a new SliceLookup if it does not exist
@@ -396,7 +396,7 @@ familySlicesOfSliceSegmentPair relations (slice, segment) = case segment of
           [_] -> error "[ panic ] getFamily: Should be Parent"
           _ -> error "[ panic ] getFamily: ChildOf root has more than one segment"
   Segment.Parent _ children -> slice : Set.toList (Set.unions (Map.elems children))
-  Segment.Unknown _ -> [slice]
+  Segment.Free _ -> [slice]
 
 lookupFamilyWithSlice :: Slice -> SliceRelations -> FamilyLookup
 lookupFamilyWithSlice slice relations =
@@ -617,7 +617,7 @@ constructKinshipWithChildOf = fold addRelation (Kinship Map.empty Map.empty)
             kinshipChildren = Map.alter (insertParentToChild root slice) (sliceRefU slice) (kinshipChildren kinship)
           }
       Segment.Parent {} -> kinship
-      Segment.Unknown _ -> kinship
+      Segment.Free _ -> kinship
 
     insertChildToParent :: Slice -> Slice -> Maybe (IntMap [Slice]) -> Maybe (IntMap [Slice])
     insertChildToParent slice target Nothing = Just (IntMap.singleton (sliceStart target) [slice])
@@ -657,7 +657,7 @@ destroyKinshipWithParent = flip (fold removeRelation)
           { kinshipParents = Map.alter removeChildFromParent (sliceRefU slice) (kinshipParents kinship),
             kinshipChildren = foldl removeParentFromChild (kinshipChildren kinship) (Set.toList (Set.unions (Map.elems children)))
           }
-      Segment.Unknown _ -> kinship
+      Segment.Free _ -> kinship
 
     removeChildFromParent :: Maybe (IntMap [Slice]) -> Maybe (IntMap [Slice])
     removeChildFromParent _ = Nothing
