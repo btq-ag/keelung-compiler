@@ -16,7 +16,7 @@ module Keelung.Compiler.Relations.Slice
     -- Testing
     isValid,
     Failure (..),
-    collectFailure,
+    validate,
   )
 where
 
@@ -240,17 +240,17 @@ fold f acc relations =
 --    1. all existing SliceLookups cover the entire width of the variable
 --    2. all children of a Parent Segment has the parent as its root
 isValid :: SliceRelations -> Bool
-isValid = null . collectFailure
+isValid = null . validate
 
 --------------------------------------------------------------------------------
 
 data Failure
-  = InvalidSliceLookup SliceLookup.Failure
+  = InvalidSliceLookup SliceLookup.Error
   | InvalidKinship Kinship
   deriving (Eq, Show)
 
-collectFailure :: SliceRelations -> [Failure]
-collectFailure relations = fromKinshipConstruction <> fromInvalidSliceLookup
+validate :: SliceRelations -> [Failure]
+validate relations = fromKinshipConstruction <> fromInvalidSliceLookup
   where
     SliceRelations refO refI refP refX = relations
 
@@ -260,7 +260,7 @@ collectFailure relations = fromKinshipConstruction <> fromInvalidSliceLookup
     isValidMapping (Mapping xs) = mconcat $ map (mconcat . map isValidSliceLookup . IntMap.elems) (IntMap.elems xs)
 
     isValidSliceLookup :: SliceLookup -> [Failure]
-    isValidSliceLookup x = map InvalidSliceLookup (SliceLookup.collectFailure False x)
+    isValidSliceLookup x = map InvalidSliceLookup (SliceLookup.validate x)
 
     fromKinshipConstruction :: [Failure]
     fromKinshipConstruction = case nullKinship (destroyKinshipWithParent relations (constructKinshipWithChildOf relations)) of

@@ -24,9 +24,9 @@ module Keelung.Data.SliceLookup
     normalize,
 
     -- * Testing
-    Failure (..),
+    Error (..),
     isValid,
-    collectFailure,
+    validate,
   )
 where
 
@@ -42,6 +42,7 @@ import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (map, null)
+import Prelude qualified
 
 --------------------------------------------------------------------------------
 
@@ -159,64 +160,60 @@ normalize (SliceLookup ref xs) =
 
 -- | A SliceLookup is considered valid if:
 --    1. all segments are non-null
+--    2. all segments are valid
 --    3. all segments are adjacent but not overlapping
 --    4. all adjacent segments are not of the same kind
+--    5. the whole RefU is covered by the segments
 isValid :: SliceLookup -> Bool
-isValid (SliceLookup _ xs) =
-  fst $
-    IntMap.foldlWithKey'
-      ( \(acc, previous) currIndex currSegment ->
-          let notNull = not (Segment.null currSegment)
-              noGapAndAdjecent = case previous of
-                Nothing -> True
-                Just (prevIndex, prevSegment) -> prevIndex + widthOf prevSegment == currIndex
-              notSameKind = case previous of
-                Nothing -> True
-                Just (_, prevSegment) -> not (Segment.sameKind prevSegment currSegment)
-           in (acc && Segment.isValid currSegment && notNull && noGapAndAdjecent && notSameKind, Just (currIndex, currSegment))
-      )
-      (True, Nothing)
-      xs
+isValid = Prelude.null . validate
 
-data Failure
-  = FailureNullSegment SliceLookup Segment
-  | FailureHasGapOrNotAdjacent SliceLookup Segment Segment
-  | FailureOfSameKindOfSegment SliceLookup Segment Segment
-  | FailureNotValidSegment SliceLookup Segment
+data Error
+  = NullSegment SliceLookup Segment
+  | HasGapOrNotAdjacent SliceLookup Segment Segment
+  | OfSameKindOfSegment SliceLookup Segment Segment
+  | NotValidSegment SliceLookup Segment
+  | NotCoveringAll SliceLookup
   deriving (Eq, Show)
 
-collectFailure :: Bool -> SliceLookup -> [Failure]
-collectFailure checkSameKindOfSegment x@(SliceLookup _ xs) =
-  fst $
-    IntMap.foldlWithKey'
-      ( \(acc, previous) currIndex currSegment ->
-          let isValidSegment =
-                if Segment.isValid currSegment
-                  then []
-                  else [FailureNotValidSegment x currSegment]
-              isNull =
-                if Segment.null currSegment
-                  then [FailureNullSegment x currSegment]
-                  else []
-              hasGapOrNotAdjacent = case previous of
-                Nothing -> []
-                Just (prevIndex, prevSegment) ->
-                  if prevIndex + widthOf prevSegment == currIndex
-                    then []
-                    else [FailureHasGapOrNotAdjacent x prevSegment currSegment]
-              notSameKind = case previous of
-                Nothing -> []
-                Just (_, prevSegment) ->
-                  if Segment.sameKind prevSegment currSegment
-                    then [FailureOfSameKindOfSegment x prevSegment currSegment]
-                    else []
-           in ( isValidSegment
-                  <> isNull
-                  <> hasGapOrNotAdjacent
-                  <> (if checkSameKindOfSegment then notSameKind else [])
-                  <> acc,
-                Just (currIndex, currSegment)
-              )
-      )
-      ([], Nothing)
-      xs
+validate :: SliceLookup -> [Error]
+validate x@(SliceLookup ref xs) =
+  let (errors, finalState) =
+        IntMap.foldlWithKey'
+          ( \(acc, previous) currIndex currSegment ->
+              let isValidSegment =
+                    if Segment.isValid currSegment
+                      then []
+                      else [NotValidSegment x currSegment]
+                  isNull =
+                    if Segment.null currSegment
+                      then [NullSegment x currSegment]
+                      else []
+                  hasGapOrNotAdjacent = case previous of
+                    Nothing -> []
+                    Just (prevIndex, prevSegment) ->
+                      if prevIndex + widthOf prevSegment == currIndex
+                        then []
+                        else [HasGapOrNotAdjacent x prevSegment currSegment]
+                  notSameKind = case previous of
+                    Nothing -> []
+                    Just (_, prevSegment) ->
+                      if Segment.sameKind prevSegment currSegment
+                        then [OfSameKindOfSegment x prevSegment currSegment]
+                        else []
+                  coveringAll = case previous of
+                    Nothing -> if currIndex == 0 then [] else [NotCoveringAll x]
+                    _ -> []
+               in ( acc
+                      <> isValidSegment
+                      <> isNull
+                      <> hasGapOrNotAdjacent
+                      <> notSameKind
+                      <> coveringAll,
+                    Just (currIndex, currSegment)
+                  )
+          )
+          ([], Nothing)
+          xs
+   in case finalState of
+        Nothing -> []
+        Just (lastIndex, lastSegment) -> if lastIndex + widthOf lastSegment == widthOf ref then errors else NotCoveringAll x : errors

@@ -44,13 +44,13 @@ tests = describe "SliceRelations" $ do
       let relations = SliceRelations.new
       forAll arbitraryNonOverlappingCommands $ \commands -> do
         let relations' = foldr execCommand relations commands
-        SliceRelations.collectFailure relations' `shouldBe` []
+        SliceRelations.validate relations' `shouldBe` []
 
     it "should result in valid SliceRelations" $ do
       let relations = SliceRelations.new
       property $ \commands -> do
         let relations' = foldr execCommand relations (commands :: [Command])
-        SliceRelations.collectFailure relations' `shouldBe` []
+        SliceRelations.validate relations' `shouldBe` []
 
     it "should handle this simple case correctly 1" $ do
       let relations = SliceRelations.new
@@ -58,7 +58,7 @@ tests = describe "SliceRelations" $ do
             [ Relate (Slice (RefUO 30 0) 10 30) (Slice (RefUO 30 0) 0 20)
             ]
       let relations' = foldr execCommand relations commands
-      SliceRelations.collectFailure relations' `shouldBe` []
+      SliceRelations.validate relations' `shouldBe` []
 
     it "should handle this simple case correctly 2" $ do
       -- RefUO 50 0     ├───────────╠═══════════╣─────┤
@@ -70,7 +70,7 @@ tests = describe "SliceRelations" $ do
               Relate (Slice (RefUO 50 0) 20 40) (Slice (RefUX 30 1) 0 20)
             ]
       let relations' = foldl (flip execCommand) relations commands
-      SliceRelations.collectFailure relations' `shouldBe` []
+      SliceRelations.validate relations' `shouldBe` []
 
     it "should handle this simple case correctly 3" $ do
       -- RefUO 50 0     ├───────────╠═══════════╣─────┤
@@ -82,7 +82,7 @@ tests = describe "SliceRelations" $ do
               Relate (Slice (RefUO 50 0) 20 40) (Slice (RefUO 50 0) 30 50)
             ]
       let relations' = foldl (flip execCommand) relations commands
-      SliceRelations.collectFailure relations' `shouldBe` []
+      SliceRelations.validate relations' `shouldBe` []
 
 --------------------------------------------------------------------------------
 
