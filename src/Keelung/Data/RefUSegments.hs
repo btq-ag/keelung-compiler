@@ -7,12 +7,13 @@
 module Keelung.Data.RefUSegments
   ( -- * Construction
     RefUSegments (RefUSegments),
+    PartialRefUSegments (PartialRefUSegments),
     fromRefU,
     fromSegment,
+    toPartial,
 
     -- * Projection
     toRefU,
-    toList,
     toIntMap,
 
     -- * Query
@@ -22,7 +23,6 @@ module Keelung.Data.RefUSegments
     mapInterval,
 
     -- * Splitting and slicing
-    split,
     splice,
 
     -- * Normalizing
@@ -68,6 +68,17 @@ instance HasWidth RefUSegments where
 
 --------------------------------------------------------------------------------
 
+data PartialRefUSegments = PartialRefUSegments Slice (IntMap Segment)
+  deriving (Eq, Generic, Show)
+
+instance HasWidth PartialRefUSegments where
+  widthOf (PartialRefUSegments slice _) = widthOf slice
+
+toPartial :: RefUSegments -> PartialRefUSegments
+toPartial (RefUSegments ref segments) = PartialRefUSegments (Slice ref 0 (widthOf ref)) segments
+
+--------------------------------------------------------------------------------
+
 -- | Constructs a `RefUSegments` with a `RefU` as its own parent
 fromRefU :: RefU -> RefUSegments
 fromRefU ref = RefUSegments ref (IntMap.singleton 0 (Segment.Free (widthOf ref)))
@@ -95,37 +106,33 @@ fromSegment (Slice ref start end) segment =
                     else [(0, segment)]
 
 -- | Split a `RefUSegments` into two at a given absolute index
-split :: Int -> RefUSegments -> (RefU, IntMap Segment, IntMap Segment)
-split index (RefUSegments ref xs) = case IntMap.splitLookup index xs of
-  (before, Just segment, after) -> (ref, before, IntMap.insert index segment after)
+split :: Int -> IntMap Segment -> (IntMap Segment, IntMap Segment)
+split index xs = case IntMap.splitLookup index xs of
+  (before, Just segment, after) -> (before, IntMap.insert index segment after)
   (before, Nothing, after) -> case IntMap.lookupLE index xs of
-    Nothing -> (ref, mempty, after)
+    Nothing -> (mempty, after)
     Just (index', segment) ->
       let (segment1, segment2) = Segment.unsafeSplit (index - index') segment
        in case (Segment.null segment1, Segment.null segment2) of
             (True, True) ->
               -- xs = before <index> after
-              (ref, before, after)
+              (before, after)
             (True, False) ->
               -- index = index'
               -- xs = before <index> segment2 <> after
-              (ref, before, IntMap.insert index segment2 after)
+              (before, IntMap.insert index segment2 after)
             (False, True) ->
               -- xs = before <index'> segment1 <index> after
-              (ref, IntMap.insert index' segment1 before, after)
+              (IntMap.insert index' segment1 before, after)
             (False, False) ->
               -- xs = before <index'> segment1 <index> segment2 <> after
-              (ref, IntMap.insert index' segment1 before, IntMap.insert index segment2 after)
+              (IntMap.insert index' segment1 before, IntMap.insert index segment2 after)
 
 -- | Given an interval, get a slice of RefUSegments
-splice :: (Int, Int) -> RefUSegments -> RefUSegments
-splice (start, end) segments = case split start segments of
-  (ref, _, afterStart) -> case split end (RefUSegments ref afterStart) of
-    (_, mid, _) -> RefUSegments ref mid
-
--- | Convert a `RefUSegments` to a list of `Segment`s
-toList :: RefUSegments -> [Segment]
-toList = IntMap.elems . rsSegments
+splice :: (Int, Int) -> RefUSegments -> PartialRefUSegments
+splice (start, end) (RefUSegments ref segments) = case split start segments of
+  (_, afterStart) -> case split end afterStart of
+    (mid, _) -> PartialRefUSegments (Slice ref start end) mid
 
 -- | Convert a `RefUSegments` to a IntMap of `Segment`s
 toIntMap :: RefUSegments -> IntMap Segment
@@ -151,9 +158,9 @@ lookupAt index (RefUSegments _ xs) = do
 
 -- | Given an interval, replace all segments with a single segment
 mapInterval :: (Segment -> Segment) -> (Int, Int) -> RefUSegments -> RefUSegments
-mapInterval f (start, end) segments = case split start segments of
-  (ref, beforeStart, afterStart) -> case split end (RefUSegments ref afterStart) of
-    (_, middle, afterEnd) -> RefUSegments ref $ beforeStart <> fmap f middle <> afterEnd
+mapInterval f (start, end) (RefUSegments ref segments) = case split start segments of
+  (beforeStart, afterStart) -> case split end afterStart of
+    (middle, afterEnd) -> RefUSegments ref $ beforeStart <> fmap f middle <> afterEnd
 
 --------------------------------------------------------------------------------
 

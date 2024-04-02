@@ -66,8 +66,8 @@ instance HasWidth Segment where
 -- | Check if two Segments are of the same kind
 sameKind :: Segment -> Segment -> Bool
 sameKind (Constant _) (Constant _) = True
-sameKind (ChildOf _) (ChildOf _) = True
 sameKind (Free _) (Free _) = True
+sameKind (ChildOf _) (ChildOf _) = False
 sameKind (Parent {}) (Parent {}) = False
 sameKind _ _ = False
 

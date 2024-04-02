@@ -32,7 +32,7 @@ defaultVar :: Gen Var
 defaultVar = chooseInt (0, 10)
 
 defaultWidth :: Gen Width
-defaultWidth = chooseInt (0, 8)
+defaultWidth = chooseInt (1, 8)
 
 instance Arbitrary RefU where
   arbitrary = defaultWidth >>= arbitraryRefUOfWidth
@@ -84,7 +84,7 @@ arbitrarySegmentOfSlice (Slice.Slice _ start end) =
         [ Segment.Constant <$> arbitraryUOfWidth width,
           Segment.ChildOf <$> arbitrarySliceOfWidth width,
           do
-            childrenCount <- defaultWidth
+            childrenCount <- chooseInt (1, 4)
             children <- vectorOf childrenCount $ arbitrarySliceOfWidth width
             pure $ Segment.Parent width (Map.fromList (map (\child -> (Slice.sliceRefU child, Set.singleton child)) children))
         ]
@@ -103,15 +103,12 @@ arbitrarySliceOfWidth width = do
 
 instance Arbitrary RefUSegments where
   arbitrary = do
-    start <- chooseInt (0, 16)
     segments <- removeAdjectSameKind <$> arbitrary
+    let intmap = snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (0, mempty) segments
     let width = sum (map widthOf segments)
-    var <- arbitraryRefUOfWidth width
+    ref <- arbitraryRefUOfWidth width
     pure $
-      RefUSegments.normalize $
-        RefUSegments.RefUSegments
-          var
-          (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (start, mempty) segments)
+      RefUSegments.normalize $ RefUSegments.RefUSegments ref intmap
     where
       -- prevent segments of the same kind from being adjacent
       removeAdjectSameKind :: [Segment] -> [Segment]

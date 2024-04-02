@@ -4,11 +4,11 @@ import Data.IntMap.Strict qualified as IntMap
 import Keelung (widthOf)
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
+import Keelung.Data.RefUSegments qualified as RefUSegments
 import Keelung.Data.Reference
 import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
-import Keelung.Data.RefUSegments qualified as RefUSegments
 import Test.Arbitrary
 import Test.Hspec
 import Test.QuickCheck
@@ -26,7 +26,7 @@ tests = describe "SliceRelations" $ do
             value <- arbitraryUOfWidth (widthOf ref)
             pure (ref, value)
       forAll genParam $ \(ref, val) -> do
-        let expected = RefUSegments.normalize $ RefUSegments.RefUSegments ref (IntMap.singleton 0 (Segment.Constant val))
+        let expected = RefUSegments.toPartial $ RefUSegments.normalize $ RefUSegments.RefUSegments ref (IntMap.singleton 0 (Segment.Constant val))
         let relations' = SliceRelations.assign (Slice.fromRefU ref) val relations
         let actual = SliceRelations.lookup (Slice.fromRefU ref) relations'
         actual `shouldBe` expected

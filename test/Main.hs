@@ -25,5 +25,4 @@ main = hspec $ do
   Data.LC.tests
   Data.PolyL.tests
   Data.IntervalSet.tests
-
--- Data.RefUSegments.tests
+  Data.RefUSegments.tests

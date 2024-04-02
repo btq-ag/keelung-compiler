@@ -20,7 +20,7 @@ import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
-import Keelung.Data.RefUSegments (RefUSegments (..))
+import Keelung.Data.RefUSegments (PartialRefUSegments (..))
 import Keelung.Data.Reference
 import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice (Slice)
@@ -255,7 +255,7 @@ reduceDivMod (a, b, q, r) = do
     go :: SliceRelations -> Either RefU U -> Either RefU U
     go _ (Right val) = Right val
     go relations (Left var) =
-      let RefUSegments _ segments = SliceRelations.lookup (Slice.fromRefU var) relations
+      let PartialRefUSegments _ segments = SliceRelations.lookup (Slice.fromRefU var) relations
        in case IntMap.elems segments of
             [Segment.ChildOf root] -> Left (Slice.sliceRefU root)
             [Segment.Constant value] -> Right value
@@ -497,7 +497,7 @@ substSlice ::
   (Slice, n) ->
   (Either n (PolyL n), Maybe Changes)
 substSlice relations initState (sliceWhole, multiplier) =
-  let RefUSegments _ segments = SliceRelations.lookup sliceWhole relations
+  let PartialRefUSegments _ segments = SliceRelations.lookup sliceWhole relations
       tagWithSlice = map (\(index, segment) -> (Slice.Slice (Slice.sliceRefU sliceWhole) index (index + widthOf segment), segment))
       removeNullSegment = filter (not . Segment.null . snd)
       segmentsWithSlices = tagWithSlice $ removeNullSegment (IntMap.toList segments)
