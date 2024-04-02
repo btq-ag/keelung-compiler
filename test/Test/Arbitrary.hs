@@ -13,13 +13,13 @@ import Keelung (Var)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
+import Keelung.Data.RefUSegments (RefUSegments)
+import Keelung.Data.RefUSegments qualified as RefUSegments
 import Keelung.Data.Reference
 import Keelung.Data.Segment (Segment)
 import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
-import Keelung.Data.SliceLookup (SliceLookup)
-import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf), Width)
@@ -101,15 +101,15 @@ arbitrarySliceOfWidth width = do
   ref <- arbitraryRefUOfWidth refUWidth
   pure $ Slice.Slice ref start end
 
-instance Arbitrary SliceLookup where
+instance Arbitrary RefUSegments where
   arbitrary = do
     start <- chooseInt (0, 16)
     segments <- removeAdjectSameKind <$> arbitrary
     let width = sum (map widthOf segments)
     var <- arbitraryRefUOfWidth width
     pure $
-      SliceLookup.normalize $
-        SliceLookup.SliceLookup
+      RefUSegments.normalize $
+        RefUSegments.RefUSegments
           var
           (snd $ foldr (\segment (index, acc) -> (index + widthOf segment, IntMap.insert index segment acc)) (start, mempty) segments)
     where

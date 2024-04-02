@@ -105,7 +105,7 @@ data Lookup n = Root | Value n | ChildOf n Ref n
 lookup :: (GaloisField n) => SliceRelations -> Ref -> RefRelations n -> Lookup n
 lookup relationsS (B (RefUBit refU index)) relationsR =
   let -- look in the SliceRelations first
-      lookupSliceRelations = case SliceRelations.lookupRefUBit refU index relationsS of
+      lookupSliceRelations = case SliceRelations.refUSegmentsRefUBit refU index relationsS of
         Nothing -> lookupRefRelations
         Just (Left (parent, index')) -> ChildOf 1 (B (RefUBit parent index')) 0
         Just (Right bitVal) -> Value (if bitVal then 1 else 0)

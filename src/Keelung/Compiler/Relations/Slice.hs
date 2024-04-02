@@ -11,7 +11,7 @@ module Keelung.Compiler.Relations.Slice
     relate,
     size,
     lookup,
-    lookupRefUBit,
+    refUSegmentsRefUBit,
     toConstraints,
     -- Testing
     isValid,
@@ -37,13 +37,13 @@ import Keelung.Compiler.Util
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.FieldInfo qualified as FieldInfo
+import Keelung.Data.RefUSegments (RefUSegments (..))
+import Keelung.Data.RefUSegments qualified as RefUSegments
 import Keelung.Data.Reference
 import Keelung.Data.Segment (Segment)
 import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
-import Keelung.Data.SliceLookup (SliceLookup (..))
-import Keelung.Data.SliceLookup qualified as SliceLookup
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (Width)
@@ -72,17 +72,11 @@ instance Show SliceRelations where
       showMapping :: Mapping -> String
       showMapping = indent . mconcat . map showVarMap . IntMap.elems . unMapping
 
-      showVarMap :: IntMap SliceLookup -> String
+      showVarMap :: IntMap RefUSegments -> String
       showVarMap varMap =
         if IntMap.null varMap
           then ""
-          else unlines (map showSliceLookup (IntMap.elems varMap))
-
-      showSliceLookup :: SliceLookup -> String
-      showSliceLookup (SliceLookup ref segments) =
-        show ref
-          <> ": "
-          <> show (IntMap.elems segments)
+          else unlines (map show (IntMap.elems varMap))
 
 new :: SliceRelations
 new = SliceRelations (Mapping mempty) (Mapping mempty) (Mapping mempty) (Mapping mempty)
@@ -129,12 +123,12 @@ size (SliceRelations refO refI refP refX) = sum (map sizeMapping [refO, refI, re
     sizeMapping :: Mapping -> Int
     sizeMapping (Mapping xs) = sum (map sizeVarMap (IntMap.elems xs))
 
-    sizeVarMap :: IntMap SliceLookup -> Int
+    sizeVarMap :: IntMap RefUSegments -> Int
     sizeVarMap = IntMap.size
 
--- | Given a Slice, return the SliceLookup of the Slice
-lookup :: Slice -> SliceRelations -> SliceLookup
-lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
+-- | Given a Slice, return the RefUSegments of the Slice
+lookup :: Slice -> SliceRelations -> RefUSegments
+lookup (Slice ref start end) relations = getRefUSegments (getMapping ref)
   where
     getMapping :: RefU -> Mapping
     getMapping (RefUO _ _) = srRefO relations
@@ -142,18 +136,18 @@ lookup (Slice ref start end) relations = lookupMapping (getMapping ref)
     getMapping (RefUP _ _) = srRefP relations
     getMapping (RefUX _ _) = srRefX relations
 
-    lookupMapping :: Mapping -> SliceLookup
-    lookupMapping (Mapping xs) =
-      let whenNotFound = SliceLookup ref (IntMap.singleton start (Segment.Free (end - start)))
+    getRefUSegments :: Mapping -> RefUSegments
+    getRefUSegments (Mapping xs) =
+      let whenNotFound = RefUSegments ref (IntMap.singleton start (Segment.Free (end - start)))
        in case IntMap.lookup (widthOf ref) xs of
             Nothing -> whenNotFound
-            Just varMap -> case IntMap.lookup (refUVar ref) varMap of
+            Just varToSegments -> case IntMap.lookup (refUVar ref) varToSegments of
               Nothing -> whenNotFound
-              Just lookups -> SliceLookup.splice (start, end) lookups
+              Just segments -> RefUSegments.splice (start, end) segments
 
 -- | Given a RefUBit, return the Segment of the RefUBit
-lookupRefUBit :: RefU -> Int -> SliceRelations -> Maybe (Either (RefU, Int) Bool)
-lookupRefUBit ref index relations = lookupMapping (getMapping ref)
+refUSegmentsRefUBit :: RefU -> Int -> SliceRelations -> Maybe (Either (RefU, Int) Bool)
+refUSegmentsRefUBit ref index relations = getRefUSegments (getMapping ref)
   where
     getMapping :: RefU -> Mapping
     getMapping (RefUO _ _) = srRefO relations
@@ -161,12 +155,12 @@ lookupRefUBit ref index relations = lookupMapping (getMapping ref)
     getMapping (RefUP _ _) = srRefP relations
     getMapping (RefUX _ _) = srRefX relations
 
-    lookupMapping :: Mapping -> Maybe (Either (RefU, Int) Bool)
-    lookupMapping (Mapping xs) = case IntMap.lookup (widthOf ref) xs of
+    getRefUSegments :: Mapping -> Maybe (Either (RefU, Int) Bool)
+    getRefUSegments (Mapping xs) = case IntMap.lookup (widthOf ref) xs of
       Nothing -> Nothing
-      Just varMap -> case IntMap.lookup (refUVar ref) varMap of
+      Just varToSegments -> case IntMap.lookup (refUVar ref) varToSegments of
         Nothing -> Nothing
-        Just lookups -> SliceLookup.lookupAt index lookups
+        Just segments -> RefUSegments.lookupAt index segments
 
 -- | Convert relations to specialized constraints
 toConstraints :: FieldInfo -> OccurU -> (Slice -> Bool) -> SliceRelations -> Seq (Constraint n)
@@ -233,11 +227,11 @@ fold f acc relations =
    in foldl foldMapping acc [refO, refI, refP, refX]
   where
     foldMapping a (Mapping xs) = foldl foldVarMap a xs
-    foldVarMap = foldl foldSliceLookup
-    foldSliceLookup a (SliceLookup ref segments) = foldl (\b (index, segment) -> f b (Slice ref index (index + widthOf segment)) segment) a (IntMap.toList segments)
+    foldVarMap = foldl foldRefUSegments
+    foldRefUSegments a (RefUSegments ref segments) = foldl (\b (index, segment) -> f b (Slice ref index (index + widthOf segment)) segment) a (IntMap.toList segments)
 
 -- | FOR TESTING: A SliceRelations is valid if:
---    1. all existing SliceLookups cover the entire width of the variable
+--    1. all existing RefUSegmentss cover the entire width of the variable
 --    2. all children of a Parent Segment has the parent as its root
 isValid :: SliceRelations -> Bool
 isValid = null . validate
@@ -245,22 +239,22 @@ isValid = null . validate
 --------------------------------------------------------------------------------
 
 data Failure
-  = InvalidSliceLookup SliceLookup.Error
+  = InvalidRefUSegments RefUSegments.Error
   | InvalidKinship Kinship
   deriving (Eq, Show)
 
 validate :: SliceRelations -> [Failure]
-validate relations = fromKinshipConstruction <> fromInvalidSliceLookup
+validate relations = fromKinshipConstruction <> fromInvalidRefUSegments
   where
     SliceRelations refO refI refP refX = relations
 
-    fromInvalidSliceLookup = mconcat (map isValidMapping [refO, refI, refP, refX])
+    fromInvalidRefUSegments = mconcat (map isValidMapping [refO, refI, refP, refX])
 
     isValidMapping :: Mapping -> [Failure]
-    isValidMapping (Mapping xs) = mconcat $ map (mconcat . map isValidSliceLookup . IntMap.elems) (IntMap.elems xs)
+    isValidMapping (Mapping xs) = mconcat $ map (mconcat . map isValidRefUSegments . IntMap.elems) (IntMap.elems xs)
 
-    isValidSliceLookup :: SliceLookup -> [Failure]
-    isValidSliceLookup x = map InvalidSliceLookup (SliceLookup.validate x)
+    isValidRefUSegments :: RefUSegments -> [Failure]
+    isValidRefUSegments x = map InvalidRefUSegments (RefUSegments.validate x)
 
     fromKinshipConstruction :: [Failure]
     fromKinshipConstruction = case nullKinship (destroyKinshipWithParent relations (constructKinshipWithChildOf relations)) of
@@ -305,13 +299,13 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
 assignValueToSegment :: U -> Slice -> M ()
 assignValueToSegment val (Slice ref start end) =
   modify $
-    modifySliceLookup
+    modifyRefUSegments
       ref
-      (mapSliceLookup (SliceLookup.fromRefU ref)) -- insert this SliceLookup if it does not exist
-      mapSliceLookup -- else modify the existing SliceLookup
+      (mapRefUSegments (RefUSegments.fromRefU ref)) -- insert this RefUSegments if it does not exist
+      mapRefUSegments -- else modify the existing RefUSegments
   where
-    mapSliceLookup :: SliceLookup -> SliceLookup
-    mapSliceLookup = SliceLookup.mapInterval (const (Segment.Constant val)) (start, end)
+    mapRefUSegments :: RefUSegments -> RefUSegments
+    mapRefUSegments = RefUSegments.mapInterval (const (Segment.Constant val)) (start, end)
 
 assignValueToFamily :: U -> FamilyLookup -> M ()
 assignValueToFamily _ (FamilyLookup []) = return ()
@@ -339,10 +333,10 @@ relateRootToSegment root child = do
     modifySegment :: (Maybe Segment -> Segment) -> Slice -> M ()
     modifySegment f (Slice ref start end) =
       modify $
-        modifySliceLookup
+        modifyRefUSegments
           ref
-          (SliceLookup.fromSegment (Slice ref start end) (f Nothing)) -- what to do if the SliceLookup does not exist
-          (SliceLookup.mapInterval (f . Just) (start, end))
+          (RefUSegments.fromSegment (Slice ref start end) (f Nothing)) -- what to do if the RefUSegments does not exist
+          (RefUSegments.mapInterval (f . Just) (start, end))
 
 relateRootToFamily :: Slice -> FamilyLookup -> M ()
 relateRootToFamily _ (FamilyLookup []) = return ()
@@ -353,8 +347,8 @@ relateRootToFamily root (FamilyLookup (x : xs)) = do
 
 --------------------------------------------------------------------------------
 
--- | Internal data structure for storing SliceLookups
-newtype Mapping = Mapping {unMapping :: IntMap (IntMap SliceLookup)}
+-- | Internal data structure for storing RefUSegmentss
+newtype Mapping = Mapping {unMapping :: IntMap (IntMap RefUSegments)}
   deriving (Eq, Generic)
 
 instance NFData Mapping
@@ -368,36 +362,36 @@ instance Show Mapping where
           <> mconcat (map showVarMap (IntMap.elems xs))
           <> "}"
     where
-      showVarMap :: IntMap SliceLookup -> String
+      showVarMap :: IntMap RefUSegments -> String
       showVarMap varMap =
         if IntMap.null varMap
           then ""
           else unlines (map (\(_, slice) -> "    " <> show slice) (IntMap.toList varMap))
 
--- | Given a RefU, modify the SliceLookup referenced by the RefU
---   Insert a new SliceLookup if it does not exist
-modifySliceLookup :: RefU -> SliceLookup -> (SliceLookup -> SliceLookup) -> SliceRelations -> SliceRelations
-modifySliceLookup ref e f relations = case ref of
-  RefUO width _ -> relations {srRefO = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefO relations)))}
-  RefUI width _ -> relations {srRefI = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefI relations)))}
-  RefUP width _ -> relations {srRefP = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefP relations)))}
-  RefUX width _ -> relations {srRefX = Mapping (IntMap.alter alterSliceLookups width (unMapping (srRefX relations)))}
+-- | Given a RefU, modify the RefUSegments referenced by the RefU
+--   Insert a new RefUSegments if it does not exist
+modifyRefUSegments :: RefU -> RefUSegments -> (RefUSegments -> RefUSegments) -> SliceRelations -> SliceRelations
+modifyRefUSegments ref e f relations = case ref of
+  RefUO width _ -> relations {srRefO = Mapping (IntMap.alter alterRefUSegmentss width (unMapping (srRefO relations)))}
+  RefUI width _ -> relations {srRefI = Mapping (IntMap.alter alterRefUSegmentss width (unMapping (srRefI relations)))}
+  RefUP width _ -> relations {srRefP = Mapping (IntMap.alter alterRefUSegmentss width (unMapping (srRefP relations)))}
+  RefUX width _ -> relations {srRefX = Mapping (IntMap.alter alterRefUSegmentss width (unMapping (srRefX relations)))}
   where
-    alterSliceLookups :: Maybe (IntMap SliceLookup) -> Maybe (IntMap SliceLookup)
-    alterSliceLookups Nothing = Just (IntMap.singleton (refUVar ref) e) -- insert a new SliceLookup if it does not exist
-    alterSliceLookups (Just x) = Just (IntMap.alter alterSliceLookup (refUVar ref) x)
+    alterRefUSegmentss :: Maybe (IntMap RefUSegments) -> Maybe (IntMap RefUSegments)
+    alterRefUSegmentss Nothing = Just (IntMap.singleton (refUVar ref) e) -- insert a new RefUSegments if it does not exist
+    alterRefUSegmentss (Just x) = Just (IntMap.alter alterRefUSegments (refUVar ref) x)
 
-    alterSliceLookup :: Maybe SliceLookup -> Maybe SliceLookup
-    alterSliceLookup Nothing = Just e -- insert a new SliceLookup if it does not exist
-    alterSliceLookup (Just x) = Just (f x)
+    alterRefUSegments :: Maybe RefUSegments -> Maybe RefUSegments
+    alterRefUSegments Nothing = Just e -- insert a new RefUSegments if it does not exist
+    alterRefUSegments (Just x) = Just (f x)
 
 -- | Convert a SliceRelations to a list of SliceSegmentPairs
-sliceLookupToPairs :: SliceLookup -> [SliceSegmentPair]
-sliceLookupToPairs (SliceLookup ref segments) = map (\(offset, segment) -> (Slice ref offset (offset + widthOf segment), segment)) (IntMap.toList segments)
+sliceLookupToPairs :: RefUSegments -> [SliceSegmentPair]
+sliceLookupToPairs (RefUSegments ref segments) = map (\(offset, segment) -> (Slice ref offset (offset + widthOf segment), segment)) (IntMap.toList segments)
 
 --------------------------------------------------------------------------------
 
--- | The equivalence class version of SliceLookup
+-- | The equivalence class version of RefUSegments
 newtype FamilyLookup = FamilyLookup [[Slice]] -- the equivalence class of each segment
 
 -- | Given a Slice and its corresponding Segment, return all member Slices of the equivalence class of that Slice
@@ -407,7 +401,7 @@ familySlicesOfSliceSegmentPair :: SliceRelations -> SliceSegmentPair -> [Slice]
 familySlicesOfSliceSegmentPair relations (slice, segment) = case segment of
   Segment.Constant _ -> []
   Segment.ChildOf root ->
-    let SliceLookup _ segments = lookup root relations
+    let RefUSegments _ segments = lookup root relations
      in case IntMap.elems segments of
           [] -> error "[ panic ] getFamily: ChildOf root has no segments"
           [Segment.Parent _ children] -> root : Set.toList (Set.unions (Map.elems children))
@@ -434,16 +428,16 @@ lookupFamilyWithSliceSegmentPairM = gets . lookupFamilyWithSliceSegmentPair
 
 --------------------------------------------------------------------------------
 
--- | Given 2 SliceLookups of the same lengths, generate pairs of aligned segments (indexed with their offsets).
---   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two lookups.
+-- | Given 2 RefUSegmentss of the same lengths, generate pairs of aligned segments (indexed with their offsets).
+--   Such that the boundaries of the generated segments pairs are the union of the boundaries of the two segments.
 --   Example:
 --      slice 1      ├─────B─────┼──A──┤
 --      slice 2      ├──A──┼─────C─────┤
 --                          =>
 --      pairs        ├──B──┼──B──┼──A──┤
 --      pairs        ├──A──┼──C──┼──C──┤
-toAlignedSegmentPairs :: SliceLookup -> SliceLookup -> [(SliceSegmentPair, SliceSegmentPair)]
-toAlignedSegmentPairs (SliceLookup ref1 segments1) (SliceLookup ref2 segments2) =
+toAlignedSegmentPairs :: RefUSegments -> RefUSegments -> [(SliceSegmentPair, SliceSegmentPair)]
+toAlignedSegmentPairs (RefUSegments ref1 segments1) (RefUSegments ref2 segments2) =
   step (IntMap.toList segments1) (IntMap.toList segments2)
   where
     step :: [(Int, Segment)] -> [(Int, Segment)] -> [(SliceSegmentPair, SliceSegmentPair)]

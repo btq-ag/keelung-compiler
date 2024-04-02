@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module Main where
 
@@ -7,6 +7,7 @@ import Test.Data.IntervalSet qualified as Data.IntervalSet
 import Test.Data.IntervalTable qualified as Data.IntervalTable
 import Test.Data.LC qualified as Data.LC
 import Test.Data.PolyRS qualified as Data.PolyL
+import Test.Data.RefUSegments qualified as Data.RefUSegments
 import Test.Hspec (hspec)
 import Test.Intergration qualified as Intergration
 import Test.Optimization qualified as Optimization
@@ -24,3 +25,5 @@ main = hspec $ do
   Data.LC.tests
   Data.PolyL.tests
   Data.IntervalSet.tests
+
+-- Data.RefUSegments.tests
