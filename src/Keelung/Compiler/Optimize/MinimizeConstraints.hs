@@ -1,3 +1,17 @@
+-- | Optimization by substituting variables in constraints.
+--
+--   In each iteration, we do the following steps:
+--      1. reduce constraints by substituting their constituents with known facts
+--      2. learn new facts from the reduced constraints
+--      3. repeat until we can't reduce any more constraints
+--
+--   In order to minimize the the number of iterations, we group constraints into these categories:
+--      1. addative constraints
+--      2. multiplicative constraints
+--      3. DivMods hints
+--      4. ModInvs hints
+--
+--    Optimization are run in the order above, if we have learned a new fact of a certain category, we restart the optimization of that category.
 module Keelung.Compiler.Optimize.MinimizeConstraints (run) where
 
 import Control.Monad.Except
@@ -83,11 +97,6 @@ runStateMachine cm action = do
 
 ------------------------------------------------------------------------------
 
--- optimizeAddF :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
--- optimizeAddF cm = runOptiM cm $ runRoundM $ do
---   result <- foldMaybeM reduceAddF [] (cmAddF cm)
---   modify' $ \cm' -> cm' {cmAddF = result}
-
 optimizeAddL :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compile.Error n) (WhatChanged, ConstraintModule n)
 optimizeAddL cm = runOptiM cm $ runRoundM $ do
   result <- foldMaybeM reduceAddL mempty (cmAddL cm)
@@ -122,119 +131,120 @@ foldMaybeM f = foldM $ \acc x -> do
 
 ------------------------------------------------------------------------------
 
--- | Trying to reduce an additive field constraint, returns Nothing if it cannot be reduced
+-- | Trying to reduce an additive constraint, returns Nothing if it cannot be reduced
 reduceAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Maybe (PolyL n))
 reduceAddL polynomial = do
-  relations <- gets cmRelations
-  case substPolyL relations polynomial of
-    Nothing -> do
-      reduced <- learnFromAddL polynomial -- learn from the polynomial
-      if reduced
-        then return Nothing -- polynomial has been reduced to nothing
-        else return (Just polynomial) -- nothing changed
-    Just (Left constant, changes) -> do
-      when (constant /= 0) $ error "[ panic ] Additive reduced to some constant other than 0"
-      -- the polynomial has been reduced to nothing
-      markChanged AdditiveLimbConstraintChanged
-      -- remove all variables in the polynomial from the occurrence list
-      applyChanges changes
-      return Nothing
-    Just (Right substitutedPolynomial, changes) -> do
+  -- substitution phase
+  result <- substPolyM polynomial
+  substResult <- case result of
+    Nothing -> return (Just polynomial) -- nothing substituted
+    Just (Left constant) -> do
+      when (constant /= 0) $ error "[ panic ] Additive constraint reduced to some constant other than 0"
+      return Nothing -- the polynomial has been reduced to nothing
+    Just (Right substitutedPolynomial) -> do
       -- the polynomial has been reduced to something
       markChanged AdditiveLimbConstraintChanged
-      -- remove variables that has been reduced in the polynomial from the occurrence list
-      applyChanges changes
-      -- learn from the substituted Polynomial
-      reduced <- learnFromAddL substitutedPolynomial
+      return (Just substitutedPolynomial)
+  -- learning phase
+  case substResult of
+    Nothing -> return Nothing
+    Just poly -> do
+      reduced <- learnFromAdd poly
       if reduced
         then return Nothing -- polynomial has been reduced to nothing
-        else -- keep substituting the substituted polynomial
-          reduceAddL substitutedPolynomial
+        else return (Just poly)
 
 ------------------------------------------------------------------------------
 
 type MulL n = (PolyL n, PolyL n, Either n (PolyL n))
 
+-- | Trying to reduce a multiplicative constraint, returns Nothing if it cannot be reduced
 reduceMulL :: (GaloisField n, Integral n) => MulL n -> RoundM n (Maybe (MulL n))
 reduceMulL (polyA, polyB, polyC) = do
+  -- substitution phase
   polyAResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyA
   polyBResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyB
   polyCResult <- case polyC of
     Left constantC -> return (Left constantC)
     Right polyC' -> substitutePolyL MultiplicativeLimbConstraintChanged polyC'
-  reduceMulL_ polyAResult polyBResult polyCResult
+  -- learning phase
+  case (polyAResult, polyBResult, polyCResult) of
+    (Left a, Left b, Left c) -> do
+      when (a * b /= c) $ error $ "[ panic ] Multiplicative constraint reduced to some inequality: " <> show a <> " * " <> show b <> " /= " <> show c
+      return Nothing
+    (Left a, Left b, Right c) -> do
+      learnFromMulLCCP a b c
+      return Nothing
+    (Left a, Right b, Left c) -> do
+      learnFromMulLCPC a b c
+      return Nothing
+    (Left a, Right b, Right c) -> do
+      learnFromMulLCPP a b c
+      return Nothing
+    (Right a, Left b, Left c) -> do
+      learnFromMulLCPC b a c
+      return Nothing
+    (Right a, Left b, Right c) -> do
+      learnFromMulLCPP b a c
+      return Nothing
+    (Right a, Right b, Left c) -> return (Just (a, b, Left c))
+    (Right a, Right b, Right c) -> return (Just (a, b, Right c))
 
 -- | Substitutes Refs & Limbs in a polynomial and returns the reduced polynomial if it is reduced
 substitutePolyL :: (GaloisField n, Integral n) => WhatChanged -> PolyL n -> RoundM n (Either n (PolyL n))
 substitutePolyL typeOfChange polynomial = do
-  relations <- gets cmRelations
-  case substPolyL relations polynomial of
+  result <- substPolyM polynomial
+  case result of
     Nothing -> return (Right polynomial) -- nothing changed
-    Just (Left constant, changes) -> do
+    Just (Left constant) -> do
       -- the polynomial has been reduced to nothing
       markChanged typeOfChange
-      -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list
-      applyChanges changes
       return (Left constant)
-    Just (Right reducePolynomial, changes) -> do
+    Just (Right substitutedPolynomial) -> do
       -- the polynomial has been reduced to something
       markChanged typeOfChange
-      -- remove all referenced RefUs in the Limbs of the polynomial from the occurrence list and add the new ones
-      applyChanges changes
-      return (Right reducePolynomial)
+      return (Right substitutedPolynomial)
 
--- | Trying to reduce a multiplicative limb constaint, returns the reduced constraint if it is reduced
-reduceMulL_ :: (GaloisField n, Integral n) => Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> RoundM n (Maybe (MulL n))
-reduceMulL_ polyA polyB polyC = case (polyA, polyB, polyC) of
-  (Left _a, Left _b, Left _c) -> return Nothing
-  (Left a, Left b, Right c) -> reduceMulLCCP a b c >> return Nothing
-  (Left a, Right b, Left c) -> reduceMulLCPC a b c >> return Nothing
-  (Left a, Right b, Right c) -> reduceMulLCPP a b c >> return Nothing
-  (Right a, Left b, Left c) -> reduceMulLCPC b a c >> return Nothing
-  (Right a, Left b, Right c) -> reduceMulLCPP b a c >> return Nothing
-  (Right a, Right b, Left c) -> return (Just (a, b, Left c))
-  (Right a, Right b, Right c) -> return (Just (a, b, Right c))
-
--- | Trying to reduce a multiplicative limb constaint of (Constant / Constant / Polynomial)
+-- | Trying to learn from a multiplicative limb constaint of (Constant / Constant / Polynomial)
 --    a * b = cm
 --      =>
 --    cm - a * b = 0
-reduceMulLCCP :: (GaloisField n, Integral n) => n -> n -> PolyL n -> RoundM n ()
-reduceMulLCCP a b cm = addAddL $ PolyL.addConstant (-a * b) cm
+learnFromMulLCCP :: (GaloisField n, Integral n) => n -> n -> PolyL n -> RoundM n ()
+learnFromMulLCCP a b cm = learnFromMul $ PolyL.addConstant (-a * b) cm
 
--- | Trying to reduce a multiplicative limb constaint of (Constant / Polynomial / Constant)
+-- | Trying to learn from a multiplicative limb constaint of (Constant / Polynomial / Constant)
 --    a * bs = c
 --      =>
 --    c - a * bs = 0
-reduceMulLCPC :: (GaloisField n, Integral n) => n -> PolyL n -> n -> RoundM n ()
-reduceMulLCPC a bs c = case PolyL.multiplyBy (-a) bs of
+learnFromMulLCPC :: (GaloisField n, Integral n) => n -> PolyL n -> n -> RoundM n ()
+learnFromMulLCPC a bs c = case PolyL.multiplyBy (-a) bs of
   Left constant ->
     if constant == c
       then modify' $ removeOccurrence bs
       else throwError $ Compile.ConflictingValuesF constant c
-  Right xs -> addAddL $ PolyL.addConstant c xs
+  Right xs -> learnFromMul $ PolyL.addConstant c xs
 
--- | Trying to reduce a multiplicative limb constaint of (Constant / Polynomial / Polynomial)
+-- | Trying to learn from a multiplicative limb constaint of (Constant / Polynomial / Polynomial)
 --    a * bs = cm
 --      =>
 --    cm - a * bs = 0
-reduceMulLCPP :: (GaloisField n, Integral n) => n -> PolyL n -> PolyL n -> RoundM n ()
-reduceMulLCPP a polyB polyC = case PolyL.multiplyBy (-a) polyB of
+learnFromMulLCPP :: (GaloisField n, Integral n) => n -> PolyL n -> PolyL n -> RoundM n ()
+learnFromMulLCPP a polyB polyC = case PolyL.multiplyBy (-a) polyB of
   Left constant ->
     if constant == 0
       then do
         -- a * bs = 0
         -- cm = 0
         modify' $ removeOccurrence polyB
-        addAddL polyC
+        learnFromMul polyC
       else do
         -- a * bs = constant = cm
         -- => cm - constant = 0
         modify' $ removeOccurrence polyB
-        addAddL (PolyL.addConstant (-constant) polyC)
+        learnFromMul (PolyL.addConstant (-constant) polyC)
   Right polyBa -> case PolyL.merge polyC polyBa of
     Left _ -> return ()
-    Right poly -> addAddL poly
+    Right poly -> learnFromMul poly
 
 ------------------------------------------------------------------------------
 
@@ -305,10 +315,10 @@ runRoundM = execWriterT
 markChanged :: WhatChanged -> RoundM n ()
 markChanged = tell
 
--- | Go through additive constraints and classify them into relation constraints when possible.
---   Returns 'True' if the constraint has been reduced.
-learnFromAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
-learnFromAddL poly = case PolyL.view poly of
+-- | Learn about facts of a additive constraint.
+--   Returns 'True' if the constraint has been reduced to nothing.
+learnFromAdd :: (GaloisField n, Integral n) => PolyL n -> RoundM n Bool
+learnFromAdd poly = case PolyL.view poly of
   PolyL.RefMonomial intercept (var, slope) -> do
     --    intercept + slope * var = 0
     --  =>
@@ -337,6 +347,16 @@ learnFromAddL poly = case PolyL.view poly of
       else return False
   PolyL.SlicePolynomial {} -> return False
   PolyL.MixedPolynomial {} -> return False
+
+-- | Learn about facts of additive constraints after substituting multiplicative constraints
+learnFromMul :: (GaloisField n, Integral n) => PolyL n -> RoundM n ()
+learnFromMul poly = do
+  reducedToNothing <- learnFromAdd poly
+  if reducedToNothing
+    then return ()
+    else do
+      markChanged AdditiveFieldConstraintChanged
+      modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
 
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
@@ -400,46 +420,6 @@ relateS slice1 slice2 = do
 
 --------------------------------------------------------------------------------
 
--- | Add learned additive constraints to the pool
-addAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n ()
-addAddL poly = case PolyL.view poly of
-  PolyL.RefMonomial constant (var1, coeff1) -> do
-    --    constant + coeff1 * var1 = 0
-    --      =>
-    --    var1 = - constant / coeff1
-    assign var1 (-constant / coeff1)
-  PolyL.RefBinomial constant (var1, coeff1) (var2, coeff2) -> do
-    --    constant + coeff1 * var1 + coeff2 * var2 = 0
-    --      =>
-    --    coeff1 * var1 = - coeff2 * var2 - constant
-    --      =>
-    --    var1 = - coeff2 * var2 / coeff1 - constant / coeff1
-    void $ relateF var1 (-coeff2 / coeff1, var2, -constant / coeff1)
-  PolyL.RefPolynomial _ _ -> do
-    markChanged AdditiveFieldConstraintChanged
-    modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
-  PolyL.SliceMonomial constant (slice1, multiplier1) -> do
-    --  constant + slice1 * multiplier1  = 0
-    --    =>
-    --  slice1 = - constant / multiplier1
-    assignS slice1 (toInteger (-constant / multiplier1))
-  PolyL.SliceBinomial constant (slice1, multiplier1) (slice2, multiplier2) -> do
-    if constant == 0 && multiplier1 == -multiplier2
-      then do
-        --  slice1 * multiplier1 = slice2 * multiplier2
-        void $ relateS slice1 slice2
-      else do
-        markChanged AdditiveLimbConstraintChanged
-        modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
-  PolyL.SlicePolynomial {} -> do
-    markChanged AdditiveLimbConstraintChanged
-    modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
-  PolyL.MixedPolynomial {} -> do
-    markChanged AdditiveFieldConstraintChanged
-    modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
-
---------------------------------------------------------------------------------
-
 -- | Keep track of what has been changed in the substitution
 data Changes = Changes
   { addedSlices :: Set Slice,
@@ -473,6 +453,17 @@ removeRef ref (Just changes) = Just (changes {removedRefs = Set.insert ref (remo
 removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 
 --------------------------------------------------------------------------------
+
+-- | Try to substitute a polynomial, returns 'Nothing' if nothing changed, 'Just' if something changed
+substPolyM :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Maybe (Either n (PolyL n)))
+substPolyM poly = do
+  relations <- gets cmRelations
+  let result = substPolyL relations poly
+  case result of
+    Nothing -> return Nothing
+    Just (substituted, changes) -> do
+      applyChanges changes
+      return (Just substituted)
 
 -- | Substitutes Limbs in a PolyL.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
