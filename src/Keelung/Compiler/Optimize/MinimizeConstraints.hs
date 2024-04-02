@@ -131,7 +131,7 @@ foldMaybeM f = foldM $ \acc x -> do
 
 ------------------------------------------------------------------------------
 
--- | Trying to reduce an additive constraint, returns Nothing if it cannot be reduced
+-- | Trying to reduce an additive constraint, returns Nothing if it has been reduced to nothing
 reduceAddL :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Maybe (PolyL n))
 reduceAddL polynomial = do
   -- substitution phase
@@ -158,19 +158,19 @@ reduceAddL polynomial = do
 
 type MulL n = (PolyL n, PolyL n, Either n (PolyL n))
 
--- | Trying to reduce a multiplicative constraint, returns Nothing if it cannot be reduced
+-- | Trying to reduce a multiplicative constraint, returns Nothing if it has been reduced to nothing
 reduceMulL :: (GaloisField n, Integral n) => MulL n -> RoundM n (Maybe (MulL n))
 reduceMulL (polyA, polyB, polyC) = do
   -- substitution phase
-  polyAResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyA
-  polyBResult <- substitutePolyL MultiplicativeLimbConstraintChanged polyB
+  polyAResult <- substitute polyA
+  polyBResult <- substitute polyB
   polyCResult <- case polyC of
     Left constantC -> return (Left constantC)
-    Right polyC' -> substitutePolyL MultiplicativeLimbConstraintChanged polyC'
+    Right polyC' -> substitute polyC'
   -- learning phase
   case (polyAResult, polyBResult, polyCResult) of
     (Left a, Left b, Left c) -> do
-      when (a * b /= c) $ error $ "[ panic ] Multiplicative constraint reduced to some inequality: " <> show a <> " * " <> show b <> " /= " <> show c
+      when (a * b /= c) $ throwError $ Compile.ConflictingValuesF (a * b) c
       return Nothing
     (Left a, Left b, Right c) -> do
       learnFromMulLCCP a b c
@@ -189,21 +189,15 @@ reduceMulL (polyA, polyB, polyC) = do
       return Nothing
     (Right a, Right b, Left c) -> return (Just (a, b, Left c))
     (Right a, Right b, Right c) -> return (Just (a, b, Right c))
-
--- | Substitutes Refs & Limbs in a polynomial and returns the reduced polynomial if it is reduced
-substitutePolyL :: (GaloisField n, Integral n) => WhatChanged -> PolyL n -> RoundM n (Either n (PolyL n))
-substitutePolyL typeOfChange polynomial = do
-  result <- substPolyM polynomial
-  case result of
-    Nothing -> return (Right polynomial) -- nothing changed
-    Just (Left constant) -> do
-      -- the polynomial has been reduced to nothing
-      markChanged typeOfChange
-      return (Left constant)
-    Just (Right substitutedPolynomial) -> do
-      -- the polynomial has been reduced to something
-      markChanged typeOfChange
-      return (Right substitutedPolynomial)
+  where
+    substitute :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Either n (PolyL n))
+    substitute polynomial = do
+      substResult <- substPolyM polynomial
+      case substResult of
+        Nothing -> return (Right polynomial) -- nothing changed
+        Just result -> do
+          markChanged MultiplicativeLimbConstraintChanged
+          return result
 
 -- | Trying to learn from a multiplicative limb constaint of (Constant / Constant / Polynomial)
 --    a * b = cm
@@ -243,7 +237,8 @@ learnFromMulLCPP a polyB polyC = case PolyL.multiplyBy (-a) polyB of
         modify' $ removeOccurrence polyB
         learnFromMul (PolyL.addConstant (-constant) polyC)
   Right polyBa -> case PolyL.merge polyC polyBa of
-    Left _ -> return ()
+    Left 0 -> return ()
+    Left constant -> throwError $ Compile.ConflictingValuesF constant 0
     Right poly -> learnFromMul poly
 
 ------------------------------------------------------------------------------
