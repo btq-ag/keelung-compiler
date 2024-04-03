@@ -55,8 +55,8 @@ linkConstraintModule cm =
     { csOptions = cmOptions cm,
       csCounters = envCounters env,
       csConstraints = constraints >>= linkConstraint env,
-      csDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) divMods,
-      csCLDivMods = fmap (\(a, b, c, d) -> ([a], [b], [c], [d])) clDivMods,
+      csDivMods = divMods,
+      csCLDivMods = clDivMods,
       csModInvs = fmap (\(a, b, c, d) -> ([a], [b], [c], d)) modInvs
     }
   where
@@ -65,13 +65,17 @@ linkConstraintModule cm =
     constraints = toConstraints cm env
 
     -- constraints extracted from hints
-    divMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmDivMods cm
-    clDivMods = (\(a, b, q, r) -> (fromEitherRefU a, fromEitherRefU b, fromEitherRefU q, fromEitherRefU r)) <$> cmCLDivMods cm
+    divMods = (\(a, b, q, r) -> (fromEitherPolyL a, fromEitherPolyL b, fromEitherPolyL q, fromEitherPolyL r)) <$> cmDivMods cm
+    clDivMods = (\(a, b, q, r) -> (fromEitherPolyL a, fromEitherPolyL b, fromEitherPolyL q, fromEitherPolyL r)) <$> cmCLDivMods cm
     modInvs = (\(a, output, n, p) -> (fromEitherRefU a, fromEitherRefU output, fromEitherRefU n, toInteger p)) <$> cmModInvs cm
 
     fromEitherRefU :: Either RefU U -> (Width, Either Var Integer)
     fromEitherRefU (Left var) = let width = widthOf var in (width, Left (reindexRefB env (RefUBit var 0)))
     fromEitherRefU (Right val) = let width = widthOf val in (width, Right (toInteger val))
+
+    fromEitherPolyL :: Either n (PolyL n) -> [(Width, Either Var Integer)]
+    fromEitherPolyL (Left val) = let width = widthOf val in [(width, Right (toInteger val))]
+    fromEitherPolyL (Right poly) = let width = widthOf var in (width, Left (reindexRefB env (RefUBit var 0)))
 
 -------------------------------------------------------------------------------
 

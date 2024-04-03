@@ -243,19 +243,17 @@ learnFromMulLCPP a polyB polyC = case PolyL.multiplyBy (-a) polyB of
 
 ------------------------------------------------------------------------------
 
-type DivMod = (Either RefU U, Either RefU U, Either RefU U, Either RefU U)
+type DivMod n = (Either n (PolyL n), Either n (PolyL n), Either n (PolyL n), Either n (PolyL n))
 
 -- | Subsitute variables in polynomials of DivMod with their corresponding values or roots
-reduceDivMod :: (GaloisField n, Integral n) => DivMod -> RoundM n (Maybe DivMod)
+reduceDivMod :: (GaloisField n, Integral n) => DivMod n -> RoundM n (Maybe (DivMod n))
 reduceDivMod (a, b, q, r) = do
-  relationsS <- gets (Relations.relationsS . cmRelations)
-  return $
-    Just
-      ( go relationsS a,
-        go relationsS b,
-        go relationsS q,
-        go relationsS r
-      )
+  -- relationsS <- gets (Relations.relationsS . cmRelations)
+  a' <- substitute a
+  b' <- substitute b
+  q' <- substitute q
+  r' <- substitute r
+  return $ Just (a', b', q', r')
   where
     go :: SliceRelations -> Either RefU U -> Either RefU U
     go _ (Right val) = Right val
@@ -267,6 +265,14 @@ reduceDivMod (a, b, q, r) = do
             [Segment.Parent _ _] -> Left var
             [Segment.Free _] -> Left var
             _ -> Left var
+
+    substitute :: (GaloisField n, Integral n) => Either n (PolyL n) -> RoundM n (Either n (PolyL n))
+    substitute (Left constant) = return (Left constant)
+    substitute (Right polynomial) = do
+      substResult <- substPolyM polynomial
+      case substResult of
+        Nothing -> return (Right polynomial) -- nothing changed
+        Just result -> return result
 
 ------------------------------------------------------------------------------
 

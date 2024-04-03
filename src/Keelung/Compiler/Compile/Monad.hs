@@ -270,14 +270,14 @@ writeSliceEq x y =
 
 --------------------------------------------------------------------------------
 
-addDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
+addDivModHint :: (GaloisField n, Integral n) => Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> M n ()
 addDivModHint x y q r = modify' $ \cs ->
-  addOccurrences (Set.fromList [Hint x, Hint y, Hint q, Hint r]) $
+  addOccurrences (Set.fromList [x, y, q, r]) $
     cs {cmDivMods = (x, y, q, r) Seq.<| cmDivMods cs}
 
-addCLDivModHint :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> Either RefU U -> Either RefU U -> M n ()
+addCLDivModHint :: (GaloisField n, Integral n) => Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> M n ()
 addCLDivModHint x y q r = modify' $ \cs ->
-  addOccurrences (Set.fromList [Hint x, Hint y, Hint q, Hint r]) $
+  addOccurrences (Set.fromList [x, y, q, r]) $
     cs {cmCLDivMods = (x, y, q, r) Seq.<| cmCLDivMods cs}
 
 -- | Width of all values are doubled in this hint

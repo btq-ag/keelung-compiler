@@ -29,6 +29,8 @@ import Keelung.Compiler.ConstraintModule qualified as CM
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.LC qualified as LC
+import Keelung.Data.PolyL (PolyL)
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
@@ -203,7 +205,11 @@ assertDivModU width dividend divisor quotient remainder = do
   -- 0 < divisor
   assertGT width divisorRef 0
   -- add hint for DivMod
-  addDivModHint dividendRef' divisorRef' quotientRef' remainderRef'
+  addDivModHint (toPoly dividendRef') (toPoly divisorRef') (toPoly quotientRef') (toPoly remainderRef')
+
+toPoly :: (Integral n, GaloisField n) => Either RefU U -> Either n (PolyL n)
+toPoly (Left ref) = PolyL.new 0 [] [(Slice.fromRefU ref, 1)]
+toPoly (Right val) = Left (fromIntegral val)
 
 -- -- | Assert that a UInt is less than some constant
 -- assertLT :: (GaloisField n, Integral n) => Width -> Either RefU U -> Integer -> M n ()
@@ -260,7 +266,7 @@ assertCLDivModU compileAssertion width dividend divisor quotient remainder = do
   -- 0 < divisor
   assertGT width divisorRef 0
   -- add hint for CLDivMod
-  addCLDivModHint dividendRef divisorRef quotientRef remainderRef
+  addCLDivModHint (toPoly dividendRef) (toPoly divisorRef) (toPoly quotientRef) (toPoly remainderRef)
 
 -- | Assert that a UInt is less than some constant
 assertLT :: (GaloisField n, Integral n) => Width -> Either RefU U -> Integer -> M n ()

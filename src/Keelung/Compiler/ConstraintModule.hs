@@ -61,10 +61,10 @@ data ConstraintModule n = ConstraintModule
     cmMulL :: Seq (PolyL n, PolyL n, Either n (PolyL n)),
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
-    cmDivMods :: Seq (Either RefU U, Either RefU U, Either RefU U, Either RefU U),
+    cmDivMods :: Seq (Either n (PolyL n), Either n (PolyL n), Either n (PolyL n), Either n (PolyL n)),
     -- hints for generating witnesses for carry-less DivMod constraints
     -- a = b .*. q .^. r
-    cmCLDivMods :: Seq (Either RefU U, Either RefU U, Either RefU U, Either RefU U),
+    cmCLDivMods :: Seq (Either n (PolyL n), Either n (PolyL n), Either n (PolyL n), Either n (PolyL n)),
     -- hints for generating witnesses for ModInv constraints
     cmModInvs :: Seq (Either RefU U, Either RefU U, Either RefU U, U)
   }
@@ -201,6 +201,18 @@ instance (Num n) => UpdateOccurrences (PolyL n) where
     let slices = map fst $ PolyL.toSlices poly
         refs = Map.keysSet $ PolyL.polyRefs poly
      in (removeOccurrences slices . removeOccurrences refs) cm
+
+instance (Num n) => UpdateOccurrences (Either n (PolyL n)) where
+  addOccurrence (Right poly) cm =
+    let slices = map fst $ PolyL.toSlices poly
+        refs = Map.keysSet $ PolyL.polyRefs poly
+     in (addOccurrences slices . addOccurrences refs) cm
+  addOccurrence (Left _) cm = cm 
+  removeOccurrence (Right poly) cm = 
+    let slices = map fst $ PolyL.toSlices poly
+        refs = Map.keysSet $ PolyL.polyRefs poly
+     in (removeOccurrences slices . removeOccurrences refs) cm
+  removeOccurrence (Left _) cm = cm 
 
 newtype Hint = Hint (Either RefU U)
   deriving (Show, Eq, Ord)
