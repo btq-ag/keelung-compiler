@@ -37,12 +37,12 @@ compile expr = case expr of
     result <- compile y
     case result of
       Constant val -> return $ Constant (val * n)
-      Polynomial poly -> return $ scale n (Polynomial poly)
+      Polynomial poly -> return $ n *. Polynomial poly
   MulF x (ValF n) -> do
     result <- compile x
     case result of
       Constant val -> return $ Constant (val * n)
-      Polynomial poly -> return $ scale n (Polynomial poly)
+      Polynomial poly -> return $ n *. Polynomial poly
   MulF x y -> do
     x' <- compile x
     y' <- compile y

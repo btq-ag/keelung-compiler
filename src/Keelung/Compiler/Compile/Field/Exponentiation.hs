@@ -8,7 +8,6 @@ import Keelung.Compiler.ConstraintModule (ConstraintModule (cmOptions))
 import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
-import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 
 compile :: (GaloisField n, Integral n) => LC n -> Integer -> M n (LC n)
@@ -59,8 +58,8 @@ fastExp acc (Polynomial base) e =
     -- \| Compute the multiplication of two variables
     mul :: (GaloisField n, Integral n) => LC n -> LC n -> M n (LC n)
     mul (Constant x) (Constant y) = return $ Constant (x * y)
-    mul (Constant x) (Polynomial ys) = return $ fromPolyL $ PolyL.multiplyBy x ys
-    mul (Polynomial xs) (Constant y) = return $ fromPolyL $ PolyL.multiplyBy y xs
+    mul (Constant x) (Polynomial ys) = return $ x *. Polynomial ys
+    mul (Polynomial xs) (Constant y) = return $ y *. Polynomial xs
     mul (Polynomial xs) (Polynomial ys) = do
       out <- freshRefF
       let result = 1 @ F out

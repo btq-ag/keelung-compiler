@@ -1,11 +1,10 @@
 module Keelung.Data.LC
   ( LC (..),
-    fromPolyL,
-    toPolyL,
-    fromRefU,
+    new,
     (@),
     neg,
-    scale,
+    (*.),
+    fromRefU,
   )
 where
 
@@ -16,10 +15,11 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 
--- import qualified Keelung.Data.Slice as Slice
+--------------------------------------------------------------------------------
 
 -- | Linear combination of variables and constants.
 data LC n
@@ -27,14 +27,26 @@ data LC n
   | Polynomial (PolyL n)
   deriving (Eq, Show)
 
--- | Converting from 'Either n (PolyL n)'
-fromPolyL :: Either n (PolyL n) -> LC n
-fromPolyL = either Constant Polynomial
+-- | A LC is a semigroup under addition.
+instance (Integral n, GaloisField n) => Semigroup (LC n) where
+  Constant c <> Constant d = Constant (c + d)
+  Polynomial xs <> Polynomial ys = fromEither (PolyL.merge xs ys)
+  Polynomial xs <> Constant c = Polynomial (PolyL.addConstant c xs)
+  Constant c <> Polynomial xs = Polynomial (PolyL.addConstant c xs)
 
--- | Converting to 'Either n (PolyL n)'
-toPolyL :: (Num n, Eq n) => LC n -> Either n (PolyL n)
-toPolyL (Constant c) = Left c
-toPolyL (Polynomial xs) = Right xs
+-- | A LC is a monoid under addition.
+instance (Integral n, GaloisField n) => Monoid (LC n) where
+  mempty = Constant 0
+
+-- | Construct a LC from a constant, Refs, and Limbs
+new :: (Integral n, GaloisField n) => n -> [(Ref, n)] -> [(Slice, n)] -> LC n
+new constant refs slices = fromEither (PolyL.new constant refs slices)
+
+-- | Ref constructor
+(@) :: (Integral n, GaloisField n) => n -> Ref -> LC n
+n @ x = fromEither (PolyL.fromRefs 0 [(x, n)])
+
+--------------------------------------------------------------------------------
 
 -- | Converting from a 'Either RefU U' to a list of 'LC n'.
 fromRefU :: (GaloisField n, Integral n) => FieldInfo -> Either RefU U -> [LC n]
@@ -49,23 +61,27 @@ fromRefU fieldInfo (Left var) =
   let slices = Slice.fromRefUWithDesiredWidth (fieldWidth fieldInfo) var
    in map (Polynomial . PolyL.fromSlice 0) slices
 
--- | A LC is a semigroup under addition.
-instance (Integral n, GaloisField n) => Semigroup (LC n) where
-  Constant c <> Constant d = Constant (c + d)
-  Polynomial xs <> Polynomial ys = fromPolyL (PolyL.merge xs ys)
-  Polynomial xs <> Constant c = Polynomial (PolyL.addConstant c xs)
-  Constant c <> Polynomial xs = Polynomial (PolyL.addConstant c xs)
+--------------------------------------------------------------------------------
 
--- | A LC is a monoid under addition.
-instance (Integral n, GaloisField n) => Monoid (LC n) where
-  mempty = Constant 0
+infixl 7 ^*
 
-(@) :: (Integral n, GaloisField n) => n -> Ref -> LC n
-n @ x = fromPolyL (PolyL.fromRefs 0 [(x, n)])
+-- | Scalar multiplication.
+(^*) :: (Integral n, GaloisField n) => LC n -> n -> LC n
+Constant c ^* n = Constant (n * c)
+Polynomial xs ^* n = fromEither (PolyL.multiplyBy n xs)
 
+infixr 7 *.
+
+-- | Scalar multiplication.
+(*.) :: (Integral n, GaloisField n) => n -> LC n -> LC n
+(*.) = flip (^*)
+
+-- | Negation.
 neg :: (Integral n, GaloisField n) => LC n -> LC n
-neg = scale (-1)
+neg x = (-1) *. x
 
-scale :: (Integral n, GaloisField n) => n -> LC n -> LC n
-scale n (Constant c) = Constant (n * c)
-scale n (Polynomial xs) = fromPolyL (PolyL.multiplyBy n xs)
+--------------------------------------------------------------------------------
+
+-- | Helper function for converting from 'Either n (PolyL n)'
+fromEither :: Either n (PolyL n) -> LC n
+fromEither = either Constant Polynomial
