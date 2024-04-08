@@ -3,6 +3,7 @@
 
 module Test.Compilation.Experiment (run, tests) where
 
+import Data.Bits qualified
 import Keelung
 import Test.Arbitrary ()
 import Test.Compilation.Util
@@ -33,15 +34,15 @@ tests = describe "Experiment" $ do
   --     solveOutput gf181 program [2] [] `shouldReturn` [0]
   --     solveOutput gf181 program [1] [] `shouldReturn` [0]
   --     solveOutput gf181 program [0] [] `shouldReturn` [1]
-  describe "UInt constant multiplication" $ do
-    let program = do
-          -- 1 = out * x (mod 3)
-          --
-          --    * in * out = n3 + 1
-          --    * n ≤ 3
-          x <- input Public :: Comp (UInt 8)
-          return (modInv x 3)
-    it "equals zero" $ do
-      debug gf181 program
 
--- (mod 13) 1 * 1 = 13 * 1 + 1, 2 * 7 = 13 * 1 + 1, 3 * 9 = 13 * 2 + 1, 4 * 10 = 13 * 3 + 1, 5 * 8 = 13 * 3 + 1, 6 * 11 = 13 * 5 + 1, 7 * 2 = 13 * 1 + 1, 8 * 5 = 13 * 3 + 1, 9 * 3 = 13 * 2 + 1, 10 * 4 = 13 * 3 + 1, 11 * 6 = 13 * 5 + 1, 12 * 12 = 13 * 11 + 1
+  describe "fromBools" $ do
+    it "from variables" $ do
+      let program = do
+            xs <- inputList Public 8
+            fromBools xs :: Comp (UInt 8)
+      let x = 1 :: Int
+      let bits = map (\b -> if b then 1 else 0) $ Data.Bits.testBit x <$> [0 .. 7]
+      -- forM_ [gf181, Prime 2, Binary 7] $ \field -> do
+      testCompiler (Binary 7) program bits [] [fromIntegral x]
+      testCompiler (Prime 2) program bits [] [fromIntegral x]
+      testCompiler gf181 program bits [] [fromIntegral x]

@@ -8,7 +8,6 @@ module Keelung.Compiler.Compile (run) where
 import Control.Arrow (left)
 import Control.Monad.Except
 import Control.Monad.RWS
-import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.Map.Strict qualified as Map
 import Keelung.Compiler.Compile.Boolean qualified as Boolean
@@ -22,6 +21,7 @@ import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
+import Keelung.Data.LC qualified as LC
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
@@ -85,35 +85,36 @@ compileSideEffect (ToUInt width varU varF) = do
 compileSideEffect (BitsToUInt width varU bits) = do
   let refU = RefUX width varU
 
-  -- TODO: enable this optimization
-  let new = False
+  -- pair variables with slices, such that
+  --    var0 + 2var1 + ... + 2^(width-1)var(width-1) = slice
+  -- we may need multiple pairs because of the field size limitation
+  -- each pair can only has at most `fieldWidth - 1` variables
+  fieldInfo <- gets (optFieldInfo . cmOptions)
+  let fieldWidth = FieldInfo.fieldWidth fieldInfo
 
-  if new
-    then do
-      -- compile each bit to a RefB or a constant and tag it with its index
-      zipped <-
-        mapM
-          ( \(i, bit) -> do
-              result <- compileExprB bit
+  polys <- step fieldWidth bits
+  let slices = LC.fromRefU fieldInfo (Left refU)
+  forM_ (zip polys slices) $ \(a, b) -> do
+    writeAddWithLC $ neg a <> b
+  where
+    step :: (GaloisField n, Integral n) => Width -> [ExprB n] -> M n [LC n]
+    step _ [] = return []
+    step fieldWidth exprsss = do
+      let (exprs, exprss) = splitAt fieldWidth exprsss
+      poly <-
+        foldM
+          ( \acc (i, expr) -> do
+              result <- compileExprB expr
               return $ case result of
-                Left var -> Left (i, var)
-                Right val -> Right (i, val)
+                Left var -> acc <> 2 ^ (i :: Int) @ B var
+                Right val -> acc <> Constant (if val then 2 ^ i else 0)
           )
-          (zip [0 .. width - 1 :: Int] bits)
-      let (vars, vals) = Either.partitionEithers zipped
-      let summedVals = sum [(if val then 1 else 0) * (2 ^ i) | (i, val) <- vals]
-      let weightedVars = [(B var, 2 ^ i) | (i, var) <- vars]
-      let poly1 = PolyL.fromSlice summedVals (Slice.Slice refU 0 width)
-      let poly = PolyL.insertRefs 0 weightedVars poly1
-      writeAddWithPolyL poly
-    else do
-      forM_ (zip [0 .. width - 1] bits) $ \(i, bit) -> do
-        result <- compileExprB bit
-        case result of
-          Left (RefUBit refU2 j) -> writeSliceEq (Slice.Slice refU i (i + 1)) (Slice.Slice refU2 j (j + 1))
-          Left var -> writeAdd 0 [(B (RefUBit refU i), -1), (B var, 1)]
-          Right True -> writeAdd 1 [(B (RefUBit refU i), -1)]
-          Right False -> writeAdd 0 [(B (RefUBit refU i), 1)]
+          mempty
+          (zip [0 ..] exprs)
+
+      polys <- step fieldWidth exprss
+
+      return (poly : polys)
 compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU width dividend divisor quotient remainder
 compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
 compileSideEffect (AssertLTE width value bound) = do

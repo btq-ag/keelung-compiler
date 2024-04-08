@@ -42,6 +42,9 @@ instance (Integral n, GaloisField n) => Monoid (LC n) where
 new :: (Integral n, GaloisField n) => n -> [(Ref, n)] -> [(Slice, n)] -> LC n
 new constant refs slices = fromEither (PolyL.new constant refs slices)
 
+
+infixr 7 @
+
 -- | Ref constructor
 (@) :: (Integral n, GaloisField n) => n -> Ref -> LC n
 n @ x = fromEither (PolyL.fromRefs 0 [(x, n)])

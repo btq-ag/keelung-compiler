@@ -19,19 +19,19 @@ tests = describe "Statement" $ do
   describe "fromBools" $ do
     -- constraint breakdown:
     --  I/O: 8*2 = 16
-    --  equality = 8
+    --  equality = ⌈ 8 / fieldWidth ⌉
     it "from variables" $ do
       (cs, cs') <- executeGF181 $ do
         xs <- inputList Public 8
         x <- fromBools xs
         return (x :: UInt 8)
-      cs `shouldHaveSize` 33
-      cs' `shouldHaveSize` 24
+      cs `shouldHaveSize` 26
+      cs' `shouldHaveSize` 17
 
     it "bit tests" $ do
       (cs, cs') <- executeGF181 $ do
         xs <- inputList Public 8
         x <- fromBools [xs !! 0, xs !! 2, xs !! 4, xs !! 6, xs !! 1, xs !! 3, xs !! 5, xs !! 7]
         return (x :: UInt 8)
-      cs `shouldHaveSize` 33
-      cs' `shouldHaveSize` 24
+      cs `shouldHaveSize` 26
+      cs' `shouldHaveSize` 17
