@@ -4,6 +4,7 @@ module Test.Compilation.UInt.DivMod (tests, run) where
 
 import Control.Monad
 import Data.Field.Galois (Binary, Prime)
+import Data.Sequence qualified as Seq
 import Keelung hiding (compile)
 import Keelung.Compiler.Error (Error (..))
 import Keelung.Interpreter qualified as Interpreter
@@ -271,21 +272,21 @@ tests =
               [dividend, 0]
               []
               (InterpreterError Interpreter.DivModQuotientIsZeroError)
-              (SolverError (Solver.QuotientIsZeroError [(8, Left 44)]) :: Error GF181)
+              (SolverError (Solver.QuotientIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 44]))) :: Error GF181)
             throwErrors
               (Prime 17)
               program
               [dividend, 0]
               []
               (InterpreterError Interpreter.DivModQuotientIsZeroError)
-              (SolverError (Solver.QuotientIsZeroError [(8, Left 103)]) :: Error (Prime 17))
+              (SolverError (Solver.QuotientIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 103]))) :: Error (Prime 17))
             throwErrors
               (Binary 7)
               program
               [dividend, 0]
               []
               (InterpreterError Interpreter.DivModQuotientIsZeroError)
-              (SolverError (Solver.QuotientIsZeroError [(8, Left 112)]) :: Error (Binary 7))
+              (SolverError (Solver.QuotientIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 112]))) :: Error (Binary 7))
 
         it "assertDivMod (divisor & remainder unknown & dividend = 0)" $ do
           let program = do
@@ -303,18 +304,18 @@ tests =
               [0, quotient]
               []
               (InterpreterError Interpreter.DivModDividendIsZeroError)
-              (SolverError (Solver.DividendIsZeroError [(8, Left 28)]) :: Error GF181)
+              (SolverError (Solver.DividendIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 28]))) :: Error GF181)
             throwErrors
               (Prime 17)
               program
               [0, quotient]
               []
               (InterpreterError Interpreter.DivModDividendIsZeroError)
-              (SolverError (Solver.DividendIsZeroError [(8, Left 87)]) :: Error (Prime 17))
+              (SolverError (Solver.DividendIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 87]))) :: Error (Prime 17))
             throwErrors
               (Binary 7)
               program
               [0, quotient]
               []
               (InterpreterError Interpreter.DivModDividendIsZeroError)
-              (SolverError (Solver.DividendIsZeroError [(8, Left 96)]) :: Error (Binary 7))
+              (SolverError (Solver.DividendIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 96]))) :: Error (Binary 7))

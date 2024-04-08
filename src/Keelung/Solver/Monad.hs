@@ -9,11 +9,14 @@ import Control.Monad.Except
 import Control.Monad.RWS.Strict
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (toList)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
+import Data.List qualified as List
 import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import Data.Serialize (Serialize)
 import Data.Validation (toEither)
 import Data.Vector (Vector)
@@ -27,6 +30,7 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Keelung.Data.VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters
@@ -52,42 +56,35 @@ tryLog x = do
   inDebugMode <- asks envDebugMode
   when inDebugMode $ tell (pure x)
 
--- tryLogResult :: (GaloisField n, Integral n) => Constraint n -> Result (Constraint n) -> M n ()
--- tryLogResult before result = do
---   inDebugMode <- asks envDebugMode
---   when inDebugMode $ case result of
---     Shrinked after -> tell (pure $ LogShrinkConstraint before after)
---     Stuck _ -> return ()
---     Eliminated -> tell (pure $ LogEliminateConstraint before)
---     NothingToDo -> return ()
-
 bindVar :: (GaloisField n, Integral n) => String -> Var -> n -> M n ()
 bindVar msg var val = do
   tryLog $ LogBindVar msg var val
   modify' $ IntMap.insert var val
 
-bindLimbs :: (GaloisField n, Integral n) => String -> Limbs -> U -> M n ()
-bindLimbs msg limbs val = foldM_ bindLimb 0 limbs
+bindSegments :: (GaloisField n, Integral n) => String -> Segments -> U -> M n ()
+bindSegments msg (Segments xs) val = foldM_ bindSegment 0 xs
   where
-    bindLimb :: (GaloisField n, Integral n) => Int -> (Width, Either Var Integer) -> M n Int
-    bindLimb offset (width, Left var) = do
-      forM_ [0 .. width - 1] $ \i -> do
-        bindVar msg (var + i) (if Data.Bits.testBit (toInteger val) (offset + i) then 1 else 0)
-      return (offset + width)
-    bindLimb offset (width, Right _) = return (offset + width)
+    bindSegment :: (GaloisField n, Integral n) => Int -> Segment -> M n Int
+    bindSegment offset (SegConst x) = return (offset + widthOf x)
+    bindSegment offset (SegVar var) = do
+      bindVar msg var (if Data.Bits.testBit val offset then 1 else 0)
+      return (offset + 1)
+    bindSegment offset (SegVars w var) = do
+      forM_ [0 .. w - 1] $ \i -> do
+        bindVar msg (var + i) (if Data.Bits.testBit val (offset + i) then 1 else 0)
+      return (offset + w)
 
 --------------------------------------------------------------------------------
-
-type Limbs = [(Width, Either Var Integer)]
 
 data Constraint n
   = MulConstraint (Poly n) (Poly n) (Either n (Poly n))
   | AddConstraint (Poly n)
   | BooleanConstraint Var
   | -- | Dividend, Divisor, Quotient, Remainder
-    DivModConstaint (Limbs, Limbs, Limbs, Limbs)
-  | CLDivModConstaint (Limbs, Limbs, Limbs, Limbs)
-  | ModInvConstraint (Limbs, Limbs, Limbs, Integer)
+    DivModConstaint DivModTuple
+  | -- | Dividend, Divisor, Quotient, Remainder
+    CLDivModConstaint DivModTuple
+  | ModInvConstraint ModInvTuple
   deriving (Eq, Generic, NFData)
 
 instance (Serialize n) => Serialize (Constraint n)
@@ -129,16 +126,74 @@ instance Functor Constraint where
 
 --------------------------------------------------------------------------------
 
+type ModInvTuple = (Segments, Segments, Segments, Integer)
+
+type DivModTuple = (Segments, Segments, Segments, Segments)
+
+toDivModTuple :: (Limbs, Limbs, Limbs, Limbs) -> DivModTuple
+toDivModTuple (a, b, c, d) = (limbsToSegments a, limbsToSegments b, limbsToSegments c, limbsToSegments d)
+
+fromDivModTuple :: DivModTuple -> (Limbs, Limbs, Limbs, Limbs)
+fromDivModTuple (a, b, c, d) = (segmentsToLimbs a, segmentsToLimbs b, segmentsToLimbs c, segmentsToLimbs d)
+
+--------------------------------------------------------------------------------
+
+type Limbs = [(Width, Either Var Integer)]
+
+-- | For representing either a constant, a single variable, or a series of variables
+data Segment
+  = SegConst U -- constant
+  | SegVar Var -- single variable
+  | SegVars Width Var -- series of variables starting from Var
+  deriving (Eq, Generic, NFData, Serialize)
+
+instance Show Segment where
+  show (SegConst val) = show val <> "[" <> show (widthOf val) <> "]"
+  show (SegVar var) = "$" <> show var
+  show (SegVars w var) = "$" <> show var <> "..$" <> show (var + w - 1)
+
+instance HasWidth Segment where
+  widthOf (SegConst val) = widthOf val
+  widthOf (SegVar _) = 1
+  widthOf (SegVars w _) = w
+
+newtype Segments = Segments {unSegments :: Seq Segment}
+  deriving (Eq, Generic, NFData, Serialize)
+
+instance Show Segments where
+  show (Segments xs) = "[ " <> List.intercalate " , " (map show (toList xs)) <> " ]"
+
+instance HasWidth Segments where
+  widthOf (Segments xs) = sum (map widthOf (toList xs))
+
+segmentsToLimbs :: Segments -> Limbs
+segmentsToLimbs (Segments xs) = map segmentToLimb (toList xs)
+  where
+    segmentToLimb :: Segment -> (Width, Either Var Integer)
+    segmentToLimb (SegConst val) = (widthOf val, Right (toInteger val))
+    segmentToLimb (SegVar var) = (1, Left var)
+    segmentToLimb (SegVars w var) = (w, Left var)
+
+limbsToSegments :: Limbs -> Segments
+limbsToSegments = Segments . Seq.fromList . map limbToSegment
+  where
+    limbToSegment :: (Width, Either Var Integer) -> Segment
+    limbToSegment (w, Right val) = SegConst (U.new w val)
+    limbToSegment (1, Left var) = SegVar var
+    limbToSegment (w, Left var) = SegVars w var
+
+--------------------------------------------------------------------------------
+
 data Error n
   = VarUnassignedError IntSet
   | R1CInconsistentError (R1C n)
   | ConflictingValues String
   | BooleanConstraintError Var n
   | StuckError (IntMap n) [Constraint n]
-  | ModInvError Limbs Integer
-  | DividendIsZeroError Limbs
-  | DivisorIsZeroError Limbs
-  | QuotientIsZeroError Limbs
+  | ModInvError Segments Integer
+  | DividendIsZeroError Segments
+  | DivisorIsZeroError Segments
+  | QuotientIsZeroError Segments
   deriving (Eq, Generic, NFData, Functor)
 
 instance (Serialize n) => Serialize (Error n)
@@ -157,21 +212,14 @@ instance (GaloisField n, Integral n) => Show (Error n) where
       <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
       <> "while these variables have been solved: \n"
       <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList context)
-  show (ModInvError limbs p) =
-    "Unable to calculate '" <> showLimbs limbs <> " `modInv` " <> show p <> "'"
-  show (DividendIsZeroError limbs) =
-    "Unable to perform division because the bits representing the dividend " <> showLimbs limbs <> " evaluates to 0"
-  show (DivisorIsZeroError limbs) =
-    "Unable to perform division because the bits representing the divisor " <> showLimbs limbs <> " evaluates to 0"
-  show (QuotientIsZeroError limbs) =
-    "Unable to perform division because the bits representing the quotient " <> showLimbs limbs <> " evaluates to 0"
-
-showLimbs :: Limbs -> String
-showLimbs limbs = "[" <> unwords (map showLimb limbs) <> "]"
-  where
-    showLimb :: (Width, Either Var Integer) -> String
-    showLimb (width, Left var) = "$" <> show var <> "..$" <> show (var + width - 1)
-    showLimb (width, Right val) = concat [if Data.Bits.testBit val i then "1" else "0" | i <- [0 .. width - 1]]
+  show (ModInvError segments p) =
+    "Unable to calculate '" <> show segments <> " `modInv` " <> show p <> "'"
+  show (DividendIsZeroError segments) =
+    "Unable to perform division because the bits representing the dividend " <> show segments <> " evaluates to 0"
+  show (DivisorIsZeroError segments) =
+    "Unable to perform division because the bits representing the divisor " <> show segments <> " evaluates to 0"
+  show (QuotientIsZeroError segments) =
+    "Unable to perform division because the bits representing the quotient " <> show segments <> " evaluates to 0"
 
 --------------------------------------------------------------------------------
 
@@ -250,7 +298,7 @@ shrinkedOrStuck :: [Bool] -> a -> Result a
 shrinkedOrStuck changes r1c = if or changes then Shrinked r1c else Stuck r1c
 
 -- | Substitute varaibles with values in a polynomial
-substAndView :: (Num n, Eq n) => IntMap n -> Poly n -> PolyResult n
+substAndView :: (Num n, Eq n) => IntMap n -> Poly n -> PolyView n
 substAndView bindings xs = case Poly.substWithIntMap xs bindings of
   (Left constant, _) -> Constant constant -- reduced to a constant
   (Right poly, changed) ->
@@ -263,7 +311,7 @@ substAndView bindings xs = case Poly.substWithIntMap xs bindings of
               else Polynomial changed poly
 
 -- | View of result after substituting a polynomial
-data PolyResult n
+data PolyView n
   = Constant n
   | Uninomial Bool (Poly n) n (Var, n)
   | Polynomial Bool (Poly n)

@@ -12,6 +12,8 @@ import Keelung.Solver qualified as Solver
 import Test.Compilation.Util
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
+import qualified Keelung.Solver.Monad as Solver
+import qualified Data.Sequence as Seq
 
 run :: IO ()
 run = hspec tests
@@ -153,7 +155,7 @@ tests =
           [dividend, 0]
           []
           (InterpreterError Interpreter.DivModQuotientIsZeroError)
-          (SolverError (Solver.QuotientIsZeroError [(4, Left 12)]) :: Error (Prime 17))
+          (SolverError (Solver.QuotientIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 4 12]))) :: Error (Prime 17))
 
     it "assertCLDivMod (divisor & remainder unknown & dividend = 0)" $ do
       let program = do
@@ -171,7 +173,7 @@ tests =
           [0, quotient]
           []
           (InterpreterError Interpreter.DivModDividendIsZeroError)
-          (SolverError (Solver.DividendIsZeroError [(4, Left 8)]) :: Error (Prime 17))
+          (SolverError (Solver.DividendIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 4 8]))) :: Error (Prime 17))
 
     -- it "assertCLDivMod (divisor & remainder unknown)" $ do
     --   let program = do
