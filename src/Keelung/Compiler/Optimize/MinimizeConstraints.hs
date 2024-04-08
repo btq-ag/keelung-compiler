@@ -32,6 +32,7 @@ import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
+import Keelung.Data.LC
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.RefUSegments (PartialRefUSegments (..))
@@ -138,10 +139,10 @@ reduceAddL polynomial = do
   result <- substPolyM polynomial
   substResult <- case result of
     Nothing -> return (Just polynomial) -- nothing substituted
-    Just (Left constant) -> do
+    Just (Constant constant) -> do
       when (constant /= 0) $ error "[ panic ] Additive constraint reduced to some constant other than 0"
       return Nothing -- the polynomial has been reduced to nothing
-    Just (Right substitutedPolynomial) -> do
+    Just (Polynomial substitutedPolynomial) -> do
       -- the polynomial has been reduced to something
       markChanged AdditiveLimbConstraintChanged
       return (Just substitutedPolynomial)
@@ -156,7 +157,7 @@ reduceAddL polynomial = do
 
 ------------------------------------------------------------------------------
 
-type MulL n = (PolyL n, PolyL n, Either n (PolyL n))
+type MulL n = (PolyL n, PolyL n, LC n)
 
 -- | Trying to reduce a multiplicative constraint, returns Nothing if it has been reduced to nothing
 reduceMulL :: (GaloisField n, Integral n) => MulL n -> RoundM n (Maybe (MulL n))
@@ -165,36 +166,36 @@ reduceMulL (polyA, polyB, polyC) = do
   polyAResult <- substitute polyA
   polyBResult <- substitute polyB
   polyCResult <- case polyC of
-    Left constantC -> return (Left constantC)
-    Right polyC' -> substitute polyC'
+    Constant constantC -> return (Constant constantC)
+    Polynomial polyC' -> substitute polyC'
   -- learning phase
   case (polyAResult, polyBResult, polyCResult) of
-    (Left a, Left b, Left c) -> do
+    (Constant a, Constant b, Constant c) -> do
       when (a * b /= c) $ throwError $ Compile.ConflictingValuesF (a * b) c
       return Nothing
-    (Left a, Left b, Right c) -> do
+    (Constant a, Constant b, Polynomial c) -> do
       learnFromMulLCCP a b c
       return Nothing
-    (Left a, Right b, Left c) -> do
+    (Constant a, Polynomial b, Constant c) -> do
       learnFromMulLCPC a b c
       return Nothing
-    (Left a, Right b, Right c) -> do
+    (Constant a, Polynomial b, Polynomial c) -> do
       learnFromMulLCPP a b c
       return Nothing
-    (Right a, Left b, Left c) -> do
+    (Polynomial a, Constant b, Constant c) -> do
       learnFromMulLCPC b a c
       return Nothing
-    (Right a, Left b, Right c) -> do
+    (Polynomial a, Constant b, Polynomial c) -> do
       learnFromMulLCPP b a c
       return Nothing
-    (Right a, Right b, Left c) -> return (Just (a, b, Left c))
-    (Right a, Right b, Right c) -> return (Just (a, b, Right c))
+    (Polynomial a, Polynomial b, Constant c) -> return (Just (a, b, Constant c))
+    (Polynomial a, Polynomial b, Polynomial c) -> return (Just (a, b, Polynomial c))
   where
-    substitute :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Either n (PolyL n))
+    substitute :: (GaloisField n, Integral n) => PolyL n -> RoundM n (LC n)
     substitute polynomial = do
       substResult <- substPolyM polynomial
       case substResult of
-        Nothing -> return (Right polynomial) -- nothing changed
+        Nothing -> return (Polynomial polynomial) -- nothing changed
         Just result -> do
           markChanged MultiplicativeLimbConstraintChanged
           return result
@@ -450,7 +451,7 @@ removeRef ref Nothing = Just (Changes mempty mempty mempty (Set.singleton ref))
 --------------------------------------------------------------------------------
 
 -- | Try to substitute a polynomial, returns 'Nothing' if nothing changed, 'Just' if something changed
-substPolyM :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Maybe (Either n (PolyL n)))
+substPolyM :: (GaloisField n, Integral n) => PolyL n -> RoundM n (Maybe (LC n))
 substPolyM poly = do
   relations <- gets cmRelations
   let result = substPolyL relations poly
@@ -462,15 +463,16 @@ substPolyM poly = do
 
 -- | Substitutes Limbs in a PolyL.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
-substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (Either n (PolyL n), Changes)
+substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (LC n, Changes)
 substPolyL relations poly = do
   let constant = PolyL.polyConstant poly
       initState = (Left constant, Nothing)
-      afterSubstSlice =
-        foldl
-          (substSlice (Relations.relationsS relations))
-          initState
-          (PolyL.toSlices poly)
+      afterSubstSlice = case foldl
+        (substSlice (Relations.relationsS relations))
+        initState
+        (PolyL.toSlices poly) of
+        (Left c, changes) -> (Constant c, changes)
+        (Right p, changes) -> (Polynomial p, changes)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstSlice (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed
@@ -511,29 +513,20 @@ substSlice relations initState (sliceWhole, multiplier) =
 substRef ::
   (Integral n, GaloisField n) =>
   Relations n ->
-  (Either n (PolyL n), Maybe Changes) ->
+  (LC n, Maybe Changes) ->
   Ref ->
   n ->
-  (Either n (PolyL n), Maybe Changes)
-substRef relations (accPoly, changes) ref coeff = case Relations.lookup ref relations of
-  Relations.Root -> case accPoly of -- ref already a root, no need to substitute
-    Left c -> (PolyL.fromRefs c [(ref, coeff)], changes)
-    Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
+  (LC n, Maybe Changes)
+substRef relations (acc, changes) ref coeff = case Relations.lookup ref relations of
+  Relations.Root -> (acc <> coeff @ ref, changes) -- ref already a root, no need to substitute
   Relations.Value intercept ->
     -- ref = intercept
-    case accPoly of
-      Left c -> (Left (intercept * coeff + c), removeRef ref changes)
-      Right xs -> (Right $ PolyL.addConstant (intercept * coeff) xs, removeRef ref changes)
+    (acc <> Constant (intercept * coeff), removeRef ref changes)
   Relations.ChildOf slope root intercept ->
     if root == ref
       then
         if slope == 1 && intercept == 0
-          then -- ref = root, nothing changed
-          case accPoly of
-            Left c -> (PolyL.fromRefs c [(ref, coeff)], changes)
-            Right xs -> (PolyL.insertRefs 0 [(ref, coeff)] xs, changes)
+          then (acc <> coeff @ ref, changes) -- ref = root, nothing changed
           else error "[ panic ] Invalid relation in RefRelations: ref = slope * root + intercept, but slope /= 1 || intercept /= 0"
-      else case accPoly of
-        -- coeff * ref = coeff * slope * root + coeff * intercept
-        Left c -> (PolyL.fromRefs (intercept * coeff + c) [(root, slope * coeff)], addRef root $ removeRef ref changes)
-        Right accPoly' -> (PolyL.insertRefs (intercept * coeff) [(root, slope * coeff)] accPoly', addRef root $ removeRef ref changes)
+      else -- coeff * ref = coeff * slope * root + coeff * intercept
+        (acc <> Constant (intercept * coeff) <> (slope * coeff) @ root, addRef root $ removeRef ref changes)

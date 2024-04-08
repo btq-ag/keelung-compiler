@@ -182,8 +182,8 @@ writeMulWithPolyL (Left x) (Right ys) (Right zs) = do
     Right ys' -> writeAddWithPolyL $ PolyL.merge ys' (PolyL.negate zs)
 writeMulWithPolyL (Right xs) (Left y) (Left z) = writeMulWithPolyL (Left y) (Right xs) (Left z)
 writeMulWithPolyL (Right xs) (Left y) (Right zs) = writeMulWithPolyL (Left y) (Right xs) (Right zs)
-writeMulWithPolyL (Right xs) (Right ys) (Left z) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ cs {cmMulL = (xs, ys, Left z) Seq.<| cmMulL cs})
-writeMulWithPolyL (Right xs) (Right ys) (Right zs) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ addOccurrence zs $ cs {cmMulL = (xs, ys, Right zs) Seq.<| cmMulL cs})
+writeMulWithPolyL (Right xs) (Right ys) (Left z) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ cs {cmMulL = (xs, ys, Constant z) Seq.<| cmMulL cs})
+writeMulWithPolyL (Right xs) (Right ys) (Right zs) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ addOccurrence zs $ cs {cmMulL = (xs, ys, Polynomial zs) Seq.<| cmMulL cs})
 
 --------------------------------------------------------------------------------
 

@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Keelung.Data.LC
   ( LC (..),
     new,
@@ -8,8 +11,10 @@ module Keelung.Data.LC
   )
 where
 
+import Control.DeepSeq (NFData)
 import Data.Bits qualified
 import Data.Field.Galois
+import GHC.Generics (Generic)
 import Keelung (HasWidth (widthOf))
 import Keelung.Data.FieldInfo
 import Keelung.Data.PolyL (PolyL)
@@ -25,7 +30,7 @@ import Keelung.Data.U (U)
 data LC n
   = Constant n
   | Polynomial (PolyL n)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFData)
 
 -- | A LC is a semigroup under addition.
 instance (Integral n, GaloisField n) => Semigroup (LC n) where
@@ -41,7 +46,6 @@ instance (Integral n, GaloisField n) => Monoid (LC n) where
 -- | Construct a LC from a constant, Refs, and Limbs
 new :: (Integral n, GaloisField n) => n -> [(Ref, n)] -> [(Slice, n)] -> LC n
 new constant refs slices = fromEither (PolyL.new constant refs slices)
-
 
 infixr 7 @
 

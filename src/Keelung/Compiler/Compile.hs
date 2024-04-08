@@ -106,7 +106,7 @@ compileSideEffect (BitsToUInt width varU bits) = do
           ( \acc (i, expr) -> do
               result <- compileExprB expr
               return $ case result of
-                Left var -> acc <> 2 ^ (i :: Int) @ B var
+                Left var -> acc <> (2 ^ (i :: Int)) @ B var
                 Right val -> acc <> Constant (if val then 2 ^ i else 0)
           )
           mempty

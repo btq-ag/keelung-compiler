@@ -37,6 +37,7 @@ import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.IntervalTable (IntervalTable)
 import Keelung.Data.IntervalTable qualified as IntervalTable
+import Keelung.Data.LC
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Polynomial (Poly)
@@ -215,7 +216,18 @@ toConstraints cm env =
       -- constraints extracted from addative constraints
       fromAddativeConstraints = fmap CAddL (cmAddL cm)
       -- constraints extracted from multiplicative constraints
-      fromMultiplicativeConstraints = fmap (\(a, b, c) -> CMulL a b c) (cmMulL cm)
+      fromMultiplicativeConstraints =
+        fmap
+          ( \(a, b, c) ->
+              CMulL
+                a
+                b
+                ( case c of
+                    Constant n -> Left n
+                    Polynomial p -> Right p
+                )
+          )
+          (cmMulL cm)
    in refConstraints
         <> sliceConstraints
         <> fromAddativeConstraints

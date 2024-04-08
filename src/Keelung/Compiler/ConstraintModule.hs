@@ -34,6 +34,7 @@ import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Util
 import Keelung.Data.FieldInfo
+import Keelung.Data.LC
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -58,7 +59,7 @@ data ConstraintModule n = ConstraintModule
     -- addative constraints
     cmAddL :: Seq (PolyL n),
     -- multiplicative constraints
-    cmMulL :: Seq (PolyL n, PolyL n, Either n (PolyL n)),
+    cmMulL :: Seq (PolyL n, PolyL n, LC n),
     -- hints for generating witnesses for DivMod constraints
     -- a = b * q + r
     cmDivMods :: Seq (Either RefU U, Either RefU U, Either RefU U, Either RefU U),
@@ -119,18 +120,14 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       showAddL = adapt "AddL" (cmAddL cm) $ \xs -> "0 = " <> show xs
       showMulL = adapt "MulL" (cmMulL cm) showMulL'
 
-      showMulL' (aV, bV, cV) = showVecWithParen aV ++ " * " ++ showVecWithParen bV ++ " = " ++ showVec cV
+      showMulL' (aV, bV, cV) = showVecWithParen aV ++ " * " ++ showVecWithParen bV <> " = " <> show cV
         where
-          showVec :: (Integral n, GaloisField n) => Either n (PolyL n) -> String
-          showVec (Left c) = show c
-          showVec (Right xs) = show xs
-
           -- wrap the string with parenthesis if it has more than 1 term
           showVecWithParen :: (Integral n, GaloisField n) => PolyL n -> String
           showVecWithParen xs =
             if PolyL.size xs < 2
-              then showVec (Right xs)
-              else "(" ++ showVec (Right xs) ++ ")"
+              then show (Polynomial xs)
+              else "(" ++ show (Polynomial xs) ++ ")"
 
 prettyVariables :: Counters -> String
 prettyVariables counters =
