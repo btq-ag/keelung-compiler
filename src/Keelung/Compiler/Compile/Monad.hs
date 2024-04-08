@@ -22,7 +22,6 @@ import Keelung.Data.LC (LC (..), neg, (@))
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
@@ -130,15 +129,10 @@ compileExprU out expr = do
 writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> M n ()
 writeAdd constant refs slices = writeAddWithLC $ LC.new constant refs slices
 
-writeAddWithPolyL :: (GaloisField n, Integral n) => Either n (PolyL n) -> M n ()
-writeAddWithPolyL xs = case xs of
-  Left 0 -> return ()
-  Left n -> error $ "[ panic ] writeAddWithPolyL: expect constant to be 0, got " <> show n
-  Right poly -> modify' (\cs -> addOccurrence poly $ cs {cmAddL = poly Seq.<| cmAddL cs})
-
 writeAddWithLC :: (GaloisField n, Integral n) => LC n -> M n ()
 writeAddWithLC xs = case xs of
-  Constant _ -> return ()
+  Constant 0 -> return ()
+  Constant n -> error $ "[ panic ] writeAddWithLC: expect constant to be 0, got " <> show n
   Polynomial poly -> modify' (\cs -> addOccurrence poly $ cs {cmAddL = poly Seq.<| cmAddL cs})
 
 writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> M n ()
@@ -149,73 +143,36 @@ writeAddWithLimbs constant refs limbs = case PolyL.fromLimbs constant limbs of
 --------------------------------------------------------------------------------
 
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
-writeMul as bs cs = writeMulWithPolyL (uncurry PolyL.fromRefs as) (uncurry PolyL.fromRefs bs) (uncurry PolyL.fromRefs cs)
+writeMul as bs cs = writeMulWithLC (fromRefs as) (fromRefs bs) (fromRefs cs)
+  where
+    fromRefs (constant, refs) = LC.new constant refs []
 
 writeMulWithLC :: (GaloisField n, Integral n) => LC n -> LC n -> LC n -> M n ()
-writeMulWithLC as bs cs = writeMulWithPolyL (convert as) (convert bs) (convert cs)
-  where
-    convert :: LC n -> Either n (PolyL n)
-    convert (Constant x) = Left x
-    convert (Polynomial xs) = Right xs
-
-writeMulWithPolyL :: (GaloisField n, Integral n) => Either n (PolyL n) -> Either n (PolyL n) -> Either n (PolyL n) -> M n ()
-writeMulWithPolyL (Left x) (Left y) (Left z) =
+writeMulWithLC (Constant x) (Constant y) (Constant z) =
   if x * y == z
     then return ()
-    else error "[ panic ] writeMulWithPolyL: constant mismatch"
-writeMulWithPolyL (Left x) (Left y) (Right zs) =
+    else error "[ panic ] writeMulWithLC: constant mismatch"
+writeMulWithLC (Constant x) (Constant y) (Polynomial zs) =
   -- zs - x * y = 0
-  writeAddWithPolyL $ Right $ PolyL.addConstant (-x * y) zs
-writeMulWithPolyL (Left x) (Right ys) (Left z) =
+  writeAddWithLC $ Polynomial $ PolyL.addConstant (-x * y) zs
+writeMulWithLC (Constant x) (Polynomial ys) (Constant z) =
   -- x * ys = z
   -- x * ys - z = 0
   case PolyL.multiplyBy x ys of
     Left _ -> return ()
-    Right poly -> writeAddWithPolyL $ Right $ PolyL.addConstant (-z) poly
-writeMulWithPolyL (Left x) (Right ys) (Right zs) = do
+    Right poly -> writeAddWithLC $ Polynomial $ PolyL.addConstant (-z) poly
+writeMulWithLC (Constant x) (Polynomial ys) (Polynomial zs) = do
   -- x * ys = zs
   -- x * ys - zs = 0
   case PolyL.multiplyBy x ys of
     Left c ->
       -- c - zs = 0
-      writeAddWithPolyL $ Right $ PolyL.addConstant (-c) zs
-    Right ys' -> writeAddWithPolyL $ PolyL.merge ys' (PolyL.negate zs)
-writeMulWithPolyL (Right xs) (Left y) (Left z) = writeMulWithPolyL (Left y) (Right xs) (Left z)
-writeMulWithPolyL (Right xs) (Left y) (Right zs) = writeMulWithPolyL (Left y) (Right xs) (Right zs)
-writeMulWithPolyL (Right xs) (Right ys) (Left z) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ cs {cmMulL = (xs, ys, Constant z) Seq.<| cmMulL cs})
-writeMulWithPolyL (Right xs) (Right ys) (Right zs) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ addOccurrence zs $ cs {cmMulL = (xs, ys, Polynomial zs) Seq.<| cmMulL cs})
-
--- writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
--- writeMul as bs cs = writeMulWithLC (fromRefs as) (fromRefs bs) (fromRefs cs)
---   where
---     fromRefs (constant, refs) = LC.new constant refs []
-
--- writeMulWithLC :: (GaloisField n, Integral n) => LC n -> LC n -> LC n -> M n ()
--- writeMulWithLC (Constant x) (Constant y) (Constant z) =
---   if x * y == z
---     then return ()
---     else error "[ panic ] writeMulWithLC: constant mismatch"
--- writeMulWithLC (Constant x) (Constant y) (Polynomial zs) =
---   -- zs - x * y = 0
---   writeAddWithPolyL $ Right $ PolyL.addConstant (-x * y) zs
--- writeMulWithLC (Constant x) (Polynomial ys) (Constant z) =
---   -- x * ys = z
---   -- x * ys - z = 0
---   case PolyL.multiplyBy x ys of
---     Left _ -> return ()
---     Right poly -> writeAddWithPolyL $ Right $ PolyL.addConstant (-z) poly
--- writeMulWithLC (Constant x) (Polynomial ys) (Polynomial zs) = do
---   -- x * ys = zs
---   -- x * ys - zs = 0
---   case PolyL.multiplyBy x ys of
---     Left c ->
---       -- c - zs = 0
---       writeAddWithPolyL $ Right $ PolyL.addConstant (-c) zs
---     Right ys' -> writeAddWithPolyL $ PolyL.merge ys' (PolyL.negate zs)
--- writeMulWithLC (Polynomial xs) (Constant y) (Constant z) = writeMulWithLC (Constant y) (Polynomial xs) (Constant z)
--- writeMulWithLC (Polynomial xs) (Constant y) (Polynomial zs) = writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
--- writeMulWithLC (Polynomial xs) (Polynomial ys) (Constant z) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ cs {cmMulL = (xs, ys, Constant z) Seq.<| cmMulL cs})
--- writeMulWithLC (Polynomial xs) (Polynomial ys) (Polynomial zs) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ addOccurrence zs $ cs {cmMulL = (xs, ys, Polynomial zs) Seq.<| cmMulL cs})
+      writeAddWithLC $ Polynomial $ PolyL.addConstant (-c) zs
+    Right ys' -> writeAddWithLC $ LC.fromEither $ PolyL.merge ys' (PolyL.negate zs)
+writeMulWithLC (Polynomial xs) (Constant y) (Constant z) = writeMulWithLC (Constant y) (Polynomial xs) (Constant z)
+writeMulWithLC (Polynomial xs) (Constant y) (Polynomial zs) = writeMulWithLC (Constant y) (Polynomial xs) (Polynomial zs)
+writeMulWithLC (Polynomial xs) (Polynomial ys) (Constant z) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ cs {cmMulL = (xs, ys, Constant z) Seq.<| cmMulL cs})
+writeMulWithLC (Polynomial xs) (Polynomial ys) (Polynomial zs) = modify (\cs -> addOccurrence xs $ addOccurrence ys $ addOccurrence zs $ cs {cmMulL = (xs, ys, Polynomial zs) Seq.<| cmMulL cs})
 
 --------------------------------------------------------------------------------
 

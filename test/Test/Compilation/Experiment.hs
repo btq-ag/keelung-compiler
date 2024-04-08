@@ -3,7 +3,7 @@
 
 module Test.Compilation.Experiment (run, tests) where
 
-import Data.Bits qualified
+import Control.Monad
 import Keelung
 import Test.Arbitrary ()
 import Test.Compilation.Util
@@ -36,13 +36,10 @@ tests = describe "Experiment" $ do
   --     solveOutput gf181 program [0] [] `shouldReturn` [1]
 
   describe "fromBools" $ do
-    it "from variables" $ do
-      let program = do
-            xs <- inputList Public 8
-            fromBools xs :: Comp (UInt 8)
-      let x = 1 :: Int
-      let bits = map (\b -> if b then 1 else 0) $ Data.Bits.testBit x <$> [0 .. 7]
-      -- forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-      testCompiler (Binary 7) program bits [] [fromIntegral x]
-      testCompiler (Prime 2) program bits [] [fromIntegral x]
-      testCompiler gf181 program bits [] [fromIntegral x]
+    it "constant dividend / constant divisor" $ do
+      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
+      let dividend = 137 :: Integer
+      let divisor = 2 :: Integer
+      let expected = [dividend `div` divisor, dividend `mod` divisor]
+      forM_ [gf181, Prime 17, Binary 7] $ \field -> do
+        testCompiler field (program dividend divisor) [] [] expected

@@ -19,7 +19,6 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
-import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
@@ -100,14 +99,13 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       upperSlice <- allocSlice upperLimbWidth
 
       let x' = fmap (second ((* constant) . fromInteger)) (Slice.fromLimb x)
-      writeAddWithPolyL $
-        PolyL.new
-          (a * constant)
-          []
-          ( (lowerSlice, -1)
-              : (upperSlice, -(2 ^ currentLimbWidth))
-              : x'
-          )
+      writeAdd
+        (a * constant)
+        []
+        ( (lowerSlice, -1)
+            : (upperSlice, -(2 ^ currentLimbWidth))
+            : x'
+        )
       let lowerLimb = Slice.toLimb lowerSlice
       let upperLimb = Slice.toLimb upperSlice
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)

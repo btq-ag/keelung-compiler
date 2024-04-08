@@ -99,10 +99,21 @@ instance (Integral n, GaloisField n) => Show (PolyL n) where
 
 -- | Construct a PolyL from a constant, Refs, and Limbs
 new :: (Integral n, GaloisField n) => n -> [(Ref, n)] -> [(Slice, n)] -> Either n (PolyL n)
+-- shortcuts
+new constant [] [] = Left constant
+new constant [] [(_, 0)] = Left constant
+new constant [] [(slice1, b1)] = Right (PolyL constant mempty (SlicePoly.fromSlices [(slice1, b1)]))
+new constant [(_, 0)] [] = Left constant
+new constant [(ref1, a1)] [] = Right (PolyL constant (Map.singleton ref1 a1) mempty)
 new constant refs slices =
-  case toRefMap refs of
-    Nothing -> Right (PolyL constant mempty (SlicePoly.fromSlices slices))
-    Just refs' -> Right (PolyL constant refs' (SlicePoly.fromSlices slices))
+  let slices' = SlicePoly.fromSlices slices
+   in if SlicePoly.null slices'
+        then case toRefMap refs of
+          Nothing -> Left constant
+          Just refs' -> Right (PolyL constant refs' mempty)
+        else case toRefMap refs of
+          Nothing -> Right (PolyL constant mempty slices')
+          Just refs' -> Right (PolyL constant refs' slices')
 
 -- | Construct a PolyL from a single Ref
 fromRef :: (Integral n, GaloisField n) => Ref -> PolyL n

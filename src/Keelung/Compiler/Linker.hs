@@ -37,7 +37,7 @@ import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.IntervalTable (IntervalTable)
 import Keelung.Data.IntervalTable qualified as IntervalTable
-import Keelung.Data.LC (LC(..))
+import Keelung.Data.LC (LC (..))
 import Keelung.Data.PolyL
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Polynomial (Poly)
