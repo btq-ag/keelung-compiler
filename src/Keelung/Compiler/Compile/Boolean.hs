@@ -19,7 +19,6 @@ import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC
 import Keelung.Data.LC qualified as LC
-import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
@@ -366,12 +365,8 @@ xorBs xs = do
       -- devise an unsigned integer for expressing the sum of vars
       let width = widthOfInteger (toInteger (length vars))
       slice <- allocSlice width
-      -- compose the LC for the sum
       let sumOfVars = mconcat (fmap (\x -> 1 @ B x) vars)
-      -- equate the LC with the unsigned integer
-      case sumOfVars of
-        Constant _ -> return ()
-        Polynomial poly -> writeAddWithPolyL $ PolyL.insertSlices [(slice, -1)] poly
+      writeAddWithLC $ sumOfVars <> LC.new 0 [] [(slice, -1)]
       -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
       return $ RefUBit (Slice.sliceRefU slice) 0
 
@@ -413,7 +408,7 @@ eqB (Left x) (Left y) = do
     binary = do
       --  1 + x + y = out
       out <- freshRefB
-      writeAdd 1 [(B x, 1), (B y, 1), (B out, -1)]
+      writeAdd 1 [(B x, 1), (B y, 1), (B out, -1)] []
       return (Left out)
 
     prime :: (GaloisField n, Integral n) => M n (Either RefB Bool)

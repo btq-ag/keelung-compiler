@@ -61,18 +61,18 @@ compileAddBPosPos width out as bs = do
     case (prevCarry, nextCarry) of
       (Nothing, Nothing) -> do
         -- c = a + b
-        writeAdd 0 [(a, 1), (b, 1), (c, -1)]
+        writeAdd 0 [(a, 1), (b, 1), (c, -1)] []
       (Nothing, Just next) -> do
         -- c = a + b
-        writeAdd 0 [(a, 1), (b, 1), (c, -1)]
+        writeAdd 0 [(a, 1), (b, 1), (c, -1)] []
         -- next = a * b
         writeMul (0, [(a, 1)]) (0, [(b, 1)]) (0, [(next, 1)])
       (Just prev, Nothing) -> do
         -- c = a + b + prev
-        writeAdd 0 [(a, 1), (b, 1), (prev, 1), (c, -1)]
+        writeAdd 0 [(a, 1), (b, 1), (prev, 1), (c, -1)] []
       (Just prev, Just next) -> do
         -- c = a + b + prev
-        writeAdd 0 [(a, 1), (b, 1), (prev, 1), (c, -1)]
+        writeAdd 0 [(a, 1), (b, 1), (prev, 1), (c, -1)] []
         -- next = a * b + a * prev + b * prev
         ab <- freshRefB
         aPrev <- freshRefB
@@ -84,7 +84,7 @@ compileAddBPosPos width out as bs = do
         -- bPrev = b * prev
         writeMul (0, [(b, 1)]) (0, [(prev, 1)]) (0, [(B bPrev, 1)])
         -- next = ab + aPrev + bPrev
-        writeAdd 0 [(B ab, 1), (B aPrev, 1), (B bPrev, 1), (next, -1)]
+        writeAdd 0 [(B ab, 1), (B aPrev, 1), (B bPrev, 1), (next, -1)] []
 
 -- | Adds a positive variable and a constant together on a binary field:
 --   Assume `as` to be the variable and `bs` to be the constant
@@ -109,23 +109,23 @@ compileAddBPosConst width out as bs = do
     case (prevCarry, nextCarry) of
       (Nothing, Nothing) -> do
         -- c = a + b
-        writeAdd b [(a, 1), (c, -1)]
+        writeAdd b [(a, 1), (c, -1)] []
       (Nothing, Just next) -> do
         -- c = a + b
-        writeAdd b [(a, 1), (c, -1)]
+        writeAdd b [(a, 1), (c, -1)] []
         -- next = a * b
-        writeAdd 0 [(a, b), (next, -1)]
+        writeAdd 0 [(a, b), (next, -1)] []
       (Just prev, Nothing) -> do
         -- c = a + b + prev
-        writeAdd b [(a, 1), (prev, 1), (c, -1)]
+        writeAdd b [(a, 1), (prev, 1), (c, -1)] []
       (Just prev, Just next) -> do
         -- c = a + b + prev
-        writeAdd b [(a, 1), (prev, 1), (c, -1)]
+        writeAdd b [(a, 1), (prev, 1), (c, -1)] []
         aPrev <- freshRefB
         -- aPrev = a * prev
         writeMul (0, [(a, 1)]) (0, [(prev, 1)]) (0, [(B aPrev, 1)])
         -- next = ab + aPrev + bPrev
-        writeAdd 0 [(a, b), (B aPrev, 1), (prev, b), (next, -1)]
+        writeAdd 0 [(a, b), (B aPrev, 1), (prev, b), (next, -1)] []
 
 -- | Adds a negative variable and a constant together on a binary field:
 --   Assume `as` to the variable and `bs` to be the constant
@@ -151,26 +151,26 @@ compileAddBNegConst width out as bs = do
       (Nothing, Nothing) -> do
         -- c = a + b + prev + 1
         --   = a + b
-        writeAdd b [(a, 1), (c, -1)]
+        writeAdd b [(a, 1), (c, -1)] []
       (Nothing, Just next) -> do
         -- c = a + b + prev + 1
         --   = a + b
-        writeAdd b [(a, 1), (c, -1)]
+        writeAdd b [(a, 1), (c, -1)] []
         -- next = a * b + a * prev + b * prev + b + prev
         --      = a * (b + 1) + 1
-        writeAdd 1 [(a, b + 1), (next, -1)]
+        writeAdd 1 [(a, b + 1), (next, -1)] []
       (Just prev, Nothing) -> do
         -- c = a + b + prev + 1
-        writeAdd (b + 1) [(a, 1), (prev, 1), (c, -1)]
+        writeAdd (b + 1) [(a, 1), (prev, 1), (c, -1)] []
       (Just prev, Just next) -> do
         -- c = a + b + prev + 1
-        writeAdd (b + 1) [(a, 1), (prev, 1), (c, -1)]
+        writeAdd (b + 1) [(a, 1), (prev, 1), (c, -1)] []
         -- next = a * b + a * prev + (b + 1) * prev + b + prev
         aPrev <- freshRefB
         -- aPrev = a * prev
         writeMul (0, [(a, 1)]) (0, [(prev, 1)]) (0, [(B aPrev, 1)])
         -- next = ab + aPrev + bPrev + b + prev
-        writeAdd b [(a, b), (B aPrev, 1), (prev, b + 1), (next, -1)]
+        writeAdd b [(a, b), (B aPrev, 1), (prev, b + 1), (next, -1)] []
 
 -- | Adds a positive variable with a negative variable on a binary field:
 --   Assume `as` to be the positive operand and `bs` to be the negative operand
@@ -196,20 +196,20 @@ compileAddBPosNeg width out as bs = do
       (Nothing, Nothing) -> do
         -- c = a + b + prev + 1
         --   = a + b
-        writeAdd 0 [(a, 1), (b, 1), (c, -1)]
+        writeAdd 0 [(a, 1), (b, 1), (c, -1)] []
       (Nothing, Just next) -> do
         -- c = a + b + prev + 1
         --   = a + b
-        writeAdd 0 [(a, 1), (b, 1), (c, -1)]
+        writeAdd 0 [(a, 1), (b, 1), (c, -1)] []
         -- next = a * b + a * prev + b * prev + a + prev
         --      = a * b + b + 1
         writeMul (0, [(a, 1)]) (0, [(b, 1)]) (-1, [(next, 1), (b, -1)])
       (Just prev, Nothing) -> do
         -- c = a + b + prev + 1
-        writeAdd 1 [(a, 1), (b, 1), (prev, 1), (c, -1)]
+        writeAdd 1 [(a, 1), (b, 1), (prev, 1), (c, -1)] []
       (Just prev, Just next) -> do
         -- c = a + b + prev + 1
-        writeAdd 1 [(a, 1), (b, 1), (prev, 1), (c, -1)]
+        writeAdd 1 [(a, 1), (b, 1), (prev, 1), (c, -1)] []
         -- next = a * b + a * prev + b * prev + a + prev
         ab <- freshRefB
         aPrev <- freshRefB
@@ -221,4 +221,4 @@ compileAddBPosNeg width out as bs = do
         -- bPrev = b * prev
         writeMul (0, [(b, 1)]) (0, [(prev, 1)]) (0, [(B bPrev, 1)])
         -- next = ab + aPrev + bPrev + a + prev
-        writeAdd 0 [(B ab, 1), (B aPrev, 1), (B bPrev, 1), (a, 1), (prev, 1), (next, -1)]
+        writeAdd 0 [(B ab, 1), (B aPrev, 1), (B bPrev, 1), (a, 1), (prev, 1), (next, -1)] []

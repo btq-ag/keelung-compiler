@@ -115,12 +115,12 @@ combineBits _ _ = error "[ panic ] combineBits: cannot handle too many bits"
 addBits :: (GaloisField n, Integral n) => [RefB] -> M n RefB
 addBits xs = do
   out <- freshRefB
-  writeAdd 0 $ (B out, -1) : [(B x, 1) | x <- xs]
+  writeAdd 0 ((B out, -1) : [(B x, 1) | x <- xs]) []
   return out
 
 -- | Like `addBits` but write the result to an existing reference
 addBits' :: (GaloisField n, Integral n) => RefB -> [RefB] -> M n ()
-addBits' out xs = writeAdd 0 $ (B out, -1) : [(B x, 1) | x <- xs]
+addBits' out xs = writeAdd 0 ((B out, -1) : [(B x, 1) | x <- xs]) []
 
 -- | Multiply two bits
 multiplyBits :: (GaloisField n, Integral n) => (RefB, RefB) -> M n RefB

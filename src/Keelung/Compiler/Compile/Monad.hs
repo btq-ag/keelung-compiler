@@ -29,6 +29,7 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax.Counters
+import qualified Keelung.Data.LC as LC
 
 --------------------------------------------------------------------------------
 
@@ -125,21 +126,20 @@ compileExprU out expr = do
 
 --------------------------------------------------------------------------------
 
+-- | Given a constant, a list of Refs, and a list of Slices, write a addative constraint of the sum
+writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> M n ()
+writeAdd constant refs slices = writeAddWithLC $ LC.new constant refs slices
+
 writeAddWithPolyL :: (GaloisField n, Integral n) => Either n (PolyL n) -> M n ()
 writeAddWithPolyL xs = case xs of
-  Left _ -> return ()
+  Left 0 -> return ()
+  Left n -> error $ "[ panic ] writeAddWithPolyL: expect constant to be 0, got " <> show n
   Right poly -> modify' (\cs -> addOccurrence poly $ cs {cmAddL = poly Seq.<| cmAddL cs})
 
 writeAddWithLC :: (GaloisField n, Integral n) => LC n -> M n ()
 writeAddWithLC xs = case xs of
   Constant _ -> return ()
-  Polynomial poly -> writeAddWithPolyL (Right poly)
-
-writeAdd :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> M n ()
-writeAdd c as = writeAddWithPolyL (PolyL.fromRefs c as)
-
-writeAddWithSlices :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Slice, n)] -> M n ()
-writeAddWithSlices constant refs slices = writeAddWithPolyL $ PolyL.new constant refs slices
+  Polynomial poly -> modify' (\cs -> addOccurrence poly $ cs {cmAddL = poly Seq.<| cmAddL cs})
 
 writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> M n ()
 writeAddWithLimbs constant refs limbs = case PolyL.fromLimbs constant limbs of

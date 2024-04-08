@@ -71,7 +71,7 @@ compileSideEffect (ToField width varU varF) = do
   fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
   -- only convert the Slice of length "width `min` fieldWidth" to a RefF because that's the maximum width allowed by a RefF
   let slice = Slice.Slice (RefUX width varU) 0 (width `min` fieldWidth)
-  writeAddWithSlices 0 [(F (RefFX varF), -1)] [(slice, 1)]
+  writeAdd 0 [(F (RefFX varF), -1)] [(slice, 1)]
 compileSideEffect (ToUInt width varU varF) = do
   fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
   -- represent "varU" as the sum of 2 Slices
@@ -79,7 +79,7 @@ compileSideEffect (ToUInt width varU varF) = do
   let toF = Slice.Slice (RefUX width varU) 0 actualWidth
   let rest = Slice.Slice (RefUX width varU) actualWidth width
   -- varF = toF + 2^actualWidth * rest
-  writeAddWithSlices 0 [(F (RefFX varF), -1)] [(toF, 1), (rest, 2 ^ actualWidth)]
+  writeAdd 0 [(F (RefFX varF), -1)] [(toF, 1), (rest, 2 ^ actualWidth)]
   -- rest = 0
   writeSliceVal rest 0
 compileSideEffect (BitsToUInt width varU bits) = do
@@ -288,8 +288,8 @@ assertEqF a b = do
       assertLC valA resultB
     (Polynomial as, Constant valB) -> do
       assertLC valB (Polynomial as)
-    (Polynomial as, Polynomial bs) -> do
-      writeAddWithPolyL $ PolyL.merge as (PolyL.negate bs)
+    (Polynomial _, Polynomial _) -> do
+      writeAddWithLC $ resultA <> neg resultB
 
 -- | Assert that two UInt expressions are equal
 assertEqU :: (GaloisField n, Integral n) => ExprU n -> ExprU n -> M n ()
@@ -353,9 +353,9 @@ relateLC :: (GaloisField n, Integral n) => RefF -> LC n -> M n ()
 relateLC out (Constant val) = writeRefFVal out val
 relateLC out (Polynomial poly) = case PolyL.view poly of
   PolyL.RefMonomial 0 (x, 1) -> writeRefEq x (F out)
-  PolyL.RefMonomial c (x, a) -> writeAdd c [(F out, -1), (x, a)]
-  PolyL.RefBinomial c (x, a) (y, b) -> writeAdd c [(F out, -1), (x, a), (y, b)]
-  PolyL.RefPolynomial c xs -> writeAdd c $ (F out, -1) : Map.toList xs
+  PolyL.RefMonomial c (x, a) -> writeAdd c [(F out, -1), (x, a)] []
+  PolyL.RefBinomial c (x, a) (y, b) -> writeAdd c [(F out, -1), (x, a), (y, b)] []
+  PolyL.RefPolynomial c xs -> writeAdd c ((F out, -1) : Map.toList xs) []
   _ -> return () -- TODO: dunno how to handle this yet
 
 -- | Assign a value to a LC
@@ -370,8 +370,8 @@ assertLC val (Polynomial poly) = case PolyL.view poly of
     writeRefVal x ((val - c) / a)
   PolyL.RefBinomial c (x, a) (y, b) ->
     -- val = c + ax + by
-    writeAdd (c - val) [(x, a), (y, b)]
+    writeAdd (c - val) [(x, a), (y, b)] []
   PolyL.RefPolynomial c xs ->
     -- val = c + xs...
-    writeAdd (c - val) (Map.toList xs)
+    writeAdd (c - val) (Map.toList xs) []
   _ -> return () -- TODO: dunno how to handle this yet
