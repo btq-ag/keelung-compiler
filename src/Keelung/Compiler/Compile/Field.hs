@@ -7,7 +7,7 @@ import Keelung.Compiler.Compile.Field.Conditional qualified as Conditional
 import Keelung.Compiler.Compile.Field.Exponentiation qualified as Exponentiation
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Syntax.Internal
-import Keelung.Data.LC
+import Keelung.Data.LC ( LC(..), (@), (*.), neg )
 import Keelung.Data.Reference
 
 ----------------------------------------------------------------

@@ -8,6 +8,8 @@ module Keelung.Data.LC
     neg,
     (*.),
     fromRefU,
+    fromLimbs,
+    fromEither,
   )
 where
 
@@ -17,6 +19,7 @@ import Data.Field.Galois
 import GHC.Generics (Generic)
 import Keelung (HasWidth (widthOf))
 import Keelung.Data.FieldInfo
+import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -51,7 +54,7 @@ infixr 7 @
 
 -- | Ref constructor
 (@) :: (Integral n, GaloisField n) => n -> Ref -> LC n
-n @ x = fromEither (PolyL.fromRefs 0 [(x, n)])
+n @ x = fromEither (PolyL.new 0 [(x, n)] [])
 
 --------------------------------------------------------------------------------
 
@@ -67,6 +70,10 @@ fromRefU fieldInfo (Right val) =
 fromRefU fieldInfo (Left var) =
   let slices = Slice.fromRefUWithDesiredWidth (fieldWidth fieldInfo) var
    in map (Polynomial . PolyL.fromSlice 0) slices
+
+-- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
+fromLimbs :: (Integral n, GaloisField n) => n -> [(Limb, n)] -> LC n
+fromLimbs c = fromEither . PolyL.fromLimbs c
 
 --------------------------------------------------------------------------------
 

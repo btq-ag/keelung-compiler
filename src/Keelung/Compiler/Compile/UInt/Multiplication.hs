@@ -16,6 +16,7 @@ import Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB)
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
+import Keelung.Data.LC qualified as LC
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
@@ -113,13 +114,13 @@ mul2Limbs currentLimbWidth (a, x) operand = do
     Right (b, y) -> do
       let carryLimbWidth = lmbWidth x + lmbWidth y - currentLimbWidth
       -- (a + x) * (b + y) = (lower + upper * 2^currentLimbWidth)
-      let firstOperand = PolyL.fromLimbs a [(x, 1)]
-      let secondOperand = PolyL.fromLimbs b [(y, 1)]
+      let firstOperand = LC.fromLimbs a [(x, 1)]
+      let secondOperand = LC.fromLimbs b [(y, 1)]
 
       lowerSlice <- allocSlice currentLimbWidth
       upperSlice <- allocSlice carryLimbWidth
-      let rightHandSide = PolyL.new 0 [] [(lowerSlice, 1), (upperSlice, 2 ^ currentLimbWidth)]
-      writeMulWithPolyL firstOperand secondOperand rightHandSide
+      let rightHandSide = LC.new 0 [] [(lowerSlice, 1), (upperSlice, 2 ^ currentLimbWidth)]
+      writeMulWithLC firstOperand secondOperand rightHandSide
 
       let lowerLimb = Slice.toLimb lowerSlice
       let upperLimb = Slice.toLimb upperSlice

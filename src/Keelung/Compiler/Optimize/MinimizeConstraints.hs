@@ -32,7 +32,8 @@ import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
-import Keelung.Data.LC
+import Keelung.Data.LC (LC (..), (@))
+import Keelung.Data.LC qualified as LC
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.RefUSegments (PartialRefUSegments (..))
@@ -466,13 +467,8 @@ substPolyM poly = do
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (LC n, Changes)
 substPolyL relations poly = do
   let constant = PolyL.polyConstant poly
-      initState = (Left constant, Nothing)
-      afterSubstSlice = case foldl
-        (substSlice (Relations.relationsS relations))
-        initState
-        (PolyL.toSlices poly) of
-        (Left c, changes) -> (Constant c, changes)
-        (Right p, changes) -> (Polynomial p, changes)
+      initState = (Constant constant, Nothing)
+      afterSubstSlice = foldl (substSlice (Relations.relationsS relations)) initState (PolyL.toSlices poly)
       afterSubstRef = Map.foldlWithKey' (substRef relations) afterSubstSlice (PolyL.polyRefs poly)
   case afterSubstRef of
     (_, Nothing) -> Nothing -- nothing changed
@@ -481,9 +477,9 @@ substPolyL relations poly = do
 substSlice ::
   (Integral n, GaloisField n) =>
   SliceRelations ->
-  (Either n (PolyL n), Maybe Changes) ->
+  (LC n, Maybe Changes) ->
   (Slice, n) ->
-  (Either n (PolyL n), Maybe Changes)
+  (LC n, Maybe Changes)
 substSlice relations initState (sliceWhole, multiplier) =
   let PartialRefUSegments _ segments = SliceRelations.lookup sliceWhole relations
       tagWithSlice = map (\(index, segment) -> (Slice.Slice (Slice.sliceRefU sliceWhole) index (index + widthOf segment), segment))
@@ -491,23 +487,16 @@ substSlice relations initState (sliceWhole, multiplier) =
       segmentsWithSlices = tagWithSlice $ removeNullSegment (IntMap.toList segments)
    in foldl step initState segmentsWithSlices
   where
-    step (accPoly, changes) (slice, segment) =
+    step (acc, changes) (slice, segment) =
       let offset = Slice.sliceStart slice - Slice.sliceStart sliceWhole
           coefficient = multiplier * 2 ^ offset
        in case segment of
-            Segment.Constant constant -> case accPoly of
-              Left c -> (Left (fromIntegral constant * coefficient + c), removeSlice slice changes)
-              Right xs -> (Right $ PolyL.addConstant (fromIntegral constant * fromIntegral coefficient) xs, removeSlice slice changes)
-            Segment.ChildOf root -> case accPoly of
+            Segment.Constant constant -> (acc <> Constant (fromIntegral constant * coefficient), removeSlice slice changes)
+            Segment.ChildOf root ->
               -- replace `slice` with `root`
-              Left c -> (PolyL.new c [] [(root, coefficient)], (addSlice root . removeSlice slice) changes)
-              Right accPoly' -> (PolyL.insertSlices [(root, coefficient)] accPoly', (addSlice root . removeSlice slice) changes)
-            Segment.Parent _ _ -> case accPoly of
-              Left c -> (PolyL.new c [] [(slice, coefficient)], changes)
-              Right xs -> (PolyL.insertSlices [(slice, coefficient)] xs, changes)
-            Segment.Free _ -> case accPoly of
-              Left c -> (PolyL.new c [] [(slice, coefficient)], changes)
-              Right xs -> (PolyL.insertSlices [(slice, coefficient)] xs, changes)
+              (acc <> LC.new 0 [] [(root, coefficient)], (addSlice root . removeSlice slice) changes)
+            Segment.Parent _ _ -> (acc <> LC.new 0 [] [(slice, coefficient)], changes)
+            Segment.Free _ -> (acc <> LC.new 0 [] [(slice, coefficient)], changes)
 
 -- | Substitutes a Ref in a PolyL.
 substRef ::

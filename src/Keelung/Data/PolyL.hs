@@ -16,8 +16,6 @@ module Keelung.Data.PolyL
     toSlices,
 
     -- * Operations
-    insertSlices,
-    insertRefs,
     addConstant,
     multiplyBy,
     merge,
@@ -134,22 +132,6 @@ fromRefs constant xs = case toRefMap xs of
 
 --------------------------------------------------------------------------------
 
--- | Insert a list of (Slice, coefficient) pairs into a PolyL
-insertSlices :: (Integral n, GaloisField n) => [(Slice, n)] -> PolyL n -> Either n (PolyL n)
-insertSlices ss' (PolyL c rs ss) =
-  let slicePoly = SlicePoly.insertMany ss' ss
-   in if SlicePoly.null slicePoly && null rs
-        then Left c
-        else Right (PolyL c rs slicePoly)
-
--- | Insert a list of (Ref, coefficient) pairs into a PolyL
-insertRefs :: (Integral n) => n -> [(Ref, n)] -> PolyL n -> Either n (PolyL n)
-insertRefs c' rs' (PolyL c rs ss) =
-  let refs = mergeListAndClean rs rs'
-   in if null rs' && SlicePoly.null ss
-        then Left (c + c')
-        else Right $ PolyL (c + c') refs ss
-
 -- | Add a constant to a PolyL
 addConstant :: (Integral n) => n -> PolyL n -> PolyL n
 addConstant c' (PolyL c rs ss) = PolyL (c + c') rs ss
@@ -241,6 +223,3 @@ limbsToSlicePoly =
 
 mergeRefsAndClean :: (Integral n, Ord a) => Map a n -> Map a n -> Map a n
 mergeRefsAndClean xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
-
-mergeListAndClean :: (Integral n, Ord a) => Map a n -> [(a, n)] -> Map a n
-mergeListAndClean xs ys = Map.filter (/= 0) (Map.unionWith (+) xs (Map.fromListWith (+) ys))

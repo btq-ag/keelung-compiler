@@ -28,6 +28,7 @@ import Keelung.Compiler.Compile.UInt.Multiplication
 import Keelung.Compiler.ConstraintModule qualified as CM
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
+import Keelung.Data.LC (neg, (@))
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
@@ -315,10 +316,10 @@ compileIfU width (Left p) x y = do
               (LC.Constant xVal, LC.Constant yVal) -> do
                 -- if both branches are constants, we can express it as addative constraints
                 -- (x - y) * p - out + y = 0
-                writeAddWithLC $ (xVal - yVal) LC.@ B p <> LC.neg outLC <> yLC
+                writeAddWithLC $ (xVal - yVal) @ B p <> neg outLC <> yLC
               _ ->
                 -- (out - y) = p * (x - y)
-                writeMulWithLC (1 LC.@ B p) (xLC <> LC.neg yLC) (outLC <> LC.neg yLC)
+                writeMulWithLC (1 @ B p) (xLC <> neg yLC) (outLC <> neg yLC)
         )
         outLCs
         xyLCs

@@ -7,13 +7,11 @@ import Data.Bifunctor (second)
 import Data.Field.Galois (Prime)
 import Data.Map (Map)
 import Data.Map qualified as Map
-import Keelung (widthOf)
 import Keelung.Data.Limb (Limb)
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import Keelung.Data.Slice (Slice)
 import Keelung.Data.SlicePolynomial qualified as SlicePoly
 import Test.Arbitrary ()
 import Test.Hspec
@@ -29,9 +27,6 @@ toRefMap = Map.filter (/= 0) . Map.fromListWith (+)
 
 toLimbMap :: (Integral n) => [(Limb, n)] -> Map Limb n
 toLimbMap = Map.filterWithKey (\limb n -> not (Limb.null limb) && n /= 0) . Map.fromListWith (+)
-
-toSliceMap :: (Integral n) => [(Slice, n)] -> Map Slice n
-toSliceMap = Map.filterWithKey (\slice n -> widthOf slice /= 0 && n /= 0) . Map.fromListWith (+)
 
 mergeRefMap :: (Integral n) => Map Ref n -> Map Ref n -> Map Ref n
 mergeRefMap xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
@@ -66,33 +61,6 @@ tests = describe "PolyRS" $ do
             PolyL.polyConstant poly `shouldBe` constant
             PolyL.polyRefs poly `shouldBe` toRefMap refs
             PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
-
-  describe "insertSlices" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(slices, poly) -> do
-        case PolyL.insertSlices slices poly of
-          Left constant' -> do
-            constant' `shouldBe` PolyL.polyConstant poly
-            null (toSliceMap slices) && null (PolyL.polyRefs poly) `shouldBe` True
-          Right polynomial -> do
-            PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` PolyL.polyConstant poly
-            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly
-            -- dunno how to check this
-            -- toSliceMap (PolyL.toSlices polynomial) `shouldBe` toSliceMap (PolyL.toSlices poly) `mergeSliceMap` toSliceMap slices
-            PolyL.validate polynomial `shouldBe` Nothing
-
-  describe "insertRefs" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(constant, refs, poly) -> do
-        case PolyL.insertRefs constant refs poly of
-          Left constant' -> do
-            constant' `shouldBe` constant + PolyL.polyConstant poly
-            null (toRefMap refs) && null (PolyL.toSlices poly) `shouldBe` True
-          Right polynomial -> do
-            PolyL.polyConstant (polynomial :: PolyL (Prime 17)) `shouldBe` constant + PolyL.polyConstant poly
-            PolyL.toSlices polynomial `shouldBe` PolyL.toSlices poly
-            PolyL.polyRefs polynomial `shouldBe` PolyL.polyRefs poly `mergeRefMap` toRefMap refs
-            PolyL.validate polynomial `shouldBe` Nothing
 
   describe "addConstant" $ do
     it "should result in valid PolyL" $ do

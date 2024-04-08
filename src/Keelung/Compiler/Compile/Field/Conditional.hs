@@ -1,5 +1,5 @@
 module Keelung.Compiler.Compile.Field.Conditional (compileIfF) where
-import Keelung.Data.LC
+import Keelung.Data.LC ( LC(..), (@), neg )
 import Data.Field.Galois
 import Keelung.Data.Reference
 import Keelung.Compiler.Compile.Monad

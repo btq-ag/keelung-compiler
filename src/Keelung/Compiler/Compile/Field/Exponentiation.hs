@@ -7,7 +7,7 @@ import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.ConstraintModule (ConstraintModule (cmOptions))
 import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo qualified as FieldInfo
-import Keelung.Data.LC
+import Keelung.Data.LC ( LC(..), (@), (*.) )
 import Keelung.Data.Reference
 
 compile :: (GaloisField n, Integral n) => LC n -> Integer -> M n (LC n)

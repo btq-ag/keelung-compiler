@@ -20,7 +20,7 @@ import Keelung.Compiler.Error
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
-import Keelung.Data.LC
+import Keelung.Data.LC ( LC(..), (@), neg )
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference

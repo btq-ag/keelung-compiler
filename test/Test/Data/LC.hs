@@ -6,7 +6,8 @@ import Data.Field.Galois ()
 import Data.Field.Galois qualified as Galois
 import Keelung
 import Keelung.Data.FieldInfo (caseFieldType)
-import Keelung.Data.LC
+import Keelung.Data.LC (LC (..))
+import Keelung.Data.LC qualified as LC
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
@@ -26,7 +27,7 @@ tests = describe "LC" $ do
         caseFieldType
           gf181
           ( \_ fieldInfo -> do
-              fromRefU fieldInfo (Right constant) `shouldBe` (expected :: [LC GF181])
+              LC.fromRefU fieldInfo (Right constant) `shouldBe` (expected :: [LC GF181])
           )
           undefined
       it "Prime 2" $ do
@@ -34,7 +35,7 @@ tests = describe "LC" $ do
         caseFieldType
           (Prime 2)
           ( \_ fieldInfo -> do
-              fromRefU fieldInfo (Right constant) `shouldBe` (expected :: [LC (Galois.Prime 2)])
+              LC.fromRefU fieldInfo (Right constant) `shouldBe` (expected :: [LC (Galois.Prime 2)])
           )
           undefined
       it "Binary 7" $ do
@@ -43,7 +44,7 @@ tests = describe "LC" $ do
           (Binary 7)
           undefined
           ( \_ fieldInfo -> do
-              fromRefU fieldInfo (Right constant) `shouldBe` (expected :: [LC (Galois.Binary 7)])
+              LC.fromRefU fieldInfo (Right constant) `shouldBe` (expected :: [LC (Galois.Binary 7)])
           )
 
     describe "converts an RefU to a list of LCs" $ do
@@ -56,7 +57,7 @@ tests = describe "LC" $ do
         caseFieldType
           gf181
           ( \_ fieldInfo -> do
-              fromRefU fieldInfo (Left refU) `shouldBe` (expected :: [LC GF181])
+              LC.fromRefU fieldInfo (Left refU) `shouldBe` (expected :: [LC GF181])
           )
           undefined
       it "Prime 2" $ do
@@ -65,7 +66,7 @@ tests = describe "LC" $ do
         caseFieldType
           (Prime 2)
           ( \_ fieldInfo -> do
-              fromRefU fieldInfo (Left refU) `shouldBe` (expected :: [LC (Galois.Prime 2)])
+              LC.fromRefU fieldInfo (Left refU) `shouldBe` (expected :: [LC (Galois.Prime 2)])
           )
           undefined
       it "Binary 7" $ do
@@ -75,5 +76,5 @@ tests = describe "LC" $ do
           (Binary 7)
           undefined
           ( \_ fieldInfo -> do
-              fromRefU fieldInfo (Left refU) `shouldBe` (expected :: [LC (Galois.Binary 7)])
+              LC.fromRefU fieldInfo (Left refU) `shouldBe` (expected :: [LC (Galois.Binary 7)])
           )

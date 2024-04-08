@@ -17,7 +17,7 @@ import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
-import Keelung.Data.LC
+import Keelung.Data.LC ( LC(Constant), (@), neg )
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
@@ -103,8 +103,8 @@ compileEqU x y = do
   result <-
     zipWithM
       (\a b -> eqZero True (a <> neg b)) -- a - b ==? 0
-      (fromRefU fieldInfo x)
-      (fromRefU fieldInfo y)
+      (LC.fromRefU fieldInfo x)
+      (LC.fromRefU fieldInfo y)
   case result of
     [] -> return $ Right True
     [result'] -> return result'
