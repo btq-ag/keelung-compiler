@@ -42,4 +42,4 @@ tests = describe "Experiment" $ do
       let divisor = 2 :: Integer
       let expected = [dividend `div` divisor, dividend `mod` divisor]
       forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-        testCompiler field (program dividend divisor) [] [] expected
+        validate field (program dividend divisor) [] [] expected

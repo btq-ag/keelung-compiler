@@ -27,17 +27,17 @@ tests = describe "exponentiation" $ do
     it "GF181" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: GF181) ^ power]
-        testCompiler gf181 (program (fromIntegral base) (fromIntegral power)) [] [] expected
+        validate gf181 (program (fromIntegral base) (fromIntegral power)) [] [] expected
 
     it "Prime 2" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: Galois.Prime 2) ^ power]
-        testCompiler (Prime 2) (program (fromIntegral base) (fromIntegral power)) [] [] expected
+        validate (Prime 2) (program (fromIntegral base) (fromIntegral power)) [] [] expected
 
     it "Binary 7" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: Galois.Binary 7) ^ power]
-        testCompiler (Binary 7) (program (fromIntegral base) (fromIntegral power)) [] [] expected
+        validate (Binary 7) (program (fromIntegral base) (fromIntegral power)) [] [] expected
 
   describe "variable base" $ do
     let genCase = do
@@ -51,14 +51,14 @@ tests = describe "exponentiation" $ do
     it "GF181" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: GF181) ^ power]
-        testCompiler gf181 (program (fromIntegral power)) [fromIntegral base] [] expected
+        validate gf181 (program (fromIntegral power)) [fromIntegral base] [] expected
 
     it "Prime 2" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: Galois.Prime 2) ^ power]
-        testCompiler (Prime 2) (program (fromIntegral power)) [fromIntegral base] [] expected
+        validate (Prime 2) (program (fromIntegral power)) [fromIntegral base] [] expected
 
     it "Binary 7" $ do
       forAll genCase $ \(base, power) -> do
         let expected = map toInteger [(fromIntegral base :: Galois.Binary 7) ^ power]
-        testCompiler (Binary 7) (program (fromIntegral power)) [fromIntegral base] [] expected
+        validate (Binary 7) (program (fromIntegral power)) [fromIntegral base] [] expected

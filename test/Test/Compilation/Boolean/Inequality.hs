@@ -20,16 +20,16 @@ tests = describe "inequality" $ do
           x <- input Public
           return $ x `neq` false
     forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-      testCompiler field program [0] [] [0]
-      testCompiler field program [1] [] [1]
+      validate field program [0] [] [0]
+      validate field program [1] [] [1]
 
   it "variable + constant true" $ do
     let program = do
           x <- input Public
           return $ x `neq` true
     forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-      testCompiler field program [0] [] [1]
-      testCompiler field program [1] [] [0]
+      validate field program [0] [] [1]
+      validate field program [1] [] [0]
 
   it "2 variables" $ do
     let program = do
@@ -37,7 +37,7 @@ tests = describe "inequality" $ do
           y <- inputBool Public
           return $ x `neq` y
     forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-      testCompiler field program [0, 0] [] [0]
-      testCompiler field program [0, 1] [] [1]
-      testCompiler field program [1, 0] [] [1]
-      testCompiler field program [1, 1] [] [0]
+      validate field program [0, 0] [] [0]
+      validate field program [0, 1] [] [1]
+      validate field program [1, 0] [] [1]
+      validate field program [1, 1] [] [0]

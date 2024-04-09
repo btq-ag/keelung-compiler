@@ -23,7 +23,7 @@ tests = describe "Compilation Experiment" $ do
             return $ sum (replicate (fromInteger n) x)
       let expected = [10 * 10 `mod` 16]
       debug (Prime 61) (program 10)
-      testCompiler (Prime 61) (program 10) [10] [] expected
+      validate (Prime 61) (program 10) [10] [] expected
 
 -- debugSolverWithOpts options (Binary 7) (program (fromIntegral divisor)) [dividend] []
 
@@ -38,4 +38,4 @@ tests = describe "Compilation Experiment" $ do
 -- forAll genPair $ \(dividend, divisor) -> do
 --   let expected = [dividend `div` divisor, dividend `mod` divisor]
 --   -- debugWithOpts options (Binary 7) (program dividend divisor)
---   testCompilerWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+--   validateWithOpts options (Binary 7) (program dividend divisor) [] [] expected

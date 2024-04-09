@@ -7,8 +7,8 @@ module Test.Compilation.Util
     debug,
     debugO0,
     -- testing by comparing the interpreter and the solver
-    testCompilerWithOpts,
-    testCompiler,
+    validateWithOpts,
+    validate,
     -- for debugging the solver
     debugSolverWithOpts,
     debugSolver,
@@ -82,9 +82,34 @@ debugO0 = debugWithOpts (defaultOptions {optOptimize = False})
 
 --------------------------------------------------------------------------------
 
--- | Use the interpreter to check the result of compilation + witness generation
-testCompilerWithOpts :: (Encode t) => Options -> FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
-testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary
+-- -- | Accepts Internal syntax and check the result of compilation with the solver, for experimenting with new features not present in the language repo
+-- testInternalWithOpts :: Options -> FieldType -> Compiler.Internal n -> [Integer] -> [Integer] -> [Integer] -> IO ()
+-- testInternalWithOpts options fieldType syntax rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary
+--   where
+--     handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
+--     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
+--       -- overwrite fieldInfo
+--       let options' = options {optFieldInfo = fieldInfo}
+--       -- tests for variable reindexing
+--       testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Prime n)) (Maybe ReindexReport.Error))
+--       -- constraint system solvers
+--       Compiler.solveOutputWithOpts options' program rawPublicInputs rawPrivateInputs
+--         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+
+--     handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
+--     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
+--       -- overwrite fieldInfo
+--       let options' = options {optFieldInfo = fieldInfo}
+--       -- tests for variable reindexing
+--       testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
+--       -- constraint system solvers
+--       Compiler.solveOutputWithOpts options' program rawPublicInputs rawPrivateInputs
+--         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
+
+
+-- | Check the result of compilation with the interpreter and the solver
+validateWithOpts :: (Encode t) => Options -> FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
+validateWithOpts options fieldType program rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary
   where
     handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
@@ -110,8 +135,8 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
       Compiler.solveOutputWithOpts options' program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
 
-testCompiler :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
-testCompiler = testCompilerWithOpts defaultOptions
+validate :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
+validate = validateWithOpts defaultOptions
 
 --------------------------------------------------------------------------------
 

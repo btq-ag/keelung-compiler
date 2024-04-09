@@ -25,10 +25,10 @@ tests = describe "Experiment" $ do
   --       cs' `shouldHaveSize` 33
   -- it "n^255 = n (Binary 283)" $ do
   --   property $ \(n :: Binary 283) -> do
-  --     testCompiler (Binary 283) (program 255) [toInteger n] [] [1]
+  --     validate (Binary 283) (program 255) [toInteger n] [] [1]
   -- it "n^254 = n (Binary 283)" $ do
   --   property $ \(n :: Binary 283) -> do
-  --     testCompiler (Binary 283) (program 254) [toInteger n] [] [toInteger (n ^ (254 :: Int))]
+  --     validate (Binary 283) (program 254) [toInteger n] [] [toInteger (n ^ (254 :: Int))]
 
   -- 4 * 3 for input / output
   -- 4 for output

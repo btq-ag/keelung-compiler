@@ -51,7 +51,7 @@ tests = do
     describe "Big Int I/O" $ do
       it "10 bit / GF257" $ do
         let program = inputUInt @10 Public
-        testCompiler (Prime 257) program [300] [] [300]
+        validate (Prime 257) program [300] [] [300]
 
     describe "Conditionals" $ do
       it "variable / variable / variable" $ do
@@ -67,7 +67,7 @@ tests = do
               return (p, x, y)
         forAll genParam $ \(p, x, y) -> do
           let expected = [fromIntegral $ if p then x else y]
-          testCompiler gf181 program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
+          validate gf181 program [if p then 1 else 0, fromIntegral x, fromIntegral y] [] expected
 
       it "variable / variable / constant" $ do
         let program y = do
@@ -81,7 +81,7 @@ tests = do
               return (p, x, y)
         forAll genParam $ \(p, x, y) -> do
           let expected = [fromIntegral $ if p then x else y]
-          testCompiler gf181 (program (fromIntegral y)) [if p then 1 else 0, fromIntegral x] [] expected
+          validate gf181 (program (fromIntegral y)) [if p then 1 else 0, fromIntegral x] [] expected
 
       it "variable / constant / variable" $ do
         let program x = do
@@ -95,7 +95,7 @@ tests = do
               return (p, x, y)
         forAll genParam $ \(p, x, y) -> do
           let expected = [fromIntegral $ if p then x else y]
-          testCompiler gf181 (program (fromIntegral x)) [if p then 1 else 0, fromIntegral y] [] expected
+          validate gf181 (program (fromIntegral x)) [if p then 1 else 0, fromIntegral y] [] expected
 
       it "variable / constant / constant" $ do
         let program x y = do
@@ -108,12 +108,12 @@ tests = do
               return (p, x, y)
         forAll genParam $ \(p, x, y) -> do
           let expected = [fromIntegral $ if p then x else y]
-          testCompiler gf181 (program (fromIntegral x :: UInt 4) (fromIntegral y)) [if p then 1 else 0] [] expected
+          validate gf181 (program (fromIntegral x :: UInt 4) (fromIntegral y)) [if p then 1 else 0] [] expected
 
       it "constant predicate" $ do
         let program = do
               return $ cond true (3 :: UInt 2) 2
-        testCompiler gf181 program [] [] [3]
+        validate gf181 program [] [] [3]
 
     describe "Equalities" $ do
       it "variable / constant" $ do
@@ -122,9 +122,9 @@ tests = do
               return (x `eq` 13)
         forAll (choose (0, 15)) $ \x -> do
           let expected = [if x == 13 then 1 else 0]
-          testCompiler gf181 program [x] [] expected
-          testCompiler (Prime 13) program [x] [] expected
-          testCompiler (Binary 7) program [x] [] expected
+          validate gf181 program [x] [] expected
+          validate (Prime 13) program [x] [] expected
+          validate (Binary 7) program [x] [] expected
 
       it "variables (Prime 13)" $ do
         let program = do
@@ -137,9 +137,9 @@ tests = do
               return (x, y)
         forAll genPair $ \(x, y) -> do
           let expected = [if x == y then 1 else 0]
-          testCompiler gf181 program [x, y] [] expected
-          testCompiler (Prime 13) program [x, y] [] expected
-          testCompiler (Binary 7) program [x, y] [] expected
+          validate gf181 program [x, y] [] expected
+          validate (Prime 13) program [x, y] [] expected
+          validate (Binary 7) program [x, y] [] expected
 
       it "neq: variable / constant" $ do
         let program = do
@@ -148,7 +148,7 @@ tests = do
 
         forAll (choose (0, 15)) $ \x -> do
           let expected = [if x == 13 then 0 else 1]
-          testCompiler (Prime 13) program [x `mod` 16] [] expected
+          validate (Prime 13) program [x `mod` 16] [] expected
 
       it "neq: variables (Prime 13)" $ do
         let program = do
@@ -161,7 +161,7 @@ tests = do
               return (x, y)
         forAll genPair $ \(x, y) -> do
           let expected = [if x /= y then 0 else 1]
-          testCompiler (Prime 13) program [x, y] [] expected
+          validate (Prime 13) program [x, y] [] expected
 
       it "neq: variables (GF181)" $ do
         let program = do
@@ -174,7 +174,7 @@ tests = do
               return (x, y)
         forAll genPair $ \(x, y) -> do
           let expected = [if x /= y then 0 else 1]
-          testCompiler gf181 program [x, y] [] expected
+          validate gf181 program [x, y] [] expected
 
       it "neq (40 bits / Prime 13)" $ do
         let program = do
@@ -182,22 +182,22 @@ tests = do
               y <- inputUInt @40 Public
               return (x `neq` y)
         -- debugPrime  (Prime 13)  program
-        testCompiler (Prime 13) program [12345, 12344] [] [1]
-        testCompiler (Prime 13) program [12340000001, 12340000000] [] [1]
-        testCompiler (Prime 13) program [1234, 1234] [] [0]
+        validate (Prime 13) program [12345, 12344] [] [1]
+        validate (Prime 13) program [12340000001, 12340000000] [] [1]
+        validate (Prime 13) program [1234, 1234] [] [0]
 
       it "neq 2" $ do
         let program = do
               x <- inputUInt @4 Public
               return (x `neq` 3)
-        testCompiler gf181 program [5] [] [1]
-        testCompiler gf181 program [3] [] [0]
+        validate gf181 program [5] [] [1]
+        validate gf181 program [3] [] [0]
 
       it "neq 3" $ do
         let program = do
               x <- inputUInt @4 Public
               assert $ x `neq` 3
-        testCompiler gf181 program [5] [] []
+        validate gf181 program [5] [] []
         throwErrors
           gf181
           program
@@ -221,33 +221,33 @@ tests = do
         let program = do
               x <- input Public :: Comp (UInt 8)
               return $ slice x (-1, 3) :: Comp (UInt 4)
-        testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
-        testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
-        testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
+        validate (Binary 7) program [0] [] [0] `shouldThrow` anyException
+        validate (Prime 17) program [0] [] [0] `shouldThrow` anyException
+        validate gf181 program [0] [] [0] `shouldThrow` anyException
 
       it "should throw exception when the ending index is smaller than the starting index" $ do
         let program = do
               x <- input Public :: Comp (UInt 8)
               return $ slice x (3, 1) :: Comp (UInt 4)
-        testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
-        testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
-        testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
+        validate (Binary 7) program [0] [] [0] `shouldThrow` anyException
+        validate (Prime 17) program [0] [] [0] `shouldThrow` anyException
+        validate gf181 program [0] [] [0] `shouldThrow` anyException
 
       it "should throw exception when the ending index is greater than the bit width" $ do
         let program = do
               x <- input Public :: Comp (UInt 8)
               return $ slice x (3, 9) :: Comp (UInt 4)
-        testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
-        testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
-        testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
+        validate (Binary 7) program [0] [] [0] `shouldThrow` anyException
+        validate (Prime 17) program [0] [] [0] `shouldThrow` anyException
+        validate gf181 program [0] [] [0] `shouldThrow` anyException
 
       it "should throw exception when the range does not match with the type" $ do
         let program = do
               x <- input Public :: Comp (UInt 8)
               return $ slice x (3, 6) :: Comp (UInt 4)
-        testCompiler (Binary 7) program [0] [] [0] `shouldThrow` anyException
-        testCompiler (Prime 17) program [0] [] [0] `shouldThrow` anyException
-        testCompiler gf181 program [0] [] [0] `shouldThrow` anyException
+        validate (Binary 7) program [0] [] [0] `shouldThrow` anyException
+        validate (Prime 17) program [0] [] [0] `shouldThrow` anyException
+        validate gf181 program [0] [] [0] `shouldThrow` anyException
 
       it "constant (slice width = 4)" $ do
         let genParam = do
@@ -260,9 +260,9 @@ tests = do
               return $ slice u (i, j) :: Comp (UInt 4)
         forAll genParam $ \(val, i) -> do
           let expected = [toInteger (U.slice (U.new 8 val) (i, i + 4))]
-          testCompiler (Binary 7) (program val (i, i + 4)) [] [] expected
-          testCompiler (Prime 17) (program val (i, i + 4)) [] [] expected
-          testCompiler gf181 (program val (i, i + 4)) [] [] expected
+          validate (Binary 7) (program val (i, i + 4)) [] [] expected
+          validate (Prime 17) (program val (i, i + 4)) [] [] expected
+          validate gf181 (program val (i, i + 4)) [] [] expected
 
       it "variable (slice width = 4)" $ do
         let genParam = do
@@ -275,9 +275,9 @@ tests = do
               return $ slice x (i, j) :: Comp (UInt 4)
         forAll genParam $ \(val, i) -> do
           let expected = [toInteger (U.slice (U.new 8 val) (i, i + 4))]
-          testCompiler (Binary 7) (program (i, i + 4)) [val] [] expected
-          testCompiler (Prime 17) (program (i, i + 4)) [val] [] expected
-          testCompiler gf181 (program (i, i + 4)) [val] [] expected
+          validate (Binary 7) (program (i, i + 4)) [val] [] expected
+          validate (Prime 17) (program (i, i + 4)) [val] [] expected
+          validate gf181 (program (i, i + 4)) [val] [] expected
 
     describe "Join" $ do
       it "constant (slice width: 4 / 4)" $ do
@@ -293,9 +293,9 @@ tests = do
 
         forAll genParam $ \(x, y) -> do
           let expected = [toInteger (U.join (U.new 4 x) (U.new 4 y))]
-          testCompiler (Binary 7) (program x y) [] [] expected
-          testCompiler (Prime 17) (program x y) [] [] expected
-          testCompiler gf181 (program x y) [] [] expected
+          validate (Binary 7) (program x y) [] [] expected
+          validate (Prime 17) (program x y) [] [] expected
+          validate gf181 (program x y) [] [] expected
 
       it "constant (slice width: 2 / 6)" $ do
         let genParam = do
@@ -310,9 +310,9 @@ tests = do
 
         forAll genParam $ \(x, y) -> do
           let expected = [toInteger (U.join (U.new 2 x) (U.new 6 y))]
-          testCompiler (Binary 7) (program x y) [] [] expected
-          testCompiler (Prime 17) (program x y) [] [] expected
-          testCompiler gf181 (program x y) [] [] expected
+          validate (Binary 7) (program x y) [] [] expected
+          validate (Prime 17) (program x y) [] [] expected
+          validate gf181 (program x y) [] [] expected
 
       it "variable (slice width: 2 / 6)" $ do
         let genParam = do
@@ -327,6 +327,6 @@ tests = do
 
         forAll genParam $ \(x, y) -> do
           let expected = [toInteger (U.join (U.new 2 x) (U.new 6 y))]
-          testCompiler (Binary 7) program [x, y] [] expected
-          testCompiler (Prime 17) program [x, y] [] expected
-          testCompiler gf181 program [x, y] [] expected
+          validate (Binary 7) program [x, y] [] expected
+          validate (Prime 17) program [x, y] [] expected
+          validate gf181 program [x, y] [] expected
