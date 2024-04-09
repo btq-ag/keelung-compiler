@@ -23,6 +23,7 @@ module Keelung.Compiler
     generateWitnessElab,
     generateWitness,
     -- solve R1CS and return output
+    solveOutputInternalWithOpts,
     solveOutputElabWithOpts,
     solveOutputWithOpts,
     solveOutput,
@@ -102,13 +103,16 @@ generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
   return (counters, outputs, witness)
 
 -- | R1CS witness solver
-solveOutputElabWithOpts :: (GaloisField n, Integral n) => Options -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-solveOutputElabWithOpts options elab rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS . Linker.linkConstraintModule <$> compileElabWithOpts options elab
+solveOutputInternalWithOpts :: (GaloisField n, Integral n) => Options -> Internal n -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveOutputInternalWithOpts options syntax rawPublicInputs rawPrivateInputs = do
+  r1cs <- toR1CS . Linker.linkConstraintModule <$> compileInternalWithOpts options syntax
   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   case Solver.run options r1cs inputs of
     Left err -> Left (SolverError err)
     Right (outputs, _) -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
+
+solveOutputElabWithOpts :: (GaloisField n, Integral n) => Options -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveOutputElabWithOpts options = solveOutputInternalWithOpts options . ToInternal.run (optFieldInfo options)
 
 solveOutputWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 solveOutputWithOpts options prog rawPublicInputs rawPrivateInputs = do

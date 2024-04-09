@@ -9,6 +9,9 @@ module Test.Compilation.Util
     -- testing by comparing the interpreter and the solver
     validateWithOpts,
     validate,
+    -- like `validate`, but accepts the internal syntax and without the interpreter
+    validateInternalSyntaxWithOpts,
+    validateInternalSyntax,
     -- for debugging the solver
     debugSolverWithOpts,
     debugSolver,
@@ -33,6 +36,7 @@ import Keelung.Compiler.ConstraintSystem qualified as CS
 import Keelung.Compiler.Linker.ReindexReport qualified as ReindexReport
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
+import Keelung.Compiler.Syntax.ToInternal qualified as ToInternal
 import Keelung.Compiler.Util (gf181Info)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Data.FieldInfo
@@ -53,10 +57,9 @@ interpretSyntaxTree fieldInfo prog rawPublicInputs rawPrivateInputs = do
 --------------------------------------------------------------------------------
 
 -- | Generate and test the report of variable reindexing
-testReindexReportWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> Either (Error n) (Maybe ReindexReport.Error)
-testReindexReportWithOpts options prog = do
-  elab <- Compiler.elaborateAndEncode prog
-  constraintModule <- Compiler.compileElabWithOpts options elab
+testReindexReportWithOpts :: (GaloisField n, Integral n) => Options -> Compiler.Internal n -> Either (Error n) (Maybe ReindexReport.Error)
+testReindexReportWithOpts options syntax = do
+  constraintModule <- Compiler.compileInternalWithOpts options syntax
   return $ ReindexReport.test constraintModule
 
 --------------------------------------------------------------------------------
@@ -82,30 +85,19 @@ debugO0 = debugWithOpts (defaultOptions {optOptimize = False})
 
 --------------------------------------------------------------------------------
 
--- -- | Accepts Internal syntax and check the result of compilation with the solver, for experimenting with new features not present in the language repo
--- testInternalWithOpts :: Options -> FieldType -> Compiler.Internal n -> [Integer] -> [Integer] -> [Integer] -> IO ()
--- testInternalWithOpts options fieldType syntax rawPublicInputs rawPrivateInputs expected = caseFieldType fieldType handlePrime handleBinary
---   where
---     handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
---     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
---       -- overwrite fieldInfo
---       let options' = options {optFieldInfo = fieldInfo}
---       -- tests for variable reindexing
---       testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Prime n)) (Maybe ReindexReport.Error))
---       -- constraint system solvers
---       Compiler.solveOutputWithOpts options' program rawPublicInputs rawPrivateInputs
---         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
+-- | Accepts Internal syntax and check the result of compilation with the solver, for experimenting with new features not present in the language repo
+validateInternalSyntaxWithOpts :: (GaloisField n, Integral n) => Options -> Compiler.Internal n -> [Integer] -> [Integer] -> [Integer] -> IO ()
+validateInternalSyntaxWithOpts options syntax rawPublicInputs rawPrivateInputs expected = do
+  -- tests for variable reindexing
+  testReindexReportWithOpts options syntax `shouldBe` (Right Nothing :: Either (Error n) (Maybe ReindexReport.Error))
+  -- constraint system solvers
+  Compiler.solveOutputInternalWithOpts options syntax rawPublicInputs rawPrivateInputs
+    `shouldBe` (Right expected :: Either (Error n) [Integer])
 
---     handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
---     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
---       -- overwrite fieldInfo
---       let options' = options {optFieldInfo = fieldInfo}
---       -- tests for variable reindexing
---       testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
---       -- constraint system solvers
---       Compiler.solveOutputWithOpts options' program rawPublicInputs rawPrivateInputs
---         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
+validateInternalSyntax :: (GaloisField n, Integral n) => Compiler.Internal n -> [Integer] -> [Integer] -> [Integer] -> IO ()
+validateInternalSyntax = validateInternalSyntaxWithOpts defaultOptions
 
+--------------------------------------------------------------------------------
 
 -- | Check the result of compilation with the interpreter and the solver
 validateWithOpts :: (Encode t) => Options -> FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
@@ -118,7 +110,7 @@ validateWithOpts options fieldType program rawPublicInputs rawPrivateInputs expe
       -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
       -- tests for variable reindexing
-      testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Prime n)) (Maybe ReindexReport.Error))
+      (Compiler.elaborateAndEncode program >>= testReindexReportWithOpts options' . ToInternal.run (optFieldInfo options)) `shouldBe` (Right Nothing :: Either (Error (Prime n)) (Maybe ReindexReport.Error))
       -- constraint system solvers
       Compiler.solveOutputWithOpts options' program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Prime n)) [Integer])
@@ -130,7 +122,7 @@ validateWithOpts options fieldType program rawPublicInputs rawPrivateInputs expe
       -- interpreter
       interpretSyntaxTree fieldInfo program rawPublicInputs rawPrivateInputs `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
       -- tests for variable reindexing
-      testReindexReportWithOpts options' program `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
+      (Compiler.elaborateAndEncode program >>= testReindexReportWithOpts options' . ToInternal.run (optFieldInfo options)) `shouldBe` (Right Nothing :: Either (Error (Binary n)) (Maybe ReindexReport.Error))
       -- constraint system solvers
       Compiler.solveOutputWithOpts options' program rawPublicInputs rawPrivateInputs
         `shouldBe` (Right expected :: Either (Error (Binary n)) [Integer])
