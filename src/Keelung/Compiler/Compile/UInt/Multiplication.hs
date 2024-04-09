@@ -46,14 +46,15 @@ import Keelung.Syntax (Width)
 -- ------------------------------------------
 --
 -- the maximum number of operands when adding these 2w-bit limbs is 2L (with carry from the previous limb)
-compileMulU :: (GaloisField n, Integral n) => Int -> RefU -> Either RefU U -> Either RefU U -> M n ()
-compileMulU _width out (Right a) (Right b) = writeRefUVal out (a * b)
-compileMulU width out (Right a) (Left b) = compileMul width out b (Right a)
-compileMulU width out (Left a) (Right b) = compileMul width out a (Right b)
-compileMulU width out (Left a) (Left b) = compileMul width out a (Left b)
+compileMulU :: (GaloisField n, Integral n) => RefU -> Either RefU U -> Either RefU U -> M n ()
+compileMulU out (Right a) (Right b) = writeRefUVal out (a * b)
+compileMulU out (Right a) (Left b) = compileMul out b (Right a)
+compileMulU out (Left a) (Right b) = compileMul out a (Right b)
+compileMulU out (Left a) (Left b) = compileMul out a (Left b)
 
-compileMul :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU U -> M n ()
-compileMul width out x y = do
+compileMul :: (GaloisField n, Integral n) => RefU -> RefU -> Either RefU U -> M n ()
+compileMul out x y = do
+  let outWidth = widthOf out
   fieldInfo <- gets (optFieldInfo . cmOptions)
 
   -- invariants about widths of carry and limbs:
@@ -63,24 +64,99 @@ compileMul width out x y = do
   let maxLimbWidth = fieldWidth fieldInfo `div` 2 -- cannot exceed half of the field width
   let minLimbWidth = 2 -- TEMPORARY HACK FOR ADDITION
   -- the number of limbs needed to represent an operand
-  let limbNumber = width `ceilDiv` (minLimbWidth `max` width `min` maxLimbWidth)
+  let limbNumber = outWidth `ceilDiv` (minLimbWidth `max` outWidth `min` maxLimbWidth)
   -- the optimal width
-  let limbWidth = width `ceilDiv` limbNumber
+  let limbWidth = outWidth `ceilDiv` limbNumber
 
   let maxHeight = if limbWidth > 20 then 1048576 else 2 ^ limbWidth -- HACK
   case fieldTypeData fieldInfo of
-    Binary _ -> compileMulB width out x y
+    Binary _ -> compileMulB outWidth out x y
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 5 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 7 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 11 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    _ -> mulnxn width maxHeight limbWidth limbNumber out x y
+    _ -> mulnxn maxHeight limbWidth limbNumber out x y
   where
     -- like div, but rounds up
     ceilDiv :: Int -> Int -> Int
     ceilDiv a b = ((a - 1) `div` b) + 1
+
+-- | n-limb by n-limb multiplication
+--                       .. x2 x1 x0
+-- x                     .. y2 y1 y0
+-- ------------------------------------------
+--                             x0*y0
+--                          x1*y0
+--                       x2*y0
+--                    .....
+--                          x0*y1
+--                       x1*y1
+--                    x2*y1
+--                 .....
+--                       x0*y2
+--                    x1*y2
+--                 x2*y2
+--               .....
+-- ------------------------------------------
+mulnxn :: (GaloisField n, Integral n) => Int -> Width -> Int -> RefU -> RefU -> Either RefU U -> M n ()
+mulnxn maxHeight limbWidth limbNumber out var operand = do
+  let outWidth = widthOf out
+  -- generate pairs of indices for choosing limbs
+  let indices = [(xi, columnIndex - xi) | columnIndex <- [0 .. limbNumber - 1], xi <- [0 .. columnIndex]]
+  -- generate pairs of limbs to be added together
+  limbColumns <-
+    foldM
+      ( \columns (xi, yi) -> do
+          -- current limb width may be smaller than
+          --    1. the default limb width in the highest limbs
+          --    2. the width of the RefU
+          let currentLimbWidthX = limbWidth `min` widthOf var `min` (outWidth - (limbWidth * xi))
+          let currentLimbWidthY = limbWidth `min` widthOf var `min` (outWidth - (limbWidth * yi))
+
+          let x = Limb.new var currentLimbWidthX (limbWidth * xi) (Left True)
+          let y = case operand of
+                Right constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
+                Left variable -> Right (0, Limb.new variable currentLimbWidthY (limbWidth * yi) (Left True))
+          let index = xi + yi
+
+          (lowerLimb, upperLimb) <- mul2Limbs limbWidth (0, x) y
+          -- insert the lower limb into the columns
+          let columns' =
+                if lowerLimb == mempty
+                  then columns
+                  else IntMap.insertWith (<>) index lowerLimb columns
+          -- insert the upper limb into the columns
+          let columns'' =
+                if upperLimb == mempty || index == limbNumber - 1 -- throw limbs higher than `limbNumber` away
+                  then columns'
+                  else IntMap.insertWith (<>) (index + 1) upperLimb columns'
+          return columns''
+      )
+      mempty
+      indices
+  -- write the result to the output RefU
+  foldM_
+    ( \previousCarryLimbs index -> do
+        -- calculate the segment of the output RefU to be written
+        let limbStart = limbWidth * index
+        let currentLimbWidth = limbWidth `min` (outWidth - limbStart)
+        let outputLimb = Limb.new out currentLimbWidth limbStart (Left True)
+
+        -- see if there's a stack of limbs to be added to the output limb
+        case IntMap.lookup index limbColumns of
+          Just limbs -> addLimbColumn maxHeight outputLimb (previousCarryLimbs <> limbs)
+          Nothing -> do
+            if previousCarryLimbs == mempty
+              then do
+                writeLimbVal outputLimb 0
+                return mempty -- no carry
+              else addLimbColumn maxHeight outputLimb previousCarryLimbs
+    )
+    mempty
+    [0 .. limbNumber - 1]
+
 
 mul2Limbs :: (GaloisField n, Integral n) => Width -> (n, Limb) -> Either n (n, Limb) -> M n (LimbColumn, LimbColumn)
 mul2Limbs currentLimbWidth (a, x) operand = do
@@ -123,76 +199,3 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       let lowerLimb = Slice.toLimb lowerSlice
       let upperLimb = Slice.toLimb upperSlice
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
-
--- | n-limb by n-limb multiplication
---                       .. x2 x1 x0
--- x                     .. y2 y1 y0
--- ------------------------------------------
---                             x0*y0
---                          x1*y0
---                       x2*y0
---                    .....
---                          x0*y1
---                       x1*y1
---                    x2*y1
---                 .....
---                       x0*y2
---                    x1*y2
---                 x2*y2
---               .....
--- ------------------------------------------
-mulnxn :: (GaloisField n, Integral n) => Width -> Int -> Width -> Int -> RefU -> RefU -> Either RefU U -> M n ()
-mulnxn width maxHeight limbWidth arity out var operand = do
-  -- generate pairs of indices for choosing limbs
-  let indices = [(xi, columnIndex - xi) | columnIndex <- [0 .. arity - 1], xi <- [0 .. columnIndex]]
-  -- generate pairs of limbs to be added together
-  limbColumns <-
-    foldM
-      ( \columns (xi, yi) -> do
-          -- current limb width may be smaller than
-          --    1. the default limb width in the highest limbs
-          --    2. the width of the RefU
-          let currentLimbWidthX = limbWidth `min` widthOf var `min` (width - (limbWidth * xi))
-          let currentLimbWidthY = limbWidth `min` widthOf var `min` (width - (limbWidth * yi))
-
-          let x = Limb.new var currentLimbWidthX (limbWidth * xi) (Left True)
-          let y = case operand of
-                Right constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
-                Left variable -> Right (0, Limb.new variable currentLimbWidthY (limbWidth * yi) (Left True))
-          let index = xi + yi
-
-          (lowerLimb, upperLimb) <- mul2Limbs limbWidth (0, x) y
-          -- insert the lower limb into the columns
-          let columns' =
-                if lowerLimb == mempty
-                  then columns
-                  else IntMap.insertWith (<>) index lowerLimb columns
-          -- insert the upper limb into the columns
-          let columns'' =
-                if upperLimb == mempty || index == arity - 1 -- throw limbs higher than the arity away
-                  then columns'
-                  else IntMap.insertWith (<>) (index + 1) upperLimb columns'
-          return columns''
-      )
-      mempty
-      indices
-  -- write the result to the output RefU
-  foldM_
-    ( \previousCarryLimbs index -> do
-        -- calculate the segment of the output RefU to be written
-        let limbStart = limbWidth * index
-        let currentLimbWidth = limbWidth `min` (width - limbStart)
-        let outputLimb = Limb.new out currentLimbWidth limbStart (Left True)
-
-        -- see if there's a stack of limbs to be added to the output limb
-        case IntMap.lookup index limbColumns of
-          Just limbs -> addLimbColumn maxHeight outputLimb (previousCarryLimbs <> limbs)
-          Nothing -> do
-            if previousCarryLimbs == mempty
-              then do
-                writeLimbVal outputLimb 0
-                return mempty -- no carry
-              else addLimbColumn maxHeight outputLimb previousCarryLimbs
-    )
-    mempty
-    [0 .. arity - 1]

@@ -49,10 +49,10 @@ compile out expr = case expr of
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = Either.partitionEithers mixed
     compileAdd w out vars (sum constants)
-  MulU w x y -> do
+  MulU _ x y -> do
     x' <- wireU x
     y' <- wireU y
-    compileMulU w out x' y'
+    compileMulU out x' y'
   AESMulU x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -154,14 +154,14 @@ wireUWithSign (others, sign) = do
 --------------------------------------------------------------------------------
 
 -- | Allocate a new RefU with double the width of the given RefU or U
-_allocDoubleWidth :: (GaloisField n, Integral n) => Either RefU U -> M n (Either RefU U)
-_allocDoubleWidth (Left ref) = do
+allocDoubleWidth :: (GaloisField n, Integral n) => Either RefU U -> M n (Either RefU U)
+allocDoubleWidth (Left ref) = do
   let width = widthOf ref
   ref' <- freshRefU (width * 2)
   writeSliceVal (Slice.Slice ref' width (width * 2)) 0 -- upper half
   writeSliceEq (Slice.Slice ref' 0 width) (Slice.fromRefU ref) -- lower half
   return (Left ref')
-_allocDoubleWidth (Right val) = return $ Right (U.mapWidth (* 2) val)
+allocDoubleWidth (Right val) = return $ Right (U.mapWidth (* 2) val)
 
 -- | Division with remainder on UInts
 --    1. dividend = divisor * quotient + remainder
@@ -178,13 +178,13 @@ assertDivModU width dividend divisor quotient remainder = do
   remainderRef <- wireU remainder
 
   -- double the widths of these variables
-  dividendRef' <- _allocDoubleWidth dividendRef
-  divisorRef' <- _allocDoubleWidth divisorRef
-  quotientRef' <- _allocDoubleWidth quotientRef
-  remainderRef' <- _allocDoubleWidth remainderRef
+  dividendRef' <- allocDoubleWidth dividendRef
+  divisorRef' <- allocDoubleWidth divisorRef
+  quotientRef' <- allocDoubleWidth quotientRef
+  remainderRef' <- allocDoubleWidth remainderRef
 
   productDQ <- freshRefU (width * 2)
-  compileMulU (width * 2) productDQ divisorRef' quotientRef'
+  compileMulU productDQ divisorRef' quotientRef'
   compileSub (width * 2) productDQ dividendRef' remainderRef'
 
   -- 0 ≤ remainder < divisor
@@ -337,11 +337,11 @@ compileModInv :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -
 compileModInv width out a p = do
   -- prod = a * out
   prod <- freshRefU width
-  compileMulU width prod a (Left out)
+  compileMulU prod a (Left out)
   -- prod = np + 1
   n <- freshRefU width
   np <- freshRefU width
-  compileMulU width np (Left n) (Right p)
+  compileMulU np (Left n) (Right p)
   compileAdd width prod [(np, True)] 1
   -- n ≤ p
   assertLTE width (Left n) (toInteger p)
