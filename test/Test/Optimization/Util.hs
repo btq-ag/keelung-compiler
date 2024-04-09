@@ -17,7 +17,6 @@ import Control.Arrow (left)
 import Data.Field.Galois (Binary, Prime)
 import Data.Proxy (Proxy)
 import Keelung hiding (compileWithOpts)
-import Keelung.Compiler (Error, compileWithOpts)
 import Keelung.Compiler qualified as Compiler
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.ConstraintSystem qualified as ConstraintSystem
@@ -36,7 +35,7 @@ executeGF181WithOpts :: (Encode t) => Options -> Comp t -> IO (ConstraintModule 
 executeGF181WithOpts options program = do
   let optionsO0 = options {optOptimize = False}
   -- without optimization
-  cm <- case compileWithOpts optionsO0 program of
+  cm <- case Compiler.compileWithOpts optionsO0 program of
     Left err -> assertFailure $ show err
     Right result -> return result
 
@@ -56,7 +55,7 @@ executePrimeWithOpts :: (Encode t, GaloisField n, Integral n) => Options -> Inte
 executePrimeWithOpts options n program = caseFieldType (Prime n) handlePrime undefined
   where
     handlePrime (_ :: Proxy (Prime n)) fieldInfo = do
-      cm <- case compileWithOpts (options {optFieldInfo = fieldInfo, optOptimize = False}) program of
+      cm <- case Compiler.compileWithOpts (options {optFieldInfo = fieldInfo, optOptimize = False}) program of
         Left err -> assertFailure $ show err
         Right result -> return result
       case optimize cm of
@@ -74,7 +73,7 @@ executeBinaryWithOpts :: (Encode t, GaloisField n, Integral n) => Options -> Int
 executeBinaryWithOpts options n program = caseFieldType (Binary n) undefined handleBinary
   where
     handleBinary (_ :: Proxy (Binary n)) fieldInfo = do
-      cm <- case compileWithOpts (options {optFieldInfo = fieldInfo, optOptimize = False}) program of
+      cm <- case Compiler.compileWithOpts (options {optFieldInfo = fieldInfo, optOptimize = False}) program of
         Left err -> assertFailure $ show err
         Right result -> return result
       case optimize cm of
@@ -93,7 +92,7 @@ shouldHaveSize cm expecteds = do
   let actual = ConstraintSystem.numberOfConstraints (Linker.linkConstraintModule cm)
   actual `shouldBe` expecteds
 
-optimize :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Error n) (ConstraintModule n)
+optimize :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compiler.Error n) (ConstraintModule n)
 optimize = left Compiler.CompilerError . Optimizer.run
 
 debug :: ConstraintModule (N GF181) -> IO ()

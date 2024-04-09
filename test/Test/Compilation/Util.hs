@@ -46,7 +46,7 @@ import Test.Hspec
 -- | syntax tree interpreter
 interpretSyntaxTree :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 interpretSyntaxTree fieldInfo prog rawPublicInputs rawPrivateInputs = do
-  elab <- left LangError (elaborateAndEncode prog)
+  elab <- Compiler.elaborateAndEncode prog
   inputs <- left InputError (Inputs.deserialize (Encoded.compCounters (Encoded.elabComp elab)) rawPublicInputs rawPrivateInputs)
   left InterpreterError (Interpreter.run fieldInfo elab inputs)
 
@@ -55,7 +55,8 @@ interpretSyntaxTree fieldInfo prog rawPublicInputs rawPrivateInputs = do
 -- | Generate and test the report of variable reindexing
 testReindexReportWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> Either (Error n) (Maybe ReindexReport.Error)
 testReindexReportWithOpts options prog = do
-  constraintModule <- Compiler.compileWithOpts options prog
+  elab <- Compiler.elaborateAndEncode prog
+  constraintModule <- Compiler.compileElabWithOpts options elab
   return $ ReindexReport.test constraintModule
 
 --------------------------------------------------------------------------------
@@ -78,6 +79,8 @@ debug = debugWithOpts defaultOptions
 
 debugO0 :: (Encode t) => FieldType -> Comp t -> IO ()
 debugO0 = debugWithOpts (defaultOptions {optOptimize = False})
+
+--------------------------------------------------------------------------------
 
 -- | Use the interpreter to check the result of compilation + witness generation
 testCompilerWithOpts :: (Encode t) => Options -> FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
@@ -109,6 +112,8 @@ testCompilerWithOpts options fieldType program rawPublicInputs rawPrivateInputs 
 
 testCompiler :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 testCompiler = testCompilerWithOpts defaultOptions
+
+--------------------------------------------------------------------------------
 
 -- | Runs the solver and prints the log report for debugging
 debugSolverWithOpts :: (Encode t) => Options -> FieldType -> Comp t -> [Integer] -> [Integer] -> IO ()
@@ -190,7 +195,7 @@ throwErrors = throwErrorsWithOpts defaultOptions
 
 assertSize :: (Encode t) => Int -> Comp t -> IO ()
 assertSize afterSize program = do
-  case Compiler.asGF181N (Compiler.compileAndLinkO1 gf181Info program) of
+  case Compiler.asGF181N (Compiler.compileAndLink gf181Info program) of
     Left err -> print err
     Right cs -> do
       CS.numberOfConstraints cs `shouldBe` afterSize
