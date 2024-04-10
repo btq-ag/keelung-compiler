@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Keelung.Compiler.Options (Options (..), defaultOptions, buildOptionsWithFieldType) where
+module Keelung.Compiler.Options (Options (..), new, defaultOptions, buildOptionsWithFieldType) where
 
 import Control.DeepSeq
 import Data.Field.Galois
@@ -24,6 +24,10 @@ data Options = Options
     optOptimize :: Bool
   }
   deriving (Eq, Generic, NFData)
+
+-- | Create new options with the given field type
+new :: FieldType -> Options
+new fieldType = Options {optFieldInfo = fromFieldType fieldType, optConstProp = True, optOptimize = True}
 
 -- | Default options
 defaultOptions :: Options

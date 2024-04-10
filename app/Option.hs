@@ -78,7 +78,7 @@ protocol =
               )
           )
         <> command
-          "solveOutput"
+          "solve"
           ( info
               (pure SolveOutput <**> helper)
               ( fullDesc

@@ -32,9 +32,9 @@ tests = describe "Experiment" $ do
   --           assert $ (x * m) `eq` (1 - out)
   --           assert $ (x * out) `eq` 0
   --           return out
-  --     solveOutput gf181 program [2] [] `shouldReturn` [0]
-  --     solveOutput gf181 program [1] [] `shouldReturn` [0]
-  --     solveOutput gf181 program [0] [] `shouldReturn` [1]
+  --     solve gf181 program [2] [] `shouldReturn` [0]
+  --     solve gf181 program [1] [] `shouldReturn` [0]
+  --     solve gf181 program [0] [] `shouldReturn` [1]
 
   describe "variable-width multiplication" $ do
     it "0" $ do
@@ -49,7 +49,7 @@ tests = describe "Experiment" $ do
       --   Right syntax -> validateInternalSyntax syntax [20, 20] [] [144]
 
       let internal2 = constructSyntaxVV 6 4 :: Internal GF181
-      validateInternalSyntax internal2 [10, 7] [] [20]
+      validateI internal2 [10, 7] [] [20]
 
 constructSyntaxVV :: Width -> Width -> Internal n
 constructSyntaxVV outputWidth operandWidth =

@@ -23,8 +23,8 @@ satisfyR1CS witness r1cs =
         else Just (toList unsatisfiable)
 
 -- | Converts ConstraintSystem to R1CS
-toR1CS :: (GaloisField n) => ConstraintSystem n -> R1CS n
-toR1CS cs =
+fromConstraintSystem :: (GaloisField n) => ConstraintSystem n -> R1CS n
+fromConstraintSystem cs =
   R1CS
     { r1csField = optFieldInfo (csOptions cs),
       r1csConstraints = fmap toR1C (csConstraints cs),

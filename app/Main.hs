@@ -19,9 +19,7 @@ import Data.Vector qualified as Vector
 import Encode
 import Keelung.CircuitFormat
 import Keelung.Compiler
-import Keelung.Compiler.Linker qualified as Linker
-import Keelung.Compiler.Options (Options (optFieldInfo), defaultOptions)
-import Keelung.Constraint.R1CS (R1CS)
+import Keelung.Compiler.Options qualified as Options
 import Keelung.Data.FieldInfo
 import Keelung.Field
 import Keelung.Syntax.Counters
@@ -44,8 +42,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO0Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO0Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
+            handlePrime (Proxy :: Proxy (Prime n)) _ = outputCircuit (left show $ compileWithOptsE ((Options.new fieldType) {Options.optOptimize = False}) elaborated >>= link >>= toR1CS :: Either String (R1CS (Prime n)))
+            handleBinary (Proxy :: Proxy (Binary n)) _ = outputCircuit (left show $ compileWithOptsE ((Options.new fieldType) {Options.optOptimize = False}) elaborated >>= link >>= toR1CS :: Either String (R1CS (Binary n)))
     Protocol CompileO1 -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -53,8 +51,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
+            handlePrime (Proxy :: Proxy (Prime n)) _ = outputCircuit (left show $ compileWithOptsE (Options.new fieldType) elaborated >>= link >>= toR1CS :: Either String (R1CS (Prime n)))
+            handleBinary (Proxy :: Proxy (Binary n)) _ = outputCircuit (left show $ compileWithOptsE (Options.new fieldType) elaborated >>= link >>= toR1CS :: Either String (R1CS (Binary n)))
     Protocol CompileO2 -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -62,8 +60,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuit (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
+            handlePrime (Proxy :: Proxy (Prime n)) _ = outputCircuit (left show $ compileWithOptsE (Options.new fieldType) elaborated >>= link >>= toR1CS :: Either String (R1CS (Prime n)))
+            handleBinary (Proxy :: Proxy (Binary n)) _ = outputCircuit (left show $ compileWithOptsE (Options.new fieldType) elaborated >>= link >>= toR1CS :: Either String (R1CS (Binary n)))
     Protocol Interpret -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
@@ -71,8 +69,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretElab fieldInfo elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer]))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretElab fieldInfo elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer]))
+            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretE fieldInfo elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer]))
+            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (interpretE fieldInfo elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer]))
     Protocol SolveOutput -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated, [Integer], [Integer])
@@ -80,8 +78,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (solveOutputElabWithOpts (defaultOptions {optFieldInfo = fieldInfo}) elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer]))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputInterpretedResult (Vector.fromList <$> left show (solveOutputElabWithOpts (defaultOptions {optFieldInfo = fieldInfo}) elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer]))
+            handlePrime (Proxy :: Proxy (Prime n)) _ = outputInterpretedResult (Vector.fromList <$> left show (solveWithOptsE (Options.new fieldType) elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Prime n)) [Integer]))
+            handleBinary (Proxy :: Proxy (Binary n)) _ = outputInterpretedResult (Vector.fromList <$> left show (solveWithOptsE (Options.new fieldType) elaborated rawPublicInputs rawPrivateInputs :: Either (Error (Binary n)) [Integer]))
     Protocol (GenCircuit filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -89,8 +87,8 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
-            handleBinary (Proxy :: Proxy (Binary n)) fieldInfo = outputCircuitAndWriteFile Aurora filepath (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Binary n)))
+            handlePrime (Proxy :: Proxy (Prime n)) _ = outputCircuitAndWriteFile Aurora filepath (left show $ compileWithOptsE (Options.new fieldType) elaborated >>= link >>= toR1CS :: Either String (R1CS (Prime n)))
+            handleBinary (Proxy :: Proxy (Binary n)) _ = outputCircuitAndWriteFile Aurora filepath (left show $ compileWithOptsE (Options.new fieldType) elaborated >>= link >>= toR1CS :: Either String (R1CS (Binary n)))
     Protocol (GenCircuitBin filepath) -> do
       blob <- getContents
       let decoded = decode (BSC.pack blob) :: Either String (FieldType, Elaborated)
@@ -98,7 +96,7 @@ main = withUtf8 $ do
         Left err -> print err
         Right (fieldType, elaborated) -> caseFieldType fieldType handlePrime handleBinary
           where
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputCircuitAndWriteFile Snarkjs filepath (left show $ toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elaborated :: Either String (R1CS (Prime n)))
+            handlePrime (Proxy :: Proxy (Prime n)) _ = outputCircuitAndWriteFile Snarkjs filepath (left show $ compileWithOptsE (Options.new fieldType) elaborated >>= link >>= toR1CS :: Either String (R1CS (Prime n)))
             handleBinary _ _ = error "Binary R1CS format doesn't support binary fields."
     Protocol (GenWitness filepath) -> do
       blob <- getContents
@@ -108,7 +106,7 @@ main = withUtf8 $ do
         Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> caseFieldType fieldType handlePrime handleBinary
           where
             -- witness file for Aurora doesn't contain the prime field info, so providing 0 is enough.
-            handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = outputInterpretedResultAndWriteFile Aurora 0 filepath (generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
+            handlePrime (Proxy :: Proxy (Prime n)) _ = outputInterpretedResultAndWriteFile Aurora 0 filepath (generateWitnessWithOptsE (Options.new fieldType) elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
             handleBinary _ _ = error "wtns format doesn't support binary fields."
     Protocol (GenWtns filepath) -> do
       blob <- getContents
@@ -118,7 +116,7 @@ main = withUtf8 $ do
         Right (fieldType, elaborated, rawPublicInputs, rawPrivateInputs) -> caseFieldType fieldType handlePrime handleBinary
           where
             handlePrime (Proxy :: Proxy (Prime n)) fieldInfo = case fieldTypeData fieldInfo of
-              (Prime p) -> outputInterpretedResultAndWriteFile Snarkjs p filepath (generateWitnessElab fieldInfo elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
+              (Prime p) -> outputInterpretedResultAndWriteFile Snarkjs p filepath (generateWitnessWithOptsE (Options.new fieldType) elaborated (map fromInteger rawPublicInputs) (map fromInteger rawPrivateInputs) :: Either (Error (Prime n)) (Counters, Vector (Prime n), Vector (Prime n)))
               (Binary _) -> error "IMPOSSIBLE"
             handleBinary _ _ = error "wtns format doesn't support binary fields."
     Version -> putStrLn $ "Keelung v" ++ versionString

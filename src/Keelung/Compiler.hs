@@ -6,32 +6,34 @@ module Keelung.Compiler
     module Prelude,
     ConstraintSystem (..),
     Internal (..),
-    module Keelung.Compiler.R1CS,
+    R1CS (..),
     -- interpret
-    interpretElab,
     interpret,
+    interpretE,
     -- compile to ConstraintModule
-    compileInternalWithOpts,
-    compileElabWithOpts,
+    compile,
     compileWithOpts,
-    compileO0Elab,
-    compileO1Elab,
-    -- compile and link to ConstraintSystem
-    compileAndLinkWithOpts,
-    compileAndLink,
+    compileWithOptsE,
+    compileWithOptsI,
     -- generate witness
-    generateWitnessElab,
     generateWitness,
+    generateWitnessWithOpts,
+    generateWitnessWithOptsE,
+    generateWitnessWithOptsI,
     -- solve R1CS and return output
-    solveOutputInternalWithOpts,
-    solveOutputElabWithOpts,
-    solveOutputWithOpts,
-    solveOutput,
-    solveOutputO0,
+    solve,
+    solveWithOpts,
+    solveWithOptsE,
+    solveWithOptsI,
     -- solve R1CS and return output with logs
-    solveOutputAndCollectLogWithOpts,
+    solveAndCollectLog,
+    solveAndCollectLogWithOpts,
+    solveAndCollectLogWithOptsI,
     -- helper functions
     elaborateAndEncode,
+    toInternalWithOpts,
+    link,
+    toR1CS,
     asGF181N,
   )
 where
@@ -52,13 +54,14 @@ import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Optimize.ConstantPropagation qualified as ConstantPropagation
 import Keelung.Compiler.Options
-import Keelung.Compiler.R1CS
+import Keelung.Compiler.Options qualified as Options
+import Keelung.Compiler.R1CS qualified as R1CS
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Keelung.Compiler.Syntax.Internal (Internal (..))
 import Keelung.Compiler.Syntax.ToInternal as ToInternal
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Data.FieldInfo
-import Keelung.Field (GF181)
+import Keelung.Field (FieldType, GF181)
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Monad (Comp)
 import Keelung.Solver qualified as Solver
@@ -78,8 +81,8 @@ interpret fieldInfo prog rawPublicInputs rawPrivateInputs = do
   map toInteger <$> left InterpreterError (Interpreter.run fieldInfo elab inputs)
 
 -- | Interpret an elaborated program with given inputs
-interpretElab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-interpretElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
+interpretE :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+interpretE fieldInfo elab rawPublicInputs rawPrivateInputs = do
   let counters = Encoded.compCounters (Encoded.elabComp elab)
   inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
   left InterpreterError (Interpreter.run fieldInfo elab inputs)
@@ -87,49 +90,57 @@ interpretElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
 --------------------------------------------------------------------------------
 -- Witness generation / R1CS solving
 
--- | Given a Keelung program and a list of raw public inputs and private inputs,
+-- | Given an Internal syntaxs and a list of raw public inputs and private inputs,
 --   Generate (structured inputs, outputs, witness)
-generateWitness :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
-generateWitness fieldInfo program rawPublicInputs rawPrivateInputs = do
-  elab <- elaborateAndEncode program
-  generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs
-
-generateWitnessElab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
-generateWitnessElab fieldInfo elab rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS . Linker.linkConstraintModule <$> compileO1Elab fieldInfo elab
+generateWitnessWithOptsI :: (GaloisField n, Integral n) => Options -> Internal n -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
+generateWitnessWithOptsI options syntax rawPublicInputs rawPrivateInputs = do
+  r1cs <- compileWithOptsI options syntax >>= link >>= toR1CS
   let counters = r1csCounters r1cs
   inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
   (outputs, witness) <- left SolverError (Solver.run defaultOptions r1cs inputs)
   return (counters, outputs, witness)
 
--- | R1CS witness solver
-solveOutputInternalWithOpts :: (GaloisField n, Integral n) => Options -> Internal n -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-solveOutputInternalWithOpts options syntax rawPublicInputs rawPrivateInputs = do
-  r1cs <- toR1CS . Linker.linkConstraintModule <$> compileInternalWithOpts options syntax
-  inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
-  case Solver.run options r1cs inputs of
-    Left err -> Left (SolverError err)
-    Right (outputs, _) -> Right (toList $ Inputs.deserializeBinReps (r1csCounters r1cs) outputs)
+-- | Given an Elaborated syntax and a list of raw public inputs and private inputs,
+--   Generate (structured inputs, outputs, witness)
+generateWitnessWithOptsE :: (GaloisField n, Integral n) => Options -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
+generateWitnessWithOptsE options elab rawPublicInputs rawPrivateInputs = toInternalWithOpts options elab >>= \syntax -> generateWitnessWithOptsI options syntax rawPublicInputs rawPrivateInputs
 
-solveOutputElabWithOpts :: (GaloisField n, Integral n) => Options -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-solveOutputElabWithOpts options = solveOutputInternalWithOpts options . ToInternal.run (optFieldInfo options)
+-- | Given a Keelung program and a list of raw public inputs and private inputs,
+--   Generate (structured inputs, outputs, witness)
+generateWitnessWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
+generateWitnessWithOpts options program rawPublicInputs rawPrivateInputs = elaborateAndEncode program >>= \elab -> generateWitnessWithOptsE options elab rawPublicInputs rawPrivateInputs
 
-solveOutputWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-solveOutputWithOpts options prog rawPublicInputs rawPrivateInputs = do
+-- | `generateWitnessWithOpts` with default options
+generateWitness :: (GaloisField n, Integral n, Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Either (Error n) (Counters, Vector n, Vector n)
+generateWitness = generateWitnessWithOpts . Options.new
+
+--------------------------------------------------------------------------------
+-- R1CS solving
+
+-- | Solve R1CS with inputs and generate outputs (takes Internal syntax)
+solveWithOptsI :: (GaloisField n, Integral n) => Options -> Internal n -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveWithOptsI options syntax rawPublicInputs rawPrivateInputs = do
+  (counters, outputs, _) <- generateWitnessWithOptsI options syntax rawPublicInputs rawPrivateInputs
+  Right (toList $ Inputs.deserializeBinReps counters outputs)
+
+-- | Solve R1CS with inputs and generate outputs (takes Elaborated syntax)
+solveWithOptsE :: (GaloisField n, Integral n) => Options -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveWithOptsE options elab rawPublicInputs rawPrivateInputs = toInternalWithOpts options elab >>= \syntax -> solveWithOptsI options syntax rawPublicInputs rawPrivateInputs
+
+-- | Solve R1CS with inputs and generate outputs (takes Keelung program)
+solveWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solveWithOpts options prog rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode prog
-  solveOutputElabWithOpts options elab rawPublicInputs rawPrivateInputs
+  solveWithOptsE options elab rawPublicInputs rawPrivateInputs
 
-solveOutput :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-solveOutput fieldInfo = solveOutputWithOpts (defaultOptions {optFieldInfo = fieldInfo})
+-- | `solveWithOpts` with default options
+solve :: (GaloisField n, Integral n, Encode t) => Lang.FieldType -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
+solve = solveWithOpts . Options.new
 
--- | R1CS witness solver (on unoptimized R1CS)
-solveOutputO0 :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [Integer] -> [Integer] -> Either (Error n) [Integer]
-solveOutputO0 fieldInfo = solveOutputWithOpts (defaultOptions {optFieldInfo = fieldInfo, optOptimize = False})
-
--- | Generate R1CS witness solver report (on optimized R1CS)
-solveOutputAndCollectLogWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
-solveOutputAndCollectLogWithOpts options prog rawPublicInputs rawPrivateInputs = case do
-  r1cs <- toR1CS <$> compileAndLinkWithOpts options prog
+-- | Solve R1CS with inputs and generate outputs + logs (takes Internal syntax)
+solveAndCollectLogWithOptsI :: (GaloisField n, Integral n) => Options -> Internal n -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
+solveAndCollectLogWithOptsI options syntax rawPublicInputs rawPrivateInputs = case do
+  r1cs <- compileWithOptsI options syntax >>= link >>= toR1CS
   inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
   return (r1cs, inputs) of
   Left err -> (Just err, Nothing)
@@ -137,12 +148,27 @@ solveOutputAndCollectLogWithOpts options prog rawPublicInputs rawPrivateInputs =
     (Left err, logs) -> (Just (SolverError err), logs)
     (Right _, logs) -> (Nothing, logs)
 
+-- | Solve R1CS with inputs and generate outputs + logs (takes Keepung program)
+solveAndCollectLogWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
+solveAndCollectLogWithOpts options prog rawPublicInputs rawPrivateInputs = case do
+  r1cs <- compileWithOpts options prog >>= link >>= toR1CS
+  inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+  return (r1cs, inputs) of
+  Left err -> (Just err, Nothing)
+  Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
+    (Left err, logs) -> (Just (SolverError err), logs)
+    (Right _, logs) -> (Nothing, logs)
+
+-- | `solveAndCollectLog` with default options
+solveAndCollectLog :: (GaloisField n, Integral n, Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
+solveAndCollectLog = solveAndCollectLogWithOpts . Options.new
+
 --------------------------------------------------------------------------------
 -- Compilation
 
 -- | Compile an Internal syntax to a constraint module with options
-compileInternalWithOpts :: (GaloisField n, Integral n) => Options -> Internal n -> Either (Error n) (ConstraintModule n)
-compileInternalWithOpts options =
+compileWithOptsI :: (GaloisField n, Integral n) => Options -> Internal n -> Either (Error n) (ConstraintModule n)
+compileWithOptsI options =
   let constProp = optConstProp options
       optimize = optOptimize options
    in ( Compile.run options -- compile
@@ -151,38 +177,34 @@ compileInternalWithOpts options =
       )
 
 -- | Compile an elaborated program to a constraint module with options
-compileElabWithOpts :: (GaloisField n, Integral n) => Options -> Elaborated -> Either (Error n) (ConstraintModule n)
-compileElabWithOpts options = compileInternalWithOpts options . ToInternal.run (optFieldInfo options)
+compileWithOptsE :: (GaloisField n, Integral n) => Options -> Elaborated -> Either (Error n) (ConstraintModule n)
+compileWithOptsE options = toInternalWithOpts options >=> compileWithOptsI options
 
 -- | Compile a Keelung program to a constraint module with options
 compileWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> Either (Error n) (ConstraintModule n)
-compileWithOpts options = elaborateAndEncode >=> compileElabWithOpts options
+compileWithOpts options = elaborateAndEncode >=> compileWithOptsE options
 
--- | Compile a Keelung program to a constraint system with options
-compileAndLinkWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> Either (Error n) (ConstraintSystem n)
-compileAndLinkWithOpts options program = Linker.linkConstraintModule <$> compileWithOpts options program
-
--- | Compile a Keelung program to a constraint system with optimization turned on
-compileAndLink ::
-  (GaloisField n, Integral n, Encode t) =>
-  FieldInfo ->
-  Comp t ->
-  Either (Error n) (ConstraintSystem n)
-compileAndLink fieldInfo = compileAndLinkWithOpts (defaultOptions {optFieldInfo = fieldInfo, optOptimize = True})
-
--- | `compileElabWithOpt` with optimization turned off
-compileO0Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintModule n)
-compileO0Elab fieldInfo = compileElabWithOpts (defaultOptions {optFieldInfo = fieldInfo, optConstProp = True, optOptimize = False})
-
--- | `compileElabWithOpt` with optimization turned on
-compileO1Elab :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> Either (Error n) (ConstraintModule n)
-compileO1Elab fieldInfo = compileElabWithOpts (defaultOptions {optFieldInfo = fieldInfo, optConstProp = True, optOptimize = True})
+-- | Compile a Keelung program to a constraint module with default options
+compile :: (GaloisField n, Integral n, Encode t) => FieldType -> Comp t -> Either (Error n) (ConstraintModule n)
+compile = compileWithOpts . Options.new
 
 --------------------------------------------------------------------------------
 
--- | Elaborates a Keelung program
+-- | Keelung Program -> Elaborated Syntax
 elaborateAndEncode :: (Encode t) => Comp t -> Either (Error n) Elaborated
 elaborateAndEncode = left LangError . Lang.elaborateAndEncode
+
+-- | Elaborated Syntax -> Internal Syntax
+toInternalWithOpts :: (GaloisField n, Integral n) => Options -> Elaborated -> Either (Error n) (Internal n)
+toInternalWithOpts options = Right . ToInternal.run (optFieldInfo options)
+
+-- | ConstraintModule -> ConstraintSystem
+link :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Error n) (ConstraintSystem n)
+link = Right . Linker.linkConstraintModule
+
+-- | ConstraintSystem -> R1CS
+toR1CS :: (GaloisField n) => ConstraintSystem n -> Either (Error n) (R1CS n)
+toR1CS = Right . R1CS.fromConstraintSystem
 
 -- | Helper function for fixing the type as `N GF181`
 asGF181N :: Either (Error (N GF181)) a -> Either (Error (N GF181)) a

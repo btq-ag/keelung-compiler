@@ -25,7 +25,7 @@ import Control.Monad.Except
 import Data.Field.Galois (GaloisField)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
-import Keelung.Compiler.Options
+import Keelung.Compiler.Options (Options)
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Reference qualified as Ref
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations

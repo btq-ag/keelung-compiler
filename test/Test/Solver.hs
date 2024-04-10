@@ -4,7 +4,6 @@ import Data.Vector qualified as Vec
 import Keelung
 import Keelung.Compiler (ConstraintSystem (..), generateWitness)
 import Keelung.Compiler qualified as Compiler
-import Test.Compilation.Util (gf181Info)
 import Test.Hspec
 import Test.Solver.BinRep qualified as Solver.BinRep
 
@@ -22,9 +21,9 @@ tests = do
               x <- inputField Public
               y <- inputField Private
               return [x, y]
-        let actual = generateWitness gf181Info program [1] [2]
+        let actual = generateWitness gf181 program [1] [2]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compile gf181 program >>= Compiler.link
               return (csCounters cs, Vec.fromList [1, 2], Vec.fromList [1, 2, 1, 2])
         actual `shouldBe` expected
 
@@ -33,9 +32,9 @@ tests = do
               x <- inputField Public
               y <- inputField Private
               return [x * y]
-        let actual = generateWitness gf181Info program [2] [3]
+        let actual = generateWitness gf181 program [2] [3]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compile gf181 program >>= Compiler.link
               return (csCounters cs, Vec.fromList [6], Vec.fromList [6, 2, 3])
         actual `shouldBe` expected
 
@@ -45,9 +44,9 @@ tests = do
               x2 <- inputField Public
               y1 <- inputField Private
               return [x1 * y1, y1, x2 * y1]
-        let actual = generateWitness gf181Info program [2, 3] [4]
+        let actual = generateWitness gf181 program [2, 3] [4]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compile gf181 program >>= Compiler.link
               return (csCounters cs, Vec.fromList [8, 4, 12], Vec.fromList [8, 4, 12, 2, 3, 4])
         actual `shouldBe` expected
 
@@ -57,9 +56,9 @@ tests = do
               x <- inputField Public
               y <- inputField Private
               return $ cond p x y
-        let actual = generateWitness gf181Info program [3] [1, 2]
+        let actual = generateWitness gf181 program [3] [1, 2]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compile gf181 program >>= Compiler.link
               return (csCounters cs, Vec.fromList [3], Vec.fromList [3, 3, 2, 1])
         actual `shouldBe` expected
 
@@ -67,8 +66,8 @@ tests = do
         let program = do
               list <- inputList Private 4 :: Comp [Field]
               return (head list)
-        let actual = generateWitness gf181Info program [] [0, 1, 2, 3]
+        let actual = generateWitness gf181 program [] [0, 1, 2, 3]
         let expected = do
-              cs <- Compiler.asGF181N $ Compiler.compileAndLink gf181Info program
+              cs <- Compiler.asGF181N $ Compiler.compile gf181 program >>= Compiler.link
               return (csCounters cs, Vec.fromList [0], Vec.fromList [0, 0, 1, 2, 3])
         actual `shouldBe` expected

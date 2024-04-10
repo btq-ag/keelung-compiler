@@ -97,7 +97,7 @@ shouldHaveSize cm expecteds = do
 
 shouldHaveSizeWithOptsI :: (GaloisField n, Integral n) => Options -> Compiler.Internal n -> Int -> IO ()
 shouldHaveSizeWithOptsI options syntax expecteds = do
-  case Compiler.compileInternalWithOpts options syntax of
+  case Compiler.compileWithOptsI options syntax of
     Left err -> assertFailure $ show err
     Right cm -> do
       -- compare the number of constraints
@@ -116,7 +116,7 @@ debugM cm = do
 
 debugI :: (GaloisField n, Integral n) => Compiler.Internal n -> IO ()
 debugI syntax = do
-  case Compiler.compileInternalWithOpts Options.defaultOptions syntax of
+  case Compiler.compileWithOptsI Options.defaultOptions syntax of
     Left err -> assertFailure $ show err
     Right cm -> do
       print cm
