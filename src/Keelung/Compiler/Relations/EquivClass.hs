@@ -8,15 +8,22 @@ module Keelung.Compiler.Relations.EquivClass
   ( EquivClass,
     VarStatus (..),
     LinRel (..),
+
+    -- * Construction
     M,
     runM,
-    -- mapError,
-    markChanged,
     new,
+
+    -- * Operations
     assign,
     relate,
+    markChanged,
+
+    -- * Conversions,
+    toConstraints,
+
+    -- * Queries
     relationBetween,
-    toMap,
     isValid,
     size,
     lookup,
@@ -27,13 +34,18 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Control.Monad.Writer
 import Data.Field.Galois (Binary, GaloisField, Prime)
+import Data.Foldable (toList)
 import Data.Map qualified as Map
 import Data.Map.Strict (Map)
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import GHC.TypeLits
 import Keelung.Compiler.Compile.Error (Error (..))
 import Keelung.Compiler.Relations.Util
+import Keelung.Data.Constraint (Constraint (..))
 import Keelung.Data.N (N (..))
+import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference (Ref)
 import Prelude hiding (lookup)
 
@@ -81,7 +93,7 @@ instance {-# OVERLAPS #-} (KnownNat n) => Show (EquivClass (Prime n)) where
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
       toString (var, IsConstant value) = [showVar var <> " = " <> show (N value)]
-      toString (var, IsRoot toChildren) = case map relationToString (Map.toList $ Map.mapKeys show toChildren) of
+      toString (var, IsRoot toChildren) = case map renderLinRel (Map.toList $ Map.mapKeys show toChildren) of
         [] -> [showVar var <> " = []"] -- should never happen
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
@@ -96,7 +108,7 @@ instance {-# OVERLAPPING #-} (KnownNat n) => Show (EquivClass (Binary n)) where
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
       toString (var, IsConstant value) = [showVar var <> " = " <> show (N value)]
-      toString (var, IsRoot toChildren) = case map relationToString (Map.toList $ Map.mapKeys show toChildren) of
+      toString (var, IsRoot toChildren) = case map renderLinRel (Map.toList $ Map.mapKeys show toChildren) of
         [] -> [showVar var <> " = []"]
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
@@ -110,7 +122,7 @@ instance (GaloisField n, Integral n) => Show (EquivClass n) where
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
       toString (var, IsConstant value) = [showVar var <> " = " <> show value]
-      toString (var, IsRoot toChildren) = case map relationToString (Map.toList $ Map.mapKeys show toChildren) of
+      toString (var, IsRoot toChildren) = case map renderLinRel (Map.toList $ Map.mapKeys show toChildren) of
         [] -> [showVar var <> " = []"] -- should never happen
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
@@ -119,11 +131,7 @@ instance (GaloisField n, Integral n) => Show (EquivClass n) where
 new :: String -> EquivClass n
 new name = EquivClass name mempty
 
--- | Returns the result of looking up a variable in the UIntEquivClass, O(lg n)
-lookup :: Ref -> EquivClass n -> VarStatus n
-lookup var (EquivClass _ relations) = case Map.lookup var relations of
-  Nothing -> IsRoot mempty
-  Just result -> result
+--------------------------------------------------------------------------------
 
 -- | Assigns a value to a variable, O(lg n)
 assign :: (GaloisField n, Integral n) => Ref -> n -> EquivClass n -> M n (EquivClass n)
@@ -152,7 +160,7 @@ assign var value (EquivClass name relations) = case Map.lookup var relations of
               -- child = relationToChild value
               Map.insert
                 child
-                (IsConstant (execRel relationToChild value))
+                (IsConstant (execLinRel relationToChild value))
                 rels
           )
           (Map.insert var (IsConstant value) relations)
@@ -163,21 +171,21 @@ assign var value (EquivClass name relations) = case Map.lookup var relations of
   -- =>
   -- parent = relation^-1 child
   Just (IsChildOf parent relationToChild) ->
-    case invertRel relationToChild of
+    case invertLinRel relationToChild of
       Nothing -> error "[ panic ] assign: relation is not invertible"
-      Just relationToParent -> assign parent (execRel relationToParent value) (EquivClass name relations)
+      Just relationToParent -> assign parent (execLinRel relationToParent value) (EquivClass name relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relate :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> EquivClass n -> M n (EquivClass n)
 relate a relation b relations =
   case compareSeniority a b of
     LT -> relateChildToParent a relation b relations
-    GT -> case invertRel relation of
+    GT -> case invertLinRel relation of
       Nothing -> error "[ panic ] relate: relation is not invertible"
       Just rel -> relateChildToParent b rel a relations
     EQ -> case compare (childrenSizeOf a) (childrenSizeOf b) of
       LT -> relateChildToParent a relation b relations
-      GT -> case invertRel relation of
+      GT -> case invertLinRel relation of
         Nothing -> error "[ panic ] relate: relation is not invertible"
         Just rel -> relateChildToParent b rel a relations
       EQ -> relateChildToParent a relation b relations
@@ -197,7 +205,7 @@ relateChildToParent child relationToChild parent relations =
       -- The parent is a constant, so we make the child a constant:
       --    * for the parent: do nothing
       --    * for the child: assign it the value of the parent with `relationToChild` applied
-      IsConstant value -> assign child (execRel relationToChild value) relations
+      IsConstant value -> assign child (execLinRel relationToChild value) relations
       -- The parent has other children
       IsRoot children -> case lookup child relations of
         -- The child also has its grandchildren, so we relate all these grandchildren to the parent, too:
@@ -223,11 +231,11 @@ relateChildToParent child relationToChild parent relations =
         -- The child is a constant, so we make the parent a constant, too:
         --  * for the parent: assign it the value of the child with the inverted relation applied
         --  * for the child: do nothing
-        IsConstant value -> case invertRel relationToChild of
+        IsConstant value -> case invertLinRel relationToChild of
           Nothing -> error "[ panic ] relate: relation is not invertible"
-          Just relationToParent -> assign parent (execRel relationToParent value) relations
+          Just relationToParent -> assign parent (execLinRel relationToParent value) relations
         -- The child is already a child of another variable `parent2`:
-        --    * for the another variable `parent2`: point `parent2` to `parent` with `invertRel parent2ToChild <> relationToChild`
+        --    * for the another variable `parent2`: point `parent2` to `parent` with `invertLinRel parent2ToChild <> relationToChild`
         --    * for the parent: add the child and `parent2` to the children map
         --    * for the child: point it to the `parent` with `relationToParent`
         IsChildOf parent2 parent2ToChild ->
@@ -235,27 +243,27 @@ relateChildToParent child relationToChild parent relations =
             then --
             -- child = relationToChild parent
             -- child = parent2ToChild parent2
-            --    => parent = (invertRel relationToChild <> parent2ToChild) parent2
-            --    or parent2 = (invertRel parent2ToChild <> relationToChild) parent
-            case invertRel relationToChild of
+            --    => parent = (invertLinRel relationToChild <> parent2ToChild) parent2
+            --    or parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
+            case invertLinRel relationToChild of
               Just relationToChild' -> relate parent (relationToChild' <> parent2ToChild) parent2 relations
-              Nothing -> case invertRel parent2ToChild of
+              Nothing -> case invertLinRel parent2ToChild of
                 Just parent2ToChild' -> relate parent2 (parent2ToChild' <> relationToChild) parent relations
                 Nothing -> error "[ panic ] relateChildToParent: relation is not transitive!"
             else do
               --
               -- child = relationToChild parent
               -- child = parent2ToChild parent2
-              --    => parent2 = (invertRel parent2ToChild <> relationToChild) parent
-              --    or parent = (invertRel relationToChild <> parent2ToChild) parent2
-              case invertRel parent2ToChild of
+              --    => parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
+              --    or parent = (invertLinRel relationToChild <> parent2ToChild) parent2
+              case invertLinRel parent2ToChild of
                 Just parent2ToChild' -> do
                   markChanged
                   relate parent2 (parent2ToChild' <> relationToChild) parent $
                     EquivClass (eqPoolName relations) $
                       Map.insert child (IsChildOf parent relationToChild) $
                         eqPoolEquivClass relations
-                Nothing -> case invertRel relationToChild of
+                Nothing -> case invertLinRel relationToChild of
                   Just relationToChild' -> do
                     markChanged
                     relate parent (relationToChild' <> parent2ToChild) parent2 $
@@ -266,6 +274,8 @@ relateChildToParent child relationToChild parent relations =
 
       -- The parent is a child of another variable, so we relate the child to the grandparent instead
       IsChildOf grandparent relationFromGrandparent -> relate child (relationToChild <> relationFromGrandparent) grandparent relations
+
+--------------------------------------------------------------------------------
 
 -- | Calculates the relation between two variables, O(lg n)
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> EquivClass n -> Maybe (LinRel n)
@@ -282,7 +292,7 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       -- var1 = parent2
       -- =>
       -- var2 = relationWithParent2 var1
-        invertRel relationWithParent2
+        invertLinRel relationWithParent2
       else Nothing
   (IsChildOf parent1 relationWithParent1, IsRoot _) ->
     if parent1 == var2
@@ -300,7 +310,7 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
       --   =>
       -- var1 = relationWithParent1 parent2
       -- var2 = relationWithParent2 parent2
-      case invertRel relationWithParent2 of
+      case invertLinRel relationWithParent2 of
         Just rel ->
           -- var1 = relationWithParent1 parent2
           -- parent2 = rel var2
@@ -308,12 +318,32 @@ relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
           -- var1 = (relationWithParent1 . rel) var2
           Just $ relationWithParent1 <> rel
         Nothing -> Nothing
-      else -- Just $ relationWithParent1 <> invertRel relationWithParent2
+      else -- Just $ relationWithParent1 <> invertLinRel relationWithParent2
         Nothing
 
 -- | Export the internal representation of the relations as a map from variables to their relations
 toMap :: EquivClass n -> Map Ref (VarStatus n)
 toMap = eqPoolEquivClass
+
+-- | Convert the relations to specialized constraints
+toConstraints :: (GaloisField n, Integral n) => (Ref -> Bool) -> EquivClass n -> Seq (Constraint n)
+toConstraints shouldBeKept = Seq.fromList . toList . Map.mapMaybeWithKey convert . toMap
+  where
+    convert :: (GaloisField n, Integral n) => Ref -> VarStatus n -> Maybe (Constraint n)
+    convert var status
+      | shouldBeKept var = case status of
+          IsConstant val -> Just (CRefFVal var val)
+          IsRoot _ -> Nothing
+          IsChildOf parent (LinRel slope intercept) ->
+            if shouldBeKept parent
+              then case (slope, intercept) of
+                (0, _) -> Just (CRefFVal var intercept)
+                (1, 0) -> Just (CRefEq var parent)
+                (_, _) -> case PolyL.fromRefs intercept [(var, -1), (parent, slope)] of
+                  Left _ -> error "[ panic ] extractRefRelations: failed to build polynomial"
+                  Right poly -> Just (CAddL poly)
+              else Nothing
+      | otherwise = Nothing
 
 -- | Returns the number of variables in the EquivClass, O(1)
 size :: EquivClass n -> Int
@@ -348,6 +378,12 @@ rootsAreSenior = Map.foldlWithKey' go True . eqPoolEquivClass
     go True var (IsRoot children) = all (\child -> compareSeniority var child /= LT) (Map.keys children)
     go True var (IsChildOf parent _) = compareSeniority parent var /= LT
 
+-- | Returns the result of looking up a variable in the UIntEquivClass, O(lg n)
+lookup :: Ref -> EquivClass n -> VarStatus n
+lookup var (EquivClass _ relations) = case Map.lookup var relations of
+  Nothing -> IsRoot mempty
+  Just result -> result
+
 --------------------------------------------------------------------------------
 
 -- | Relation representing a linear function between two variables, i.e. x = ay + b
@@ -366,8 +402,8 @@ instance (Num n) => Monoid (LinRel n) where
   mempty = LinRel 1 0
 
 -- | Render LinRel to some child as a string
-relationToString :: (GaloisField n, Integral n) => (String, LinRel n) -> String
-relationToString (var, LinRel x y) = go (LinRel (recip x) (-y / x))
+renderLinRel :: (GaloisField n, Integral n) => (String, LinRel n) -> String
+renderLinRel (var, LinRel x y) = go (LinRel (recip x) (-y / x))
   where
     go (LinRel (-1) 1) = "¬" <> var
     go (LinRel a b) =
@@ -384,11 +420,9 @@ relationToString (var, LinRel x y) = go (LinRel (recip x) (-y / x))
 --      x = ay + b
 --        =>
 --      y = (x - b) / a
-invertRel :: (GaloisField n, Integral n) => LinRel n -> Maybe (LinRel n)
-invertRel (LinRel a b) = Just (LinRel (recip a) (-b / a))
+invertLinRel :: (GaloisField n, Integral n) => LinRel n -> Maybe (LinRel n)
+invertLinRel (LinRel a b) = Just (LinRel (recip a) (-b / a))
 
---------------------------------------------------------------------------------
-
--- | `execRel relation parent = child`
-execRel :: (GaloisField n, Integral n) => LinRel n -> n -> n
-execRel (LinRel a b) value = a * value + b
+-- | `execLinRel relation parent = child`
+execLinRel :: (GaloisField n, Integral n) => LinRel n -> n -> n
+execLinRel (LinRel a b) value = a * value + b

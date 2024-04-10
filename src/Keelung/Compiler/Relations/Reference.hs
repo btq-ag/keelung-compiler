@@ -16,16 +16,12 @@ where
 
 import Control.Monad.Except
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (toList)
-import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
-import Data.Sequence qualified as Seq
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.Constraint
-import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Prelude hiding (lookup)
 
@@ -65,23 +61,7 @@ relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
 
 -- | Convert the relations to specialized constraints
 toConstraints :: (GaloisField n, Integral n) => (Ref -> Bool) -> RefRelations n -> Seq (Constraint n)
-toConstraints shouldBeKept = Seq.fromList . toList . Map.mapMaybeWithKey convert . EquivClass.toMap
-  where
-    convert :: (GaloisField n, Integral n) => Ref -> EquivClass.VarStatus n -> Maybe (Constraint n)
-    convert var status
-      | shouldBeKept var = case status of
-          EquivClass.IsConstant val -> Just (CRefFVal var val)
-          EquivClass.IsRoot _ -> Nothing
-          EquivClass.IsChildOf parent (EquivClass.LinRel slope intercept) ->
-            if shouldBeKept parent
-              then case (slope, intercept) of
-                (0, _) -> Just (CRefFVal var intercept)
-                (1, 0) -> Just (CRefEq var parent)
-                (_, _) -> case PolyL.fromRefs intercept [(var, -1), (parent, slope)] of
-                  Left _ -> error "[ panic ] extractRefRelations: failed to build polynomial"
-                  Right poly -> Just (CAddL poly)
-              else Nothing
-      | otherwise = Nothing
+toConstraints = EquivClass.toConstraints
 
 --------------------------------------------------------------------------------
 
