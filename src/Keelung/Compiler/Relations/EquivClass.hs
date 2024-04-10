@@ -39,16 +39,16 @@ import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
 
-type M err = WriterT [()] (Except err)
+type M n = WriterT [()] (Except (Error n))
 
-runM :: M (Error n) a -> Except (Error n) (Maybe a)
+runM :: M n a -> Except (Error n) (Maybe a)
 runM xs = do
   (x, changes) <- runWriterT xs
   if null changes
     then return Nothing
     else return (Just x)
 
-markChanged :: M (Error n) ()
+markChanged :: M n ()
 markChanged = tell [()]
 
 --------------------------------------------------------------------------------
@@ -126,7 +126,7 @@ lookup var (EquivClass _ relations) = case Map.lookup var relations of
   Just result -> result
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: (GaloisField n, Integral n) => Ref -> n -> EquivClass n -> M (Error n) (EquivClass n)
+assign :: (GaloisField n, Integral n) => Ref -> n -> EquivClass n -> M n (EquivClass n)
 assign var value (EquivClass name relations) = case Map.lookup var relations of
   -- The variable is not in the map, so we add it as a constant
   Nothing -> do
@@ -168,7 +168,7 @@ assign var value (EquivClass name relations) = case Map.lookup var relations of
       Just relationToParent -> assign parent (execRel relationToParent value) (EquivClass name relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> EquivClass n -> M (Error n) (EquivClass n)
+relate :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> EquivClass n -> M n (EquivClass n)
 relate a relation b relations =
   case compareSeniority a b of
     LT -> relateChildToParent a relation b relations
@@ -189,7 +189,7 @@ relate a relation b relations =
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
-relateChildToParent :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> EquivClass n -> M (Error n) (EquivClass n)
+relateChildToParent :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> EquivClass n -> M n (EquivClass n)
 relateChildToParent child relationToChild parent relations =
   if child == parent
     then return relations

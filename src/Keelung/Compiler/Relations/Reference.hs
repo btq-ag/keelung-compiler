@@ -37,14 +37,14 @@ new :: RefRelations n
 new = EquivClass.new "References Relations"
 
 -- | Note: `RefUBit` should not be allowed here
-assignR :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
+assignR :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> EquivClass.M n (RefRelations n)
 assignR = EquivClass.assign
 
-relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
+relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> EquivClass.M n (RefRelations n)
 relateB refA (polarity, refB) = EquivClass.relate (B refA) (if polarity then EquivClass.LinRel 1 0 else EquivClass.LinRel (-1) 1) (B refB)
 
 -- var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
+relateR :: (GaloisField n, Integral n) => SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M n (RefRelations n)
 relateR relationsS x slope y intercept xs =
   case (x, y, slope, intercept) of
     (_, _, 0, value) -> assignR x value xs
@@ -114,7 +114,7 @@ lookup _ var relations =
 
 --------------------------------------------------------------------------------
 
-composeLookup :: (GaloisField n, Integral n) => RefRelations n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> EquivClass.M (Error n) (RefRelations n)
+composeLookup :: (GaloisField n, Integral n) => RefRelations n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> EquivClass.M n (RefRelations n)
 composeLookup xs refA refB slope intercept relationA relationB = case (relationA, relationB) of
   (Root, Root) ->
     -- rootA = slope * rootB + intercept
@@ -172,5 +172,5 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     -- rootA = (slope * slopeB * rootB + slope * interceptB + intercept - interceptA) / slopeA
     relateF rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
   where
-    relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
+    relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M n (RefRelations n)
     relateF var1 slope' var2 intercept' = EquivClass.relate var1 (EquivClass.LinRel slope' intercept') var2

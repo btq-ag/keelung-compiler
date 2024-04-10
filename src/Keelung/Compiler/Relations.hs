@@ -48,9 +48,9 @@ instance (GaloisField n, Integral n) => Show (Relations n) where
       <> (if SliceRelations.size slices == 0 then "" else show slices)
 
 updateRelationsR ::
-  (Ref.RefRelations n -> EquivClass.M (Error n) (Ref.RefRelations n)) ->
+  (Ref.RefRelations n -> EquivClass.M n (Ref.RefRelations n)) ->
   Relations n ->
-  EquivClass.M (Error n) (Relations n)
+  EquivClass.M n (Relations n)
 updateRelationsR f xs = do
   relations <- f (relationsR xs)
   return $ xs {relationsR = relations}
@@ -60,7 +60,7 @@ updateRelationsR f xs = do
 new :: Options -> Relations n
 new = Relations Ref.new SliceRelations.new
 
-assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
+assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> EquivClass.M n (Relations n)
 assignR var val relations = case var of
   B (RefUBit refU i) ->
     if val == 0 || val == 1
@@ -68,10 +68,10 @@ assignR var val relations = case var of
       else throwError $ InvalidBooleanValue val
   _ -> updateRelationsR (Ref.assignR var val) relations
 
-assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> EquivClass.M (Error n) (Relations n)
+assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> EquivClass.M n (Relations n)
 assignB ref val = assignR (B ref) (if val then 1 else 0)
 
-assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> EquivClass.M (Error n) (Relations n)
+assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> EquivClass.M n (Relations n)
 assignS slice int relations = do
   EquivClass.markChanged
   return $
@@ -79,14 +79,14 @@ assignS slice int relations = do
       { relationsS = SliceRelations.assign slice (U.new (Slice.sliceEnd slice - Slice.sliceStart slice) int) (relationsS relations)
       }
 
-relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> EquivClass.M n (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (Ref.relateB refA (polarity, refB))
 
 -- var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> EquivClass.M n (Relations n)
 relateR x slope y intercept xs = updateRelationsR (Ref.relateR (relationsS xs) x slope y intercept) xs
 
-relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> EquivClass.M (Error n) (Relations n)
+relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> EquivClass.M n (Relations n)
 relateS slice1 slice2 relations = do
   EquivClass.markChanged
   return $

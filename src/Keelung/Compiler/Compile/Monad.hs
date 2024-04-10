@@ -80,7 +80,7 @@ freshRefU width = do
   modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ RefUX width index
 
-execRelations :: (Relations n -> EquivClass.M (Error n) (Relations n)) -> M n ()
+execRelations :: (Relations n -> EquivClass.M n (Relations n)) -> M n ()
 execRelations f = do
   cs <- get
   result <- lift $ lift $ (EquivClass.runM . f) (cmRelations cs)
