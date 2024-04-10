@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -127,14 +128,13 @@ lookup _ var relations =
 data LinRel n
   = LinRel
       n
-      -- | slope
       n
   deriving
-    ( -- | intercept
-      Show,
+    ( Show,
       Eq,
       NFData,
-      Generic
+      Generic,
+      Functor
     )
 
 instance (Num n) => Semigroup (LinRel n) where

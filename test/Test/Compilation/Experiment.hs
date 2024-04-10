@@ -7,8 +7,8 @@ import Keelung hiding (MulU, VarUI)
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Syntax.Counters qualified as Counters
 import Test.Arbitrary ()
-import Test.Util
 import Test.Hspec
+import Test.Util
 
 run :: IO ()
 run = hspec tests
@@ -39,12 +39,14 @@ tests = describe "Experiment" $ do
   describe "variable-width multiplication" $ do
     it "0" $ do
       let internal2 = constructSyntaxVV 6 4 :: Internal GF181
-      checkI gf181 internal2 [10, 7] [] [20]
+      -- debugI gf181 internal2
+      checkI gf181 internal2 [10, 7] [] [6]
+      assertCountI gf181 internal2 3
 
 constructSyntaxVV :: Width -> Width -> Internal n
 constructSyntaxVV outputWidth operandWidth =
   Internal
-    { internalExpr = [(0, ExprU (MulU outputWidth (VarUI operandWidth 0) (VarUI operandWidth 1)))],
+    { internalExpr = [(0, ExprU (MulUV outputWidth (VarUI operandWidth 0) (VarUI operandWidth 1)))],
       internalFieldBitWidth = 181,
       internalCounters = Counters.addCount (Counters.Output, Counters.WriteUInt outputWidth) 1 $ Counters.addCount (Counters.PublicInput, Counters.WriteUInt operandWidth) 2 mempty,
       internalAssertions = [],

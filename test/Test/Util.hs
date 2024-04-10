@@ -6,8 +6,10 @@
 --   * Functions ending with `I` take the internal syntax as input
 module Test.Util
   ( -- prints the compiled constraint module and R1CS
-    debugWithOpts,
     debug,
+    -- debugI,
+    debugWithOpts,
+    -- debugWithOptsI,
     -- testing by cross-validating the interpreter and the solver
     check,
     checkI,
@@ -18,7 +20,9 @@ module Test.Util
     debugSolverWithOpts,
     -- constraint counting
     assertCount,
+    assertCountI,
     assertCountO0,
+    assertCountIO0,
     assertCountWithOpts,
     assertCountWithOptsI,
     -- helper functions
@@ -61,6 +65,11 @@ testReindexReportWithOpts options syntax = do
 --------------------------------------------------------------------------------
 
 -- | Print the copmiled constraint module and R1CS
+-- debugWithOptsI :: (GaloisField n, Integral n) => Options -> Compiler.Internal n -> IO ()
+-- debugWithOptsI options syntax = do
+  -- print (fmap N <$> Compiler.compileWithOptsI options syntax)
+  -- print (Compiler.compileWithOptsI options syntax >>= Compiler.link :: Either (Error (N n)) (Compiler.ConstraintSystem (N n)))
+
 debugWithOpts :: (Encode t) => Options -> Comp t -> IO ()
 debugWithOpts options program = caseFieldType fieldType handlePrime handleBinary
   where
@@ -78,6 +87,9 @@ debugWithOpts options program = caseFieldType fieldType handlePrime handleBinary
 
 debug :: (Encode t) => FieldType -> Comp t -> IO ()
 debug = debugWithOpts . Options.new
+
+-- debugI :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> IO ()
+-- debugI = debugWithOptsI . Options.new
 
 --------------------------------------------------------------------------------
 
@@ -177,11 +189,17 @@ assertCountWithOpts options program expected = caseFieldType (FieldInfo.fieldTyp
         Left err -> assertFailure (show (err :: Error (Binary n)))
         Right syntax -> assertCountWithOptsI options (syntax :: Compiler.Internal (Binary n)) expected
 
+assertCountIO0 :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> Int -> IO ()
+assertCountIO0 fieldType = assertCountWithOptsI ((Options.new fieldType) {Options.optOptimize = False})
+
 assertCountO0 :: (Encode t) => FieldType -> Comp t -> Int -> IO ()
 assertCountO0 fieldType = assertCountWithOpts ((Options.new fieldType) {Options.optOptimize = False})
 
 assertCount :: (Encode t) => FieldType -> Comp t -> Int -> IO ()
 assertCount = assertCountWithOpts . Options.new
+
+assertCountI :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> Int -> IO ()
+assertCountI fieldType = assertCountWithOptsI (Options.new fieldType)
 
 --------------------------------------------------------------------------
 

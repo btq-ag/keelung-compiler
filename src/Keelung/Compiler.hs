@@ -36,6 +36,7 @@ module Keelung.Compiler
     link,
     toR1CS,
     asGF181N,
+    applyN
   )
 where
 
@@ -214,3 +215,6 @@ deserializeInputs counters rawPublicInputs rawPrivateInputs = left InputError (I
 -- | Helper function for fixing the type as `N GF181`
 asGF181N :: Either (Error (N GF181)) a -> Either (Error (N GF181)) a
 asGF181N = id
+
+applyN :: Either (Error (N n)) a -> Either (Error (N n)) a
+applyN = id

@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Keelung.Compiler.Relations.EquivClass
   ( IsRelation (..),
@@ -81,7 +82,7 @@ data VarStatus var n rel
     IsRoot (Map var rel)
   | -- | child = relation parent
     IsChildOf var rel
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, Functor)
 
 instance (NFData var, NFData n, NFData rel) => NFData (VarStatus var n rel)
 
@@ -89,7 +90,7 @@ data EquivClass var n rel = EquivClass
   { eqPoolName :: String,
     eqPoolEquivClass :: Map var (VarStatus var n rel) -- relation to the parent
   }
-  deriving (Eq, Generic)
+  deriving (Eq, Generic, Functor)
 
 instance (NFData var, NFData n, NFData rel) => NFData (EquivClass var n rel)
 

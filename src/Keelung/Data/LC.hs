@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Data.LC
@@ -33,7 +34,7 @@ import Keelung.Data.U (U)
 data LC n
   = Constant n
   | Polynomial (PolyL n)
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Generic, NFData, Functor)
 
 -- | A LC is a semigroup under addition.
 instance (Integral n, GaloisField n) => Semigroup (LC n) where
