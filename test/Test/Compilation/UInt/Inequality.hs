@@ -6,7 +6,7 @@ module Test.Compilation.UInt.Inequality (tests, run) where
 import Control.Monad
 import Data.Word (Word8)
 import Keelung hiding (compile)
-import Test.Compilation.Util
+import Test.Util
 import Test.Hspec
 import Test.QuickCheck
 
@@ -35,7 +35,7 @@ tests = describe "inequality" $ do
     forAll genCase $ \(x, y :: Word8) -> do
       let expected = [if x == y then 0 else 1]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        validate field (program (fromIntegral x) (fromIntegral y)) [] [] expected
+        check field (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
   it "variable + constant" $ do
     let program constant = do
@@ -45,7 +45,7 @@ tests = describe "inequality" $ do
     forAll genCase $ \(x, y :: Word8) -> do
       let expected = [if x == y then 0 else 1]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        validate field (program (fromIntegral x)) [fromIntegral y] [] expected
+        check field (program (fromIntegral x)) [fromIntegral y] [] expected
 
   it "2 variables" $ do
     let program = do
@@ -56,4 +56,4 @@ tests = describe "inequality" $ do
     forAll genCase $ \(x, y :: Word8) -> do
       let expected = [if x == y then 0 else 1]
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        validate field program [fromIntegral x, fromIntegral y] [] expected
+        check field program [fromIntegral x, fromIntegral y] [] expected

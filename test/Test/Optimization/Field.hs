@@ -1,35 +1,35 @@
 module Test.Optimization.Field (tests, run) where
 
-import Keelung hiding (compileO0)
+import Keelung
+import Test.Util
 import Test.Hspec
-import Test.Optimization.Util (executeGF181, shouldHaveSize)
 
 tests :: SpecWith ()
 tests = do
   describe "Field" $ do
-      -- 1
-      it "x `pow` 0" $ do
-        (cs, cs') <- executeGF181 $ do
-          x <- inputField Public
-          return $ x `pow` 0
-        cs `shouldHaveSize` 1
-        cs' `shouldHaveSize` 1
-      
-      -- ((x ^ 2) ^ 2) * x
-      it "x `pow` 5" $ do
-        (cs, cs') <- executeGF181 $ do
-          x <- inputField Public
-          return $ x `pow` 5
-        cs `shouldHaveSize` 5
-        cs' `shouldHaveSize` 3
-      
-      -- ((((x ^ 2) * x) ^ 2) ^ 2) * x
-      it "x `pow` 13" $ do
-        (cs, cs') <- executeGF181 $ do
-          x <- inputField Public
-          return $ x `pow` 13
-        cs `shouldHaveSize` 7
-        cs' `shouldHaveSize` 5
+    -- 1
+    it "x `pow` 0" $ do
+      let program = do
+            x <- inputField Public
+            return $ x `pow` 0
+      assertCountO0 gf181 program 1
+      assertCount gf181 program 1
+
+    -- ((x ^ 2) ^ 2) * x
+    it "x `pow` 5" $ do
+      let program = do
+            x <- inputField Public
+            return $ x `pow` 5
+      assertCountO0 gf181 program 5
+      assertCount gf181 program 3
+
+    -- ((((x ^ 2) * x) ^ 2) ^ 2) * x
+    it "x `pow` 13" $ do
+      let program = do
+            x <- inputField Public
+            return $ x `pow` 13
+      assertCountO0 gf181 program 7
+      assertCount gf181 program 5
 
 --------------------------------------------------------------------------------
 

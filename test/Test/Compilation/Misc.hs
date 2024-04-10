@@ -8,7 +8,7 @@ import Keelung.Compiler (Error (..))
 import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.Syntax.Inputs qualified as Inputs
 import Test.Hspec
-import Test.Compilation.Util
+import Test.Util
 import qualified Keelung.Interpreter as Interpreter
 
 run :: IO ()
@@ -75,10 +75,10 @@ tests = do
 
     describe "Poseidon" $ do
       it "[0]" $ do
-        validate gf181 (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385]
+        check gf181 (Poseidon.hash [0]) [] [] [969784935791658820122994814042437418105599415561111385]
 
       it "[0, 0]" $ do
-        validate gf181 (Poseidon.hash [0, 0]) [] [] [1463644445890192529906304324019268768608065984595443732]
+        check gf181 (Poseidon.hash [0, 0]) [] [] [1463644445890192529906304324019268768608065984595443732]
 
       it "[0, 0, 0]" $ do
-        validate gf181 (Poseidon.hash [0, 0, 0]) [] [] [30188980558117151136401211469358799167139495293483122]
+        check gf181 (Poseidon.hash [0, 0, 0]) [] [] [30188980558117151136401211469358799167139495293483122]

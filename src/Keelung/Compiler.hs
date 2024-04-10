@@ -30,6 +30,7 @@ module Keelung.Compiler
     solveAndCollectLogWithOpts,
     solveAndCollectLogWithOptsI,
     -- helper functions
+    deserializeInputs,
     elaborateAndEncode,
     toInternalWithOpts,
     link,
@@ -77,14 +78,14 @@ interpret :: (GaloisField n, Integral n, Encode t) => FieldInfo -> Comp t -> [In
 interpret fieldInfo prog rawPublicInputs rawPrivateInputs = do
   elab <- elaborateAndEncode prog
   let counters = Encoded.compCounters (Encoded.elabComp elab)
-  inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
+  inputs <- deserializeInputs counters rawPublicInputs rawPrivateInputs
   map toInteger <$> left InterpreterError (Interpreter.run fieldInfo elab inputs)
 
 -- | Interpret an elaborated program with given inputs
 interpretE :: (GaloisField n, Integral n) => FieldInfo -> Elaborated -> [Integer] -> [Integer] -> Either (Error n) [Integer]
 interpretE fieldInfo elab rawPublicInputs rawPrivateInputs = do
   let counters = Encoded.compCounters (Encoded.elabComp elab)
-  inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
+  inputs <- deserializeInputs counters rawPublicInputs rawPrivateInputs
   left InterpreterError (Interpreter.run fieldInfo elab inputs)
 
 --------------------------------------------------------------------------------
@@ -96,7 +97,7 @@ generateWitnessWithOptsI :: (GaloisField n, Integral n) => Options -> Internal n
 generateWitnessWithOptsI options syntax rawPublicInputs rawPrivateInputs = do
   r1cs <- compileWithOptsI options syntax >>= link >>= toR1CS
   let counters = r1csCounters r1cs
-  inputs <- left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
+  inputs <- deserializeInputs counters rawPublicInputs rawPrivateInputs
   (outputs, witness) <- left SolverError (Solver.run defaultOptions r1cs inputs)
   return (counters, outputs, witness)
 
@@ -141,7 +142,7 @@ solve = solveWithOpts . Options.new
 solveAndCollectLogWithOptsI :: (GaloisField n, Integral n) => Options -> Internal n -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
 solveAndCollectLogWithOptsI options syntax rawPublicInputs rawPrivateInputs = case do
   r1cs <- compileWithOptsI options syntax >>= link >>= toR1CS
-  inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+  inputs <- deserializeInputs (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
   return (r1cs, inputs) of
   Left err -> (Just err, Nothing)
   Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
@@ -152,7 +153,7 @@ solveAndCollectLogWithOptsI options syntax rawPublicInputs rawPrivateInputs = ca
 solveAndCollectLogWithOpts :: (GaloisField n, Integral n, Encode t) => Options -> Comp t -> [Integer] -> [Integer] -> (Maybe (Error n), Maybe (Solver.LogReport n))
 solveAndCollectLogWithOpts options prog rawPublicInputs rawPrivateInputs = case do
   r1cs <- compileWithOpts options prog >>= link >>= toR1CS
-  inputs <- left InputError (Inputs.deserialize (r1csCounters r1cs) rawPublicInputs rawPrivateInputs)
+  inputs <- deserializeInputs (r1csCounters r1cs) rawPublicInputs rawPrivateInputs
   return (r1cs, inputs) of
   Left err -> (Just err, Nothing)
   Right (r1cs, inputs) -> case Solver.debug r1cs inputs of
@@ -205,6 +206,10 @@ link = Right . Linker.linkConstraintModule
 -- | ConstraintSystem -> R1CS
 toR1CS :: (GaloisField n) => ConstraintSystem n -> Either (Error n) (R1CS n)
 toR1CS = Right . R1CS.fromConstraintSystem
+
+-- | Deserialize raw inputs into structured inputs
+deserializeInputs :: (GaloisField n, Integral n) => Counters -> [Integer] -> [Integer] -> Either (Error n) (Inputs.Inputs n)
+deserializeInputs counters rawPublicInputs rawPrivateInputs = left InputError (Inputs.deserialize counters rawPublicInputs rawPrivateInputs)
 
 -- | Helper function for fixing the type as `N GF181`
 asGF181N :: Either (Error (N GF181)) a -> Either (Error (N GF181)) a

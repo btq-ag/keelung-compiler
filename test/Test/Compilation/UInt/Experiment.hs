@@ -4,7 +4,7 @@
 module Test.Compilation.UInt.Experiment (tests, run) where
 
 import Keelung hiding (compile)
-import Test.Compilation.Util
+import Test.Util
 import Test.Hspec
 
 run :: IO ()
@@ -23,7 +23,7 @@ tests = describe "Compilation Experiment" $ do
             return $ sum (replicate (fromInteger n) x)
       let expected = [10 * 10 `mod` 16]
       debug (Prime 61) (program 10)
-      validate (Prime 61) (program 10) [10] [] expected
+      check (Prime 61) (program 10) [10] [] expected
 
 -- debugSolverWithOpts options (Binary 7) (program (fromIntegral divisor)) [dividend] []
 
@@ -38,4 +38,4 @@ tests = describe "Compilation Experiment" $ do
 -- forAll genPair $ \(dividend, divisor) -> do
 --   let expected = [dividend `div` divisor, dividend `mod` divisor]
 --   -- debugWithOpts options (Binary 7) (program dividend divisor)
---   validateWithOpts options (Binary 7) (program dividend divisor) [] [] expected
+--   checkWithOpts options (Binary 7) (program dividend divisor) [] [] expected

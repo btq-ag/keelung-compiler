@@ -7,8 +7,8 @@ module Test.Optimization.UInt.CLDivMod (tests, run) where
 import Keelung
 -- import Keelung.Compiler.Linker
 
+import Test.Util
 import Test.Hspec
-import Test.Optimization.Util
 
 -- --
 run :: IO ()
@@ -23,11 +23,9 @@ tests = describe "Carry-less Div/Mod" $ do
     -- remainder addition: 2
     -- divisor non-zero: 1
     -- divisor > remainder: 3
-
-    (_cs2, cs2') <- executeGF181 $ do
-      x <- input Public :: Comp (UInt 2)
-      y <- input Public :: Comp (UInt 2)
-      performCLDivMod x y
-    _cs2 `shouldHaveSize` 33
-    -- should be just 18
-    cs2' `shouldHaveSize` 28
+    let program = do
+          x <- input Public :: Comp (UInt 2)
+          y <- input Public :: Comp (UInt 2)
+          performCLDivMod x y
+    assertCountO0 gf181 program 33
+    assertCount gf181 program 28

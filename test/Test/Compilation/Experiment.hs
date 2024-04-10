@@ -7,7 +7,7 @@ import Keelung hiding (MulU, VarUI)
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Syntax.Counters qualified as Counters
 import Test.Arbitrary ()
-import Test.Compilation.Util
+import Test.Util
 import Test.Hspec
 
 run :: IO ()
@@ -38,18 +38,8 @@ tests = describe "Experiment" $ do
 
   describe "variable-width multiplication" $ do
     it "0" $ do
-      -- let program = do
-      --       x <- input Public :: Comp (UInt 8)
-      --       y <- input Public :: Comp (UInt 8)
-      --       return $ x * y
-      -- let elaborated = Compiler.elaborateAndEncode program :: Either (Compiler.Error GF181) Compiler.Elaborated
-      -- let internal = ToInternal.run gf181Info <$> elaborated :: Either (Compiler.Error GF181) (Compiler.Internal GF181)
-      -- case internal of
-      --   Left err -> print err
-      --   Right syntax -> validateInternalSyntax syntax [20, 20] [] [144]
-
       let internal2 = constructSyntaxVV 6 4 :: Internal GF181
-      validateI internal2 [10, 7] [] [20]
+      checkI gf181 internal2 [10, 7] [] [20]
 
 constructSyntaxVV :: Width -> Width -> Internal n
 constructSyntaxVV outputWidth operandWidth =

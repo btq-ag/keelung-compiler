@@ -5,7 +5,7 @@ module Test.Compilation.Field.Inequality (tests, run) where
 
 import Data.Field.Galois qualified as Galois
 import Keelung hiding (compile)
-import Test.Compilation.Util
+import Test.Util
 import Test.Hspec
 import Test.QuickCheck
 
@@ -23,17 +23,17 @@ tests = describe "inequality" $ do
     it "GF181" $ do
       property $ \(x, y :: GF181) -> do
         let expected = [if x == y then 0 else 1]
-        validate gf181 (program (fromIntegral x) (fromIntegral y)) [] [] expected
+        check gf181 (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "Prime 2" $ do
       property $ \(x, y :: Galois.Prime 2) -> do
         let expected = [if x == y then 0 else 1]
-        validate (Prime 2) (program (fromIntegral x) (fromIntegral y)) [] [] expected
+        check (Prime 2) (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "Binary 7" $ do
       property $ \(x, y :: Galois.Binary 7) -> do
         let expected = [if x == y then 0 else 1]
-        validate (Binary 7) (program (fromIntegral x) (fromIntegral y)) [] [] expected
+        check (Binary 7) (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
   describe "variable + constant" $ do
     let program constant = do
@@ -43,17 +43,17 @@ tests = describe "inequality" $ do
     it "GF181" $ do
       property $ \(constant, value :: GF181) -> do
         let expected = [if constant == value then 0 else 1]
-        validate gf181 (program (fromIntegral constant)) [toInteger value] [] expected
+        check gf181 (program (fromIntegral constant)) [toInteger value] [] expected
 
     it "Prime 2" $ do
       property $ \(constant, value :: Galois.Prime 2) -> do
         let expected = [if constant == value then 0 else 1]
-        validate (Prime 2) (program (fromIntegral constant)) [toInteger value] [] expected
+        check (Prime 2) (program (fromIntegral constant)) [toInteger value] [] expected
 
     it "Binary 7" $ do
       property $ \(constant, value :: Galois.Binary 7) -> do
         let expected = [if constant == value then 0 else 1]
-        validate (Binary 7) (program (fromIntegral constant)) [toInteger value] [] expected
+        check (Binary 7) (program (fromIntegral constant)) [toInteger value] [] expected
 
   describe "2 variable" $ do
     let program = do
@@ -64,14 +64,14 @@ tests = describe "inequality" $ do
     it "GF181" $ do
       property $ \(x, y :: GF181) -> do
         let expected = [if x == y then 0 else 1]
-        validate gf181 program [toInteger x, toInteger y] [] expected
+        check gf181 program [toInteger x, toInteger y] [] expected
 
     it "Prime 2" $ do
       property $ \(x, y :: Galois.Prime 2) -> do
         let expected = [if x == y then 0 else 1]
-        validate (Prime 2) program [toInteger x, toInteger y] [] expected
+        check (Prime 2) program [toInteger x, toInteger y] [] expected
 
     it "Binary 7" $ do
       property $ \(x, y :: Galois.Binary 7) -> do
         let expected = [if x == y then 0 else 1]
-        validate (Binary 7) program [toInteger x, toInteger y] [] expected
+        check (Binary 7) program [toInteger x, toInteger y] [] expected

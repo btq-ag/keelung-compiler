@@ -11,7 +11,7 @@ import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Error (Error (..))
 import Keelung.Interpreter qualified as Interpreter
 import Keelung.Solver qualified as Solver
-import Test.Compilation.Util
+import Test.Util
 import Test.Hspec
 import Test.QuickCheck
 
@@ -89,7 +89,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x <= bound
-              then validate gf181 (program bound) [fromInteger x] [] []
+              then check gf181 (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   gf181
@@ -102,7 +102,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x <= bound
-              then validate (Prime 2) (program bound) [fromInteger x] [] []
+              then check (Prime 2) (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   (Prime 2)
@@ -115,7 +115,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x <= bound
-              then validate (Binary 7) (program bound) [fromInteger x] [] []
+              then check (Binary 7) (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   (Binary 7)
@@ -191,7 +191,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x < bound
-              then validate gf181 (program bound) [fromInteger x] [] []
+              then check gf181 (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   gf181
@@ -204,7 +204,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x < bound
-              then validate (Prime 2) (program bound) [fromInteger x] [] []
+              then check (Prime 2) (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   (Prime 2)
@@ -217,7 +217,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x < bound
-              then validate (Binary 7) (program bound) [fromInteger x] [] []
+              then check (Binary 7) (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   (Binary 7)
@@ -293,7 +293,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x >= bound
-              then validate gf181 (program bound) [fromInteger x] [] []
+              then check gf181 (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   gf181
@@ -306,7 +306,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x >= bound
-              then validate (Prime 2) (program bound) [fromInteger x] [] []
+              then check (Prime 2) (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   (Prime 2)
@@ -319,7 +319,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (1, 15)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x >= bound
-              then validate (Binary 7) (program bound) [fromInteger x] [] []
+              then check (Binary 7) (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   (Binary 7)
@@ -395,7 +395,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x > bound
-              then validate gf181 (program bound) [fromInteger x] [] []
+              then check gf181 (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   gf181
@@ -408,7 +408,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x > bound
-              then validate (Prime 2) (program bound) [fromInteger x] [] []
+              then check (Prime 2) (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   (Prime 2)
@@ -421,7 +421,7 @@ tests = describe "Comparisons" $ do
         forAll (choose (0, 14)) $ \bound -> do
           forM_ [0 .. 15] $ \x -> do
             if x > bound
-              then validate (Binary 7) (program bound) [fromInteger x] [] []
+              then check (Binary 7) (program bound) [fromInteger x] [] []
               else
                 throwErrors
                   (Binary 7)
@@ -441,8 +441,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x <= y
-            then validate field program [fromIntegral x, fromIntegral y] [] [1]
-            else validate field program [fromIntegral x, fromIntegral y] [] [0]
+            then check field program [fromIntegral x, fromIntegral y] [] [1]
+            else check field program [fromIntegral x, fromIntegral y] [] [0]
 
     it "variable + constant" $ do
       let program x = do
@@ -452,8 +452,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x <= y
-            then validate field (program (fromIntegral x)) [fromIntegral y] [] [1]
-            else validate field (program (fromIntegral x)) [fromIntegral y] [] [0]
+            then check field (program (fromIntegral x)) [fromIntegral y] [] [1]
+            else check field (program (fromIntegral x)) [fromIntegral y] [] [0]
 
     it "2 constants" $ do
       let program x y = do
@@ -462,8 +462,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x <= y
-            then validate field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
-            else validate field (program (fromIntegral x) (fromIntegral y)) [] [] [0]
+            then check field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
+            else check field (program (fromIntegral x) (fromIntegral y)) [] [] [0]
 
   describe "computeLT" $ do
     it "2 variables" $ do
@@ -475,8 +475,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x < y
-            then validate field program [fromIntegral x, fromIntegral y] [] [1]
-            else validate field program [fromIntegral x, fromIntegral y] [] [0]
+            then check field program [fromIntegral x, fromIntegral y] [] [1]
+            else check field program [fromIntegral x, fromIntegral y] [] [0]
 
     it "variable + constant" $ do
       let program x = do
@@ -486,8 +486,8 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x < y
-            then validate field (program (fromIntegral x)) [fromIntegral y] [] [1]
-            else validate field (program (fromIntegral x)) [fromIntegral y] [] [0]
+            then check field (program (fromIntegral x)) [fromIntegral y] [] [1]
+            else check field (program (fromIntegral x)) [fromIntegral y] [] [0]
 
     it "2 constants" $ do
       let program x y = do
@@ -496,5 +496,5 @@ tests = describe "Comparisons" $ do
       property $ \(x, y :: Word8) -> do
         forM_ [gf181, Prime 2, Binary 7] $ \field -> do
           if x < y
-            then validate field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
-            else validate field (program (fromIntegral x) (fromIntegral y)) [] [] [0]
+            then check field (program (fromIntegral x) (fromIntegral y)) [] [] [1]
+            else check field (program (fromIntegral x) (fromIntegral y)) [] [] [0]

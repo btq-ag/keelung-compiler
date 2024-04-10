@@ -6,13 +6,14 @@ module Test.Data.IntervalTable (tests, run) where
 import Control.Monad (forM_)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung
+import Keelung.Compiler.ConstraintModule (ConstraintModule)
 import Keelung.Compiler.Linker (constructEnv, reindexRef)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Data.IntervalTable (IntervalTable (..))
 import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference
+import Test.Util
 import Test.Hspec
-import Test.Optimization.Util
 
 run :: IO ()
 run = hspec tests
@@ -134,9 +135,10 @@ tests =
 
     describe "fromEnv" $ do
       it "add + assertion" $ do
-        (_cm, cm) <- executeGF181 $ do
-          x <- inputUInt @4 Public
-          assert $ 2 `eq` (x + 1)
+        let program = do
+              x <- inputUInt @4 Public
+              assert $ 2 `eq` (x + 1)
+        cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
         let env = constructEnv cm
         let inputVar = RefUI 4 0
         reindexRef env (B (RefUBit inputVar 0)) `shouldBe` 0
@@ -152,10 +154,11 @@ tests =
         reindexRef env (B (RefUBit intermediate4 3)) `shouldBe` 8
 
       it "Bit test / and 1" $ do
-        (_, cm) <- executeGF181 $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Private
-          return $ (x .&. y) !!! 0
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Private
+              return $ (x .&. y) !!! 0
+        cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
         let env = constructEnv cm
         reindexRef env (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
@@ -174,11 +177,12 @@ tests =
         reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 15
 
       it "Bit test / and 2" $ do
-        (_, cm) <- executeGF181 $ do
-          x <- inputUInt @4 Public
-          y <- inputUInt @4 Private
-          z <- inputUInt @4 Public
-          return $ (x .&. y .&. z) !!! 0
+        let program = do
+              x <- inputUInt @4 Public
+              y <- inputUInt @4 Private
+              z <- inputUInt @4 Public
+              return $ (x .&. y .&. z) !!! 0
+        cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
         let env = constructEnv cm
 
         reindexRef env (B (RefBO 0)) `shouldBe` 0

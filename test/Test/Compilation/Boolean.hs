@@ -6,7 +6,7 @@ import Test.Compilation.Boolean.Conditional qualified
 import Test.Compilation.Boolean.Equality qualified
 import Test.Compilation.Boolean.Inequality qualified
 import Test.Compilation.Boolean.Logical qualified
-import Test.Compilation.Util
+import Test.Util
 import Test.Hspec
 
 run :: IO ()
@@ -25,4 +25,4 @@ tests = describe "Boolean" $ do
             x <- input Public
             return $ BtoF x
       forM_ [gf181, Prime 2, Binary 7] $ \field -> do
-        validate field program [1] [] [1]
+        check field program [1] [] [1]

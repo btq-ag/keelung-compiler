@@ -7,7 +7,7 @@ import Control.Monad
 import Data.Word
 import Keelung hiding (compile)
 import Keelung.Data.U qualified as U
-import Test.Compilation.Util
+import Test.Util
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 
@@ -28,8 +28,8 @@ tests =
             return (x, y)
       forAll genPair $ \(x, y) -> do
         let expected = [toInteger (U.clMul (U.new 6 x) (U.new 6 y))]
-        validate (Prime 5) (program (fromInteger x) (fromInteger y)) [] [] expected
-        validate (Prime 257) (program (fromInteger x) (fromInteger y)) [] [] expected
+        check (Prime 5) (program (fromInteger x) (fromInteger y)) [] [] expected
+        check (Prime 257) (program (fromInteger x) (fromInteger y)) [] [] expected
 
     it "2 byte variables" $ do
       let program = do
@@ -39,7 +39,7 @@ tests =
       property $ \(x, y :: Word8) -> do
         let expected = [toInteger (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
         forM_ [gf181, Prime 17] $ \field -> do
-          validate field program (map toInteger [x, y]) [] expected
+          check field program (map toInteger [x, y]) [] expected
 
     it "1 variable / 1 constant" $ do
       let program y = do
@@ -48,7 +48,7 @@ tests =
       property $ \(x :: Word8, y :: Word8) -> do
         let expected = [toInteger (U.clMul (U.new 8 (toInteger x)) (U.new 8 (toInteger y)))]
         forM_ [gf181, Prime 17] $ \field -> do
-          validate field (program (fromIntegral y)) [toInteger x] [] expected
+          check field (program (fromIntegral y)) [toInteger x] [] expected
 
     it "2 variables / 1 constant" $ do
       let program c = do
@@ -58,7 +58,7 @@ tests =
       property $ \(x, y :: Word8, c :: Word8) -> do
         let expected = [toInteger (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger c))]
         forM_ [gf181, Prime 17] $ \field -> do
-          validate field (program (fromIntegral c)) (map toInteger [x, y]) [] expected
+          check field (program (fromIntegral c)) (map toInteger [x, y]) [] expected
 
     it "3 variables / 1 constant" $ do
       let program c = do
@@ -69,4 +69,4 @@ tests =
       property $ \(x, y, z :: Word8, c :: Word8) -> do
         let expected = [toInteger (U.new 8 (toInteger x) `U.clMul` U.new 8 (toInteger y) `U.clMul` U.new 8 (toInteger z) `U.clMul` U.new 8 (toInteger c))]
         forM_ [gf181, Prime 17] $ \field -> do
-          validate field (program (fromIntegral c)) (map toInteger [x, y, z]) [] expected
+          check field (program (fromIntegral c)) (map toInteger [x, y, z]) [] expected

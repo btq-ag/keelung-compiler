@@ -4,12 +4,12 @@ module Test.Optimization.UInt (tests, run) where
 
 import Control.Monad (forM_)
 import Keelung hiding (compileO0)
+import Test.Util
 import Test.Hspec
 import Test.Optimization.UInt.AESMul qualified as UInt.AESMul
 import Test.Optimization.UInt.CLDivMod qualified as UInt.CLDivMod
 import Test.Optimization.UInt.Misc qualified as Misc
 import Test.Optimization.UInt.Statement qualified as Statement
-import Test.Optimization.Util
 
 run :: IO ()
 run = hspec tests
@@ -27,90 +27,90 @@ tests = describe "UInt" $ do
     -- 1 for multiplication
     -- 8 for multiplication output - 2
     it "keelung Issue #17" $ do
-      (cs, cs') <- executeGF181 $ do
-        a <- input Private :: Comp (UInt 4)
-        b <- input Private
-        c <- reuse $ a * b
-        return $ c .&. 5
-      cs `shouldHaveSize` 28
+      let program = do
+            a <- input Private :: Comp (UInt 4)
+            b <- input Private
+            c <- reuse $ a * b
+            return $ c .&. 5
+      assertCountO0 gf181 program 28
       -- TODO: should be 23
-      cs' `shouldHaveSize` 25
+      assertCount gf181 program 25
 
   describe "Addition / Subtraction" $ do
     it "2 variables / 8 bit / GF181" $ do
       -- 8 * 3 for input / output
       -- 1 for carry bit
       -- 1 for addition
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public
-        return $ x + y
-      cs `shouldHaveSize` 26
-      cs' `shouldHaveSize` 26
+      let program = do
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
+            return $ x + y
+      assertCountO0 gf181 program 26
+      assertCount gf181 program 26
 
     it "2 variables / 4 bit / Prime 17" $ do
       -- 12 = 4 * 3 for input / output
       -- 2 for carry bit
       -- 2 for addition
-      (cs, cs') <- executePrime 17 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Public
-        return $ x + y
-      cs `shouldHaveSize` 16
-      cs' `shouldHaveSize` 16
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Public
+            return $ x + y
+      assertCountO0 (Prime 17) program 16
+      assertCount (Prime 17) program 16
 
     it "2 variables / 256 bit / GF181" $ do
       -- 768 = 256 * 3 for input / output
       -- 2 for carry bit
       -- 2 for addition
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 256)
-        y <- input Public
-        return $ x + y
-      cs `shouldHaveSize` 772
-      cs' `shouldHaveSize` 772
+      let program = do
+            x <- input Public :: Comp (UInt 256)
+            y <- input Public
+            return $ x + y
+      assertCountO0 gf181 program 772
+      assertCount gf181 program 772
 
     it "1 variable + 1 constant / byte / GF181" $ do
       -- 8 * 2 for input / output
       -- 1 for carry bit
       -- 1 for addition
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 8)
-        return $ x + 4
-      cs `shouldHaveSize` 18
-      cs' `shouldHaveSize` 18
+      let program = do
+            x <- input Public :: Comp (UInt 8)
+            return $ x + 4
+      assertCountO0 gf181 program 18
+      assertCount gf181 program 18
 
     it "3 variable + 1 constant" $ do
       -- 4 * 4 for input / output
       -- 2 for carry bit
       -- 1 for addition
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Public
-        z <- input Public
-        return $ x + y + z + 4
-      cs `shouldHaveSize` 19
-      cs' `shouldHaveSize` 19
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Public
+            z <- input Public
+            return $ x + y + z + 4
+      assertCountO0 gf181 program 19
+      assertCount gf181 program 19
 
     it "3 variable + 1 constant (with subtraction)" $ do
       -- 4 * 4 for input / output
       -- 2 for carry bit
       -- 1 for addition
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Public
-        z <- input Public
-        return $ x - y + z + 4
-      cs `shouldHaveSize` 19
-      cs' `shouldHaveSize` 19
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Public
+            z <- input Public
+            return $ x - y + z + 4
+      assertCountO0 gf181 program 19
+      assertCount gf181 program 19
 
     -- TODO: should've been just 4
     -- CAUSE: constant variable need no Boolean constraints
     it "2 constants" $ do
-      (cs, cs') <- executeGF181 $ do
-        return $ 2 + (4 :: UInt 4)
-      cs `shouldHaveSize` 5
-      cs' `shouldHaveSize` 5
+      let program = do
+            return $ 2 + (4 :: UInt 4)
+      assertCountO0 gf181 program 5
+      assertCount gf181 program 5
 
   describe "Multiplication" $ do
     -- 8 * 3 for input / output
@@ -118,12 +118,12 @@ tests = describe "UInt" $ do
     -- 1 for multiplication
 
     it "2 variables / byte / GF181" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public
-        return $ x * y
-      cs `shouldHaveSize` 42
-      cs' `shouldHaveSize` 33
+      let program = do
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
+            return $ x * y
+      assertCountO0 gf181 program 42
+      assertCount gf181 program 33
 
     -- 8 * 3 for input / output
     -- 4 * 5 for intermediate limbs
@@ -142,35 +142,35 @@ tests = describe "UInt" $ do
     ------------------------------------------
 
     it "2 variables / byte / Prime 257" $ do
-      (cs, cs') <- executePrime 257 $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public
-        return $ x * y
-      cs `shouldHaveSize` 55
-      cs' `shouldHaveSize` 50
+      let program = do
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
+            return $ x * y
+      assertCountO0 (Prime 257) program 55
+      assertCount (Prime 257) program 50
 
     it "2 variables / byte / Prime 1031" $ do
-      (cs, cs') <- executePrime 1031 $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public
-        return $ x * y
-      cs `shouldHaveSize` 55
-      cs' `shouldHaveSize` 50
+      let program = do
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
+            return $ x * y
+      assertCountO0 (Prime 1031) program 55
+      assertCount (Prime 1031) program 50
 
     it "variable / constant" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        return $ x * 4
-      cs `shouldHaveSize` 16
-      cs' `shouldHaveSize` 11
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            return $ x * 4
+      assertCountO0 gf181 program 16
+      assertCount gf181 program 11
 
     -- TODO: should've been just 4
     it "constant / constant" $ do
-      (cs, cs') <- executeGF181 $ do
-        return $ 2 * (4 :: UInt 4)
+      let program = do
+            return $ 2 * (4 :: UInt 4)
       -- print $ linkConstraintModule cs'
-      cs `shouldHaveSize` 5
-      cs' `shouldHaveSize` 5
+      assertCountO0 gf181 program 5
+      assertCount gf181 program 5
 
   describe "Carry-less Multiplication" $ do
     -- TODO: bring this down
@@ -179,123 +179,123 @@ tests = describe "UInt" $ do
       -- I/O: 24 = 2 * 8 + 8
       -- ANDs: 36 = 8 * 9 / 2
       -- XORs: 7
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 8)
-        y <- input Public :: Comp (UInt 8)
-        return (x .*. y)
+      let program = do
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public :: Comp (UInt 8)
+            return (x .*. y)
       -- print $ linkConstraintModule cs'
-      cs `shouldHaveSize` 91
-      cs' `shouldHaveSize` 87
+      assertCountO0 gf181 program 91
+      assertCount gf181 program 87
 
   describe "Constants" $ do
     -- TODO: should be just 4
     it "`return 0`" $ do
-      (cs, cs') <- executeGF181 $ do
-        return (0 :: UInt 4)
+      let program = do
+            return (0 :: UInt 4)
       -- print $ linkConstraintModule cs'
-      cs `shouldHaveSize` 5
-      cs' `shouldHaveSize` 5
+      assertCountO0 gf181 program 5
+      assertCount gf181 program 5
 
   describe "Comparison computation" $ do
     it "x ≤ y" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Private
-        return $ x `lte` y
-      cs `shouldHaveSize` 17
-      cs' `shouldHaveSize` 16
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
+            return $ x `lte` y
+      assertCountO0 gf181 program 17
+      assertCount gf181 program 16
 
     it "0 ≤ x" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        return $ (0 :: UInt 4) `lte` x
-      cs `shouldHaveSize` 6
-      cs' `shouldHaveSize` 6
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            return $ (0 :: UInt 4) `lte` x
+      assertCountO0 gf181 program 6
+      assertCount gf181 program 6
 
     it "1 ≤ x" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        return $ (1 :: UInt 4) `lte` x
-      cs `shouldHaveSize` 9
-      cs' `shouldHaveSize` 8
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            return $ (1 :: UInt 4) `lte` x
+      assertCountO0 gf181 program 9
+      assertCount gf181 program 8
 
     it "x ≤ 0" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        return $ x `lte` 0
-      cs `shouldHaveSize` 8
-      cs' `shouldHaveSize` 7
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            return $ x `lte` 0
+      assertCountO0 gf181 program 8
+      assertCount gf181 program 7
 
     it "x ≤ 1" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        return $ x `lte` 1
-      cs `shouldHaveSize` 9
-      cs' `shouldHaveSize` 7
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            return $ x `lte` 1
+      assertCountO0 gf181 program 9
+      assertCount gf181 program 7
 
     it "0 ≤ 0" $ do
-      (cs, cs') <- executeGF181 $ do
-        return $ 0 `lte` (0 :: UInt 4)
-      cs `shouldHaveSize` 2
-      cs' `shouldHaveSize` 2
+      let program = do
+            return $ 0 `lte` (0 :: UInt 4)
+      assertCountO0 gf181 program 2
+      assertCount gf181 program 2
 
     it "x < y" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Private
-        return $ x `lt` y
-      cs `shouldHaveSize` 17
-      cs' `shouldHaveSize` 16
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
+            return $ x `lt` y
+      assertCountO0 gf181 program 17
+      assertCount gf181 program 16
 
     it "x ≥ y" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Private
-        return $ x `gte` y
-      cs `shouldHaveSize` 17
-      cs' `shouldHaveSize` 16
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
+            return $ x `gte` y
+      assertCountO0 gf181 program 17
+      assertCount gf181 program 16
 
     it "x > y" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Private
-        return $ x `gt` y
-      cs `shouldHaveSize` 17
-      cs' `shouldHaveSize` 16
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
+            return $ x `gt` y
+      assertCountO0 gf181 program 17
+      assertCount gf181 program 16
 
   describe "Comparison assertion" $ do
     describe "between variables" $ do
       it "x ≤ y" $ do
-        (cs, cs') <- executeGF181 $ do
-          x <- input Public :: Comp (UInt 4)
-          y <- input Private
-          assert $ x `lte` y
-        cs `shouldHaveSize` 16
-        cs' `shouldHaveSize` 15
+        let program = do
+              x <- input Public :: Comp (UInt 4)
+              y <- input Private
+              assert $ x `lte` y
+        assertCountO0 gf181 program 16
+        assertCount gf181 program 15
 
     it "x < y" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Private
-        assert $ x `lt` y
-      cs `shouldHaveSize` 16
-      cs' `shouldHaveSize` 15
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
+            assert $ x `lt` y
+      assertCountO0 gf181 program 16
+      assertCount gf181 program 15
 
     it "x ≥ y" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Private
-        assert $ x `gte` y
-      cs `shouldHaveSize` 16
-      cs' `shouldHaveSize` 15
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
+            assert $ x `gte` y
+      assertCountO0 gf181 program 16
+      assertCount gf181 program 15
 
     it "x > y" $ do
-      (cs, cs') <- executeGF181 $ do
-        x <- input Public :: Comp (UInt 4)
-        y <- input Private
-        assert $ x `gt` y
-      cs `shouldHaveSize` 16
-      cs' `shouldHaveSize` 15
+      let program = do
+            x <- input Public :: Comp (UInt 4)
+            y <- input Private
+            assert $ x `gt` y
+      assertCountO0 gf181 program 16
+      assertCount gf181 program 15
 
     describe "GTE on constants (4 bits / GF181)" $ do
       let program bound = do
@@ -320,8 +320,7 @@ tests = describe "UInt" $ do
         ]
         $ \(bound, expectedSize) -> do
           it ("x ≥ " <> show bound) $ do
-            (_, cs) <- executeGF181 (program bound)
-            cs `shouldHaveSize` expectedSize
+            assertCount gf181 (program bound) expectedSize
 
     describe "GTE on constants (4 bits / Prime 2)" $ do
       let program bound = do
@@ -346,8 +345,7 @@ tests = describe "UInt" $ do
         ]
         $ \(bound, expectedSize) -> do
           it ("x ≥ " <> show bound) $ do
-            (_, cs) <- executePrime 2 (program bound)
-            cs `shouldHaveSize` expectedSize
+            assertCount (Prime 2) (program bound) expectedSize
 
     describe "GTE on constants (4 bits / Prime 5)" $ do
       let program bound = do
@@ -372,8 +370,7 @@ tests = describe "UInt" $ do
         ]
         $ \(bound, expectedSize) -> do
           it ("x ≥ " <> show bound) $ do
-            (_, cs) <- executePrime 5 (program bound)
-            cs `shouldHaveSize` expectedSize
+            assertCount (Prime 5) (program bound) expectedSize
 
     describe "LTE on constants (4 bits / GF181)" $ do
       let program bound = do
@@ -398,12 +395,11 @@ tests = describe "UInt" $ do
         ]
         $ \(bound, expectedSize) -> do
           it ("x ≤ " <> show bound) $ do
-            (_, cs) <- executeGF181 (program bound)
-            cs `shouldHaveSize` expectedSize
+            assertCount gf181 (program bound) expectedSize
 
     describe "between constants" $ do
       it "0 ≤ 0" $ do
-        (cs, cs') <- executeGF181 $ do
-          assert $ 0 `lte` (0 :: UInt 4)
-        cs `shouldHaveSize` 0
-        cs' `shouldHaveSize` 0
+        let program = do
+              assert $ 0 `lte` (0 :: UInt 4)
+        assertCountO0 gf181 program 0
+        assertCount gf181 program 0

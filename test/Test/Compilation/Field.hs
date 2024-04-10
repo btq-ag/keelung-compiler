@@ -8,7 +8,7 @@ import Test.Compilation.Field.Conditional qualified
 import Test.Compilation.Field.Equality qualified
 import Test.Compilation.Field.Exponentiation qualified
 import Test.Compilation.Field.Inequality qualified
-import Test.Compilation.Util
+import Test.Util
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 
@@ -30,4 +30,4 @@ tests = describe "Field" $ do
           z <- inputField Public
           assert $ (x * y) `eq` z
     property $ \(x, y) -> do
-      validate gf181 program [toInteger (x :: GF181), toInteger y, toInteger (x * y)] [] []
+      check gf181 program [toInteger (x :: GF181), toInteger y, toInteger (x * y)] [] []

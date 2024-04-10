@@ -249,7 +249,6 @@ test-suite keelung-test
       Test.Compilation.UInt.Logical
       Test.Compilation.UInt.ModInv
       Test.Compilation.UInt.Multiplication
-      Test.Compilation.Util
       Test.Data.IntervalSet
       Test.Data.IntervalTable
       Test.Data.LC
@@ -266,12 +265,12 @@ test-suite keelung-test
       Test.Optimization.UInt.CLDivMod
       Test.Optimization.UInt.Misc
       Test.Optimization.UInt.Statement
-      Test.Optimization.Util
       Test.Relations
       Test.Relations.Field
       Test.Relations.Slice
       Test.Solver
       Test.Solver.BinRep
+      Test.Util
       Keelung.Compiler
       Keelung.Compiler.Compile
       Keelung.Compiler.Compile.Boolean

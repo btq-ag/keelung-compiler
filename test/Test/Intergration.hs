@@ -6,7 +6,7 @@ import Hash.Poseidon qualified
 import Keelung
 import Keelung.Compiler qualified as Compiler
 import Keelung.Constraint.R1CS
-import Test.Compilation.Util (gf181Info)
+import Test.Util
 import Test.Hspec
 
 -- import qualified Hash.Poseidon as Poseidon

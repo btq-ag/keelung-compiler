@@ -7,8 +7,9 @@ module Test.Optimization.UInt.Statement (tests, run) where
 
 import Keelung
 -- import Keelung.Compiler.Linker
+
+import Test.Util
 import Test.Hspec
-import Test.Optimization.Util
 
 -- --
 run :: IO ()
@@ -21,17 +22,17 @@ tests = describe "Statement" $ do
     --  I/O: 8*2 = 16
     --  equality = ⌈ 8 / fieldWidth ⌉
     it "from variables" $ do
-      (cs, cs') <- executeGF181 $ do
-        xs <- inputList Public 8
-        x <- fromBools xs
-        return (x :: UInt 8)
-      cs `shouldHaveSize` 26
-      cs' `shouldHaveSize` 17
+      let program = do
+            xs <- inputList Public 8
+            x <- fromBools xs
+            return (x :: UInt 8)
+      assertCountO0 gf181 program 26
+      assertCount gf181 program 17
 
     it "bit tests" $ do
-      (cs, cs') <- executeGF181 $ do
-        xs <- inputList Public 8
-        x <- fromBools [xs !! 0, xs !! 2, xs !! 4, xs !! 6, xs !! 1, xs !! 3, xs !! 5, xs !! 7]
-        return (x :: UInt 8)
-      cs `shouldHaveSize` 26
-      cs' `shouldHaveSize` 17
+      let program = do
+            xs <- inputList Public 8
+            x <- fromBools [xs !! 0, xs !! 2, xs !! 4, xs !! 6, xs !! 1, xs !! 3, xs !! 5, xs !! 7]
+            return (x :: UInt 8)
+      assertCountO0 gf181 program 26
+      assertCount gf181 program 17

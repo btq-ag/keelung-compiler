@@ -10,9 +10,9 @@ import Keelung hiding (compileO0)
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Data.Reference
+import Test.Util
 import Test.Hspec
 import Test.Optimization.UInt qualified as Optimization.UInt
-import Test.Optimization.Util
 
 run :: IO ()
 run = hspec tests
@@ -23,99 +23,103 @@ tests = do
     Optimization.UInt.tests
 
     it "Poseidon" $ do
-      (cm, cm') <- executeGF181 $ do
-        xs <- inputList Public 1
-        Poseidon.hash (toList xs)
+      let program = do
+            xs <- inputList Public 1
+            Poseidon.hash (toList xs)
 
       -- cm before `pow`: 1537
-      cm `shouldHaveSize` 555
+      assertCountO0 gf181 program 555
       -- cm' before `pow`: 694
-      cm' `shouldHaveSize` 552
+      assertCount gf181 program 552
 
       return ()
 
     describe "Field" $ do
       it "Field 1" $ do
-        (cm, cm') <- executeGF181 $ do
-          x <- inputField Public
-          y <- reuse x
-          z <- reuse x
-          return (x + y + z)
+        let program = do
+              x <- inputField Public
+              y <- reuse x
+              z <- reuse x
+              return (x + y + z)
 
-        cm `shouldHaveSize` 3
-        cm' `shouldHaveSize` 1
+        assertCountO0 gf181 program 3
+        assertCount gf181 program 1
+
+        cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
 
         -- FO0 = 3FI0
-        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (3, 0)
+        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (3, 0)
         -- F0 (y) = FI0
-        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (1, 0)
+        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (1, 0)
         -- F1 (z) = F0 (y)
-        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm') `shouldBe` Just (1, 0)
+        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm) `shouldBe` Just (1, 0)
 
       it "Field 2" $ do
-        (cm, cm') <- executeGF181 $ do
-          x <- inputField Public
-          y <- reuse x
-          z <- reuse (x + y)
-          return (x + y + z)
+        let program = do
+              x <- inputField Public
+              y <- reuse x
+              z <- reuse (x + y)
+              return (x + y + z)
 
-        cm `shouldHaveSize` 3
-        cm' `shouldHaveSize` 1
+        assertCountO0 gf181 program 3
+        assertCount gf181 program 1
 
+        cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
         -- FO0 = 4FI0
-        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (4, 0)
+        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (4, 0)
         -- F0 (y) = FI0
-        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (1, 0)
+        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (1, 0)
         -- F1 (z) = 2F0 (y)
-        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm') `shouldBe` Just (2, 0)
+        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm) `shouldBe` Just (2, 0)
 
       it "Field 3" $ do
-        (cm, cm') <- executeGF181 $ do
-          x <- inputField Public
-          y <- reuse (x + 1)
-          return (x + y)
+        let program = do
+              x <- inputField Public
+              y <- reuse (x + 1)
+              return (x + y)
 
-        cm `shouldHaveSize` 2
-        cm' `shouldHaveSize` 1
+        assertCountO0 gf181 program 2
+        assertCount gf181 program 1
 
+        cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
         -- FO0 = 2FI0 + 1
-        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm') `shouldBe` Just (2, 1)
+        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (2, 1)
 
       it "Field 4" $ do
-        (cm, cm') <- executeGF181 $ do
-          let x = 4
-          y <- reuse x
-          return (x + y :: Field)
+        let program = do
+              let x = 4
+              y <- reuse x
+              return (x + y :: Field)
 
-        cm `shouldHaveSize` 1
-        cm' `shouldHaveSize` 1
-        Relations.lookup (F $ RefFO 0) (cmRelations cm') `shouldBe` Relations.Value 8
+        assertCountO0 gf181 program 1
+        assertCount gf181 program 1
+        cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
+        Relations.lookup (F $ RefFO 0) (cmRelations cm) `shouldBe` Relations.Value 8
 
       it "Field 5" $ do
-        (cm, cm') <- executeGF181 $ do
-          x <- inputField Public
-          y <- reuse x
-          return (x * y :: Field)
-        cm `shouldHaveSize` 3
-        cm' `shouldHaveSize` 1
-        return ()
+        let program = do
+              x <- inputField Public
+              y <- reuse x
+              return (x * y :: Field)
+        assertCountO0 gf181 program 3
+        assertCount gf181 program 1
 
     describe "Boolean" $ do
       it "Boolean 1" $ do
-        (cm, cm') <- executeGF181 $ do
-          x <- inputBool Public
-          y <- reuse x
-          return (x .|. y)
-        cm `shouldHaveSize` 5
-        cm' `shouldHaveSize` 3
+        let program = do
+              x <- inputBool Public
+              y <- reuse x
+              return (x .|. y)
+        assertCountO0 gf181 program 5
+        assertCount gf181 program 3
 
       it "Boolean 2" $ do
-        (cm, cm') <- executeGF181 $ do
-          x <- inputBool Public
-          reuse x
+        let program = do
+              x <- inputBool Public
+              reuse x
 
-        cm `shouldHaveSize` 3
-        cm' `shouldHaveSize` 3
+        assertCountO0 gf181 program 3
+        assertCount gf181 program 3
 
 --     describe "Unsigned integers" $ do
 --       it "literal" $ do

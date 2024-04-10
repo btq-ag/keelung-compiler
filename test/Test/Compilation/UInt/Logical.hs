@@ -8,7 +8,7 @@ import Data.Bits qualified
 import Data.Word
 import Keelung hiding (compile)
 import Keelung.Data.U qualified as U
-import Test.Compilation.Util
+import Test.Util
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
 
@@ -25,7 +25,7 @@ tests = describe "logical" $ do
       forAll (choose (0, 255)) $ \x -> do
         let uint = U.new 8 x
         let expected = [toInteger (Data.Bits.complement uint)]
-        forM_ [gf181, Prime 2, Binary 7] $ \field -> validate field (program (fromInteger x)) [] [] expected
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> check field (program (fromInteger x)) [] [] expected
 
     it "variable / byte" $ do
       let program = do
@@ -34,7 +34,7 @@ tests = describe "logical" $ do
       forAll (choose (0, 255)) $ \x -> do
         let uint = U.new 8 x
         let expected = [toInteger (Data.Bits.complement uint)]
-        forM_ [gf181, Prime 2, Binary 7] $ \field -> validate field program [toInteger uint] [] expected
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> check field program [toInteger uint] [] expected
 
   describe "conjunction" $ it "1~10 variables + constant / byte" $ do
     let program n constant = do
@@ -49,7 +49,7 @@ tests = describe "logical" $ do
       )
       $ \(n, constant, xs :: [Word8]) -> do
         let expected = [toInteger (foldl (Data.Bits..&.) constant xs)]
-        forM_ [gf181, Prime 2, Binary 7] $ \field -> validate field (program n (fromIntegral constant)) (map toInteger xs) [] expected
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> check field (program n (fromIntegral constant)) (map toInteger xs) [] expected
 
   describe "disjunction" $ it "1~10 variables + constant / byte" $ do
     let program n constant = do
@@ -64,7 +64,7 @@ tests = describe "logical" $ do
       )
       $ \(n, constant, xs :: [Word8]) -> do
         let expected = [toInteger (foldl (Data.Bits..|.) constant xs)]
-        forM_ [gf181, Prime 2, Binary 7] $ \field -> validate field (program n (fromIntegral constant)) (map toInteger xs) [] expected
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> check field (program n (fromIntegral constant)) (map toInteger xs) [] expected
 
   describe "exclusive disjunction" $ it "1~10 variables + constant / byte" $ do
     let program n constant = do
@@ -79,4 +79,4 @@ tests = describe "logical" $ do
       )
       $ \(n, constant, xs :: [Word8]) -> do
         let expected = [toInteger (foldl Data.Bits.xor constant xs)]
-        forM_ [gf181, Prime 2, Binary 7] $ \field -> validate field (program n (fromIntegral constant)) (map toInteger xs) [] expected
+        forM_ [gf181, Prime 2, Binary 7] $ \field -> check field (program n (fromIntegral constant)) (map toInteger xs) [] expected
