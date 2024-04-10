@@ -3,8 +3,9 @@
 
 module Test.Compilation.Experiment (run, tests) where
 
-import Control.Monad
-import Keelung
+import Keelung hiding (MulU, VarUI)
+import Keelung.Compiler.Syntax.Internal
+import Keelung.Syntax.Counters qualified as Counters
 import Test.Arbitrary ()
 import Test.Compilation.Util
 import Test.Hspec
@@ -35,11 +36,24 @@ tests = describe "Experiment" $ do
   --     solveOutput gf181 program [1] [] `shouldReturn` [0]
   --     solveOutput gf181 program [0] [] `shouldReturn` [1]
 
-  describe "fromBools" $ do
-    it "constant dividend / constant divisor" $ do
-      let program dividend divisor = performDivMod (fromIntegral dividend) (fromIntegral divisor :: UInt 8)
-      let dividend = 137 :: Integer
-      let divisor = 2 :: Integer
-      let expected = [dividend `div` divisor, dividend `mod` divisor]
-      forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-        validate field (program dividend divisor) [] [] expected
+  describe "variable-width multiplication" $ do
+    it "0" $ do
+      -- let program = do
+      --       x <- input Public :: Comp (UInt 8)
+      --       y <- input Public :: Comp (UInt 8)
+      --       return $ x * y
+      -- let elaborated = Compiler.elaborateAndEncode program :: Either (Compiler.Error GF181) Compiler.Elaborated
+      -- let internal = ToInternal.run gf181Info <$> elaborated :: Either (Compiler.Error GF181) (Compiler.Internal GF181)
+      -- case internal of
+      --   Left err -> print err
+      --   Right syntax -> validateInternalSyntax syntax [20, 20] [] [144]
+      let internal2 =
+            Internal
+              { internalExpr = [(0, ExprU (MulU 8 (VarUI 8 0) (VarUI 8 1)))],
+                internalFieldBitWidth = 181,
+                internalCounters = Counters.addCount (Counters.Output, Counters.WriteUInt 8) 1 $ Counters.addCount (Counters.PublicInput, Counters.WriteUInt 8) 2 mempty,
+                internalAssertions = [],
+                internalSideEffects = mempty
+              } ::
+              Internal GF181
+      validateInternalSyntax internal2 [20, 20] [] [144]
