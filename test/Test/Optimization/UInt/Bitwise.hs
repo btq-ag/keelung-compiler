@@ -21,4 +21,4 @@ tests = describe "Bitwise" $ do
       -- print _cs
       -- print cs'
       -- print $ linkConstraintModule cs'
-      debug _cs
+      debugM _cs

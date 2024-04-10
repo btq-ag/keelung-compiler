@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.UInt.Multiplication (compileMulU) where
+module Keelung.Compiler.Compile.UInt.MultiplicationV (compile) where
 
 import Control.Monad.Except
 import Control.Monad.RWS
@@ -46,27 +46,28 @@ import Keelung.Syntax (Width)
 -- ------------------------------------------
 --
 -- the maximum number of operands when adding these 2w-bit limbs is 2L (with carry from the previous limb)
-compileMulU :: (GaloisField n, Integral n) => RefU -> Either RefU U -> Either RefU U -> M n ()
-compileMulU out (Right a) (Right b) = writeRefUVal out (a * b)
-compileMulU out (Right a) (Left b) = compileMul out b (Right a)
-compileMulU out (Left a) (Right b) = compileMul out a (Right b)
-compileMulU out (Left a) (Left b) = compileMul out a (Left b)
+compile :: (GaloisField n, Integral n) => RefU -> Either RefU U -> Either RefU U -> M n ()
+compile out (Right a) (Right b) = writeRefUVal out (a * b)
+compile out (Right a) (Left b) = compileMul out b (Right a)
+compile out (Left a) (Right b) = compileMul out a (Right b)
+compile out (Left a) (Left b) = compileMul out a (Left b)
 
 compileMul :: (GaloisField n, Integral n) => RefU -> RefU -> Either RefU U -> M n ()
 compileMul out x y = do
   let outWidth = widthOf out
+  let operandWidth = widthOf x -- assuming that the width of `x` is the same as the width of `y`
   fieldInfo <- gets (optFieldInfo . cmOptions)
 
-  -- limb width limitation:
+  -- limb width limitation:   
   --    2 ≤ limb width ≤ field width / 2
 
   -- determine the maximum and minimum limb widths
   let maxLimbWidth = fieldWidth fieldInfo `div` 2 -- cannot exceed half of the field width
   let minLimbWidth = 2 -- TEMPORARY HACK FOR ADDITION
   -- the number of limbs needed to represent an operand
-  let limbNumber = outWidth `ceilDiv` (minLimbWidth `max` outWidth `min` maxLimbWidth)
+  let limbNumber = operandWidth `ceilDiv` (minLimbWidth `max` outWidth `min` maxLimbWidth)
   -- the optimal width
-  let limbWidth = outWidth `ceilDiv` limbNumber
+  let limbWidth = operandWidth `ceilDiv` limbNumber
 
   let maxHeight = if limbWidth > 20 then 1048576 else 2 ^ limbWidth -- HACK
   case fieldTypeData fieldInfo of
@@ -156,6 +157,7 @@ mulnxn maxHeight limbWidth limbNumber out var operand = do
     )
     mempty
     [0 .. limbNumber - 1]
+
 
 mul2Limbs :: (GaloisField n, Integral n) => Width -> (n, Limb) -> Either n (n, Limb) -> M n (LimbColumn, LimbColumn)
 mul2Limbs currentLimbWidth (a, x) operand = do

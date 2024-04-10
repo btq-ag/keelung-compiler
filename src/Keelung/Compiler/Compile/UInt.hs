@@ -25,6 +25,7 @@ import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.Logical
 import Keelung.Compiler.Compile.UInt.Multiplication
+import Keelung.Compiler.Compile.UInt.MultiplicationV qualified as MulUV
 import Keelung.Compiler.ConstraintModule qualified as CM
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
@@ -56,7 +57,7 @@ compile out expr = case expr of
   MulUV _ x y -> do
     x' <- wireU x
     y' <- wireU y
-    compileMulU out x' y'
+    MulUV.compile out x' y'
   AESMulU x y -> do
     x' <- wireU x
     y' <- wireU y

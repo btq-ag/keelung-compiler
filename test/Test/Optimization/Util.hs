@@ -1,7 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Test.Optimization.Util
-  ( debug,
+  ( debugM,
+    debugI,
     executeGF181WithOpts,
     executeGF181,
     executePrimeWithOpts,
@@ -9,6 +10,7 @@ module Test.Optimization.Util
     executeBinaryWithOpts,
     executeBinary,
     shouldHaveSize,
+    shouldHaveSizeWithOptsI,
     Linker.linkConstraintModule,
   )
 where
@@ -23,6 +25,7 @@ import Keelung.Compiler.ConstraintSystem qualified as ConstraintSystem
 import Keelung.Compiler.Linker qualified as Linker
 import Keelung.Compiler.Optimize qualified as Optimizer
 import Keelung.Compiler.Options
+import Keelung.Compiler.Options qualified as Options
 import Keelung.Data.FieldInfo
 import Test.Compilation.Util (gf181Info)
 import Test.HUnit (assertFailure)
@@ -92,10 +95,29 @@ shouldHaveSize cm expecteds = do
   let actual = ConstraintSystem.numberOfConstraints (Linker.linkConstraintModule cm)
   actual `shouldBe` expecteds
 
+shouldHaveSizeWithOptsI :: (GaloisField n, Integral n) => Options -> Compiler.Internal n -> Int -> IO ()
+shouldHaveSizeWithOptsI options syntax expecteds = do
+  case Compiler.compileInternalWithOpts options syntax of
+    Left err -> assertFailure $ show err
+    Right cm -> do
+      -- compare the number of constraints
+      let actual = ConstraintSystem.numberOfConstraints (Linker.linkConstraintModule cm)
+      actual `shouldBe` expecteds
+
 optimize :: (GaloisField n, Integral n) => ConstraintModule n -> Either (Compiler.Error n) (ConstraintModule n)
 optimize = left Compiler.CompilerError . Optimizer.run
 
-debug :: ConstraintModule (N GF181) -> IO ()
-debug cm = do
+--------------------------------------------------------------------------------
+
+debugM :: ConstraintModule (N GF181) -> IO ()
+debugM cm = do
   print cm
   print (Linker.linkConstraintModule cm)
+
+debugI :: (GaloisField n, Integral n) => Compiler.Internal n -> IO ()
+debugI syntax = do
+  case Compiler.compileInternalWithOpts Options.defaultOptions syntax of
+    Left err -> assertFailure $ show err
+    Right cm -> do
+      print cm
+      print (Linker.linkConstraintModule cm)

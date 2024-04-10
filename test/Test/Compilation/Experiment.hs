@@ -47,13 +47,16 @@ tests = describe "Experiment" $ do
       -- case internal of
       --   Left err -> print err
       --   Right syntax -> validateInternalSyntax syntax [20, 20] [] [144]
-      let internal2 =
-            Internal
-              { internalExpr = [(0, ExprU (MulU 8 (VarUI 8 0) (VarUI 8 1)))],
-                internalFieldBitWidth = 181,
-                internalCounters = Counters.addCount (Counters.Output, Counters.WriteUInt 8) 1 $ Counters.addCount (Counters.PublicInput, Counters.WriteUInt 8) 2 mempty,
-                internalAssertions = [],
-                internalSideEffects = mempty
-              } ::
-              Internal GF181
-      validateInternalSyntax internal2 [20, 20] [] [144]
+
+      let internal2 = constructSyntaxVV 6 4 :: Internal GF181
+      validateInternalSyntax internal2 [10, 7] [] [20]
+
+constructSyntaxVV :: Width -> Width -> Internal n
+constructSyntaxVV outputWidth operandWidth =
+  Internal
+    { internalExpr = [(0, ExprU (MulU outputWidth (VarUI operandWidth 0) (VarUI operandWidth 1)))],
+      internalFieldBitWidth = 181,
+      internalCounters = Counters.addCount (Counters.Output, Counters.WriteUInt outputWidth) 1 $ Counters.addCount (Counters.PublicInput, Counters.WriteUInt operandWidth) 2 mempty,
+      internalAssertions = [],
+      internalSideEffects = mempty
+    }
