@@ -29,10 +29,7 @@ import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Prelude hiding (lookup)
 
-type RefRelations n = EquivClass.EquivClass Ref n
-
-mapError :: EquivClass.M (n, n) a -> EquivClass.M (Error n) a
-mapError = EquivClass.mapError (uncurry ConflictingValuesF)
+type RefRelations n = EquivClass.EquivClass n
 
 --------------------------------------------------------------------------------
 
@@ -41,10 +38,10 @@ new = EquivClass.new "References Relations"
 
 -- | Note: `RefUBit` should not be allowed here
 assignR :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
-assignR var val xs = mapError $ EquivClass.assign var val xs
+assignR = EquivClass.assign
 
 relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
-relateB refA (polarity, refB) xs = mapError $ EquivClass.relate (B refA) (if polarity then EquivClass.LinRel 1 0 else EquivClass.LinRel (-1) 1) (B refB) xs
+relateB refA (polarity, refB) = EquivClass.relate (B refA) (if polarity then EquivClass.LinRel 1 0 else EquivClass.LinRel (-1) 1) (B refB)
 
 -- var = slope * var2 + intercept
 relateR :: (GaloisField n, Integral n) => SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
@@ -70,7 +67,7 @@ relationBetween var1 var2 xs = case EquivClass.relationBetween var1 var2 xs of
 toConstraints :: (GaloisField n, Integral n) => (Ref -> Bool) -> RefRelations n -> Seq (Constraint n)
 toConstraints shouldBeKept = Seq.fromList . toList . Map.mapMaybeWithKey convert . EquivClass.toMap
   where
-    convert :: (GaloisField n, Integral n) => Ref -> EquivClass.VarStatus Ref n -> Maybe (Constraint n)
+    convert :: (GaloisField n, Integral n) => Ref -> EquivClass.VarStatus n -> Maybe (Constraint n)
     convert var status
       | shouldBeKept var = case status of
           EquivClass.IsConstant val -> Just (CRefFVal var val)
@@ -176,4 +173,4 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     relateF rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
   where
     relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> EquivClass.M (Error n) (RefRelations n)
-    relateF var1 slope' var2 intercept' xs' = mapError $ EquivClass.relate var1 (EquivClass.LinRel slope' intercept') var2 xs'
+    relateF var1 slope' var2 intercept' = EquivClass.relate var1 (EquivClass.LinRel slope' intercept') var2
