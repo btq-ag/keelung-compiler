@@ -5,6 +5,8 @@
 
 module Keelung.Compiler.Relations
   ( Relations (..),
+    RelM,
+    runRelM,
     new,
     assignR,
     assignB,
@@ -26,6 +28,7 @@ import Data.Field.Galois (GaloisField)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Options (Options)
+import Keelung.Compiler.Relations.Monad
 import Keelung.Compiler.Relations.Reference qualified as RefRelations
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.Reference
@@ -47,9 +50,9 @@ instance (GaloisField n, Integral n) => Show (Relations n) where
       <> (if SliceRelations.size slices == 0 then "" else show slices)
 
 updateRelationsR ::
-  (RefRelations.RefRelations n -> RefRelations.M n (RefRelations.RefRelations n)) ->
+  (RefRelations.RefRelations n -> RelM n (RefRelations.RefRelations n)) ->
   Relations n ->
-  RefRelations.M n (Relations n)
+  RelM n (Relations n)
 updateRelationsR f xs = do
   relations <- f (relationsR xs)
   return $ xs {relationsR = relations}
@@ -59,7 +62,7 @@ updateRelationsR f xs = do
 new :: Options -> Relations n
 new = Relations RefRelations.new SliceRelations.new
 
-assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> RefRelations.M n (Relations n)
+assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> RelM n (Relations n)
 assignR var val relations = case var of
   B (RefUBit refU i) ->
     if val == 0 || val == 1
@@ -67,10 +70,10 @@ assignR var val relations = case var of
       else throwError $ InvalidBooleanValue val
   _ -> updateRelationsR (RefRelations.assign var val) relations
 
-assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> RefRelations.M n (Relations n)
+assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> RelM n (Relations n)
 assignB ref val = assignR (B ref) (if val then 1 else 0)
 
-assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> RefRelations.M n (Relations n)
+assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> RelM n (Relations n)
 assignS slice int relations = do
   RefRelations.markChanged
   return $
@@ -78,14 +81,14 @@ assignS slice int relations = do
       { relationsS = SliceRelations.assign slice (U.new (Slice.sliceEnd slice - Slice.sliceStart slice) int) (relationsS relations)
       }
 
-relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> RefRelations.M n (Relations n)
+relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> RelM n (Relations n)
 relateB refA (polarity, refB) = updateRelationsR (RefRelations.relateB refA (polarity, refB))
 
 -- var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> RefRelations.M n (Relations n)
+relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> RelM n (Relations n)
 relateR x slope y intercept xs = updateRelationsR (RefRelations.relateR (relationsS xs) x slope y intercept) xs
 
-relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> RefRelations.M n (Relations n)
+relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> RelM n (Relations n)
 relateS slice1 slice2 relations = do
   RefRelations.markChanged
   return $

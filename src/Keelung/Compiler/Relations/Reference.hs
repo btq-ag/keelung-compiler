@@ -8,8 +8,6 @@ module Keelung.Compiler.Relations.Reference
   ( RefRelations,
 
     -- * Construction
-    M,
-    runM,
     new,
 
     -- * Operations
@@ -44,28 +42,14 @@ import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import GHC.TypeLits
 import Keelung.Compiler.Compile.Error (Error (..))
+import Keelung.Compiler.Relations.Monad
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
-import Keelung.Compiler.Relations.Util
 import Keelung.Data.Constraint (Constraint (..))
 import Keelung.Data.N (N (..))
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
 import Prelude hiding (lookup)
-
---------------------------------------------------------------------------------
-
-type M n = WriterT [()] (Except (Error n))
-
-runM :: M n a -> Except (Error n) (Maybe a)
-runM xs = do
-  (x, changes) <- runWriterT xs
-  if null changes
-    then return Nothing
-    else return (Just x)
-
-markChanged :: M n ()
-markChanged = tell [()]
 
 --------------------------------------------------------------------------------
 
@@ -122,7 +106,7 @@ new = RefRelations mempty
 --------------------------------------------------------------------------------
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> M n (RefRelations n)
+assign :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> RelM n (RefRelations n)
 assign var value (RefRelations relations) = case Map.lookup var relations of
   -- The variable is not in the map, so we add it as a constant
   Nothing -> do
@@ -164,7 +148,7 @@ assign var value (RefRelations relations) = case Map.lookup var relations of
       Just relationToParent -> assign parent (execLinRel relationToParent value) (RefRelations relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> M n (RefRelations n)
+relate :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> RelM n (RefRelations n)
 relate a relation b relations =
   case compareSeniority a b of
     LT -> relateChildToParent a relation b relations
@@ -185,7 +169,7 @@ relate a relation b relations =
 
 -- | Specialized version of `relate` for relating a variable to a constant
 --    var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> M n (RefRelations n)
+relateR :: (GaloisField n, Integral n) => SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> RelM n (RefRelations n)
 relateR relationsS x slope y intercept xs =
   case (x, y, slope, intercept) of
     (_, _, 0, value) -> assign x value xs
@@ -200,12 +184,12 @@ relateR relationsS x slope y intercept xs =
         (lookup relationsS refB xs)
 
 -- | Specialized version of `relate` for relating Boolean variables
-relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> M n (RefRelations n)
+relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> RelM n (RefRelations n)
 relateB refA (polarity, refB) = relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB)
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
-relateChildToParent :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> M n (RefRelations n)
+relateChildToParent :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> RelM n (RefRelations n)
 relateChildToParent child relationToChild parent relations =
   if child == parent
     then return relations
@@ -430,7 +414,7 @@ lookup _ var relations =
     IsRoot _ -> Root
     IsChildOf parent (LinRel a b) -> ChildOf a parent b
 
-composeLookup :: (GaloisField n, Integral n) => RefRelations n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> M n (RefRelations n)
+composeLookup :: (GaloisField n, Integral n) => RefRelations n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> RelM n (RefRelations n)
 composeLookup xs refA refB slope intercept relationA relationB = case (relationA, relationB) of
   (Root, Root) ->
     -- rootA = slope * rootB + intercept
@@ -488,7 +472,7 @@ composeLookup xs refA refB slope intercept relationA relationB = case (relationA
     -- rootA = (slope * slopeB * rootB + slope * interceptB + intercept - interceptA) / slopeA
     relateF rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
   where
-    relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> M n (RefRelations n)
+    relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> RelM n (RefRelations n)
     relateF var1 slope' var2 intercept' = relate var1 (LinRel slope' intercept') var2
 
 --------------------------------------------------------------------------------

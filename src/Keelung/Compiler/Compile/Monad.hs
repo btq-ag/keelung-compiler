@@ -16,7 +16,6 @@ import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Compiler.Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
-import Keelung.Compiler.Relations.Reference qualified as RefRelations
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.LC (LC (..), neg, (@))
 import Keelung.Data.LC qualified as LC
@@ -80,10 +79,10 @@ freshRefU width = do
   modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ RefUX width index
 
-execRelations :: (Relations n -> RefRelations.M n (Relations n)) -> M n ()
+execRelations :: (Relations n -> Relations.RelM n (Relations n)) -> M n ()
 execRelations f = do
   cs <- get
-  result <- lift $ lift $ (RefRelations.runM . f) (cmRelations cs)
+  result <- lift $ lift $ (Relations.runRelM . f) (cmRelations cs)
   case result of
     Nothing -> return ()
     Just relations -> put cs {cmRelations = relations}

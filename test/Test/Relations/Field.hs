@@ -7,7 +7,6 @@ import Keelung.Compiler.Compile.Error
 import Keelung.Compiler.Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
-import Keelung.Compiler.Relations.Reference qualified as RefRelations
 import Keelung.Data.Reference
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
@@ -69,7 +68,7 @@ runM options p = evalStateT p (Relations.new options)
 assign :: Ref -> GF181 -> M ()
 assign var val = do
   xs <- get
-  case runExcept (RefRelations.runM $ Relations.assignR var val xs) of
+  case runExcept (Relations.runRelM $ Relations.assignR var val xs) of
     Left err -> error $ show (err :: Error GF181)
     Right Nothing -> return ()
     Right (Just result) -> put result
@@ -77,7 +76,7 @@ assign var val = do
 relate :: RefF -> (GF181, RefF, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (RefRelations.runM $ Relations.relateR (F var) slope (F val) intercept xs) of
+  case runExcept (Relations.runRelM $ Relations.relateR (F var) slope (F val) intercept xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result

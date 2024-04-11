@@ -1,11 +1,29 @@
-module Keelung.Compiler.Relations.Util (Seniority (..)) where
+module Keelung.Compiler.Relations.Monad (RelM, runRelM, markChanged, Seniority (..)) where
 
+import Control.Monad.Except
+import Control.Monad.Writer
 import Data.Function (on)
+import Keelung.Compiler.Compile.Error (Error)
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Reference
 
 --------------------------------------------------------------------------------
 
+type RelM n = WriterT [()] (Except (Error n))
+
+runRelM :: RelM n a -> Except (Error n) (Maybe a)
+runRelM xs = do
+  (x, changes) <- runWriterT xs
+  if null changes
+    then return Nothing
+    else return (Just x)
+
+markChanged :: RelM n ()
+markChanged = tell [()]
+
+--------------------------------------------------------------------------------
+
+-- | For deciding which member gets to be the root in a equivalence class.
 class Seniority a where
   compareSeniority :: a -> a -> Ordering
 
