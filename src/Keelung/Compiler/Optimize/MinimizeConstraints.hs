@@ -508,7 +508,7 @@ substRef ::
   (LC n, Maybe Changes)
 substRef relations (acc, changes) ref coeff = case Relations.lookup ref relations of
   Relations.Root -> (acc <> coeff @ ref, changes) -- ref already a root, no need to substitute
-  Relations.Value intercept ->
+  Relations.Constant intercept ->
     -- ref = intercept
     (acc <> Constant (intercept * coeff), removeRef ref changes)
   Relations.ChildOf slope root intercept ->

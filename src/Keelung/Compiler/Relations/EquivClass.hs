@@ -6,8 +6,6 @@
 
 module Keelung.Compiler.Relations.EquivClass
   ( EquivClass,
-    VarStatus (..),
-    LinRel (..),
 
     -- * Construction
     M,
@@ -16,17 +14,21 @@ module Keelung.Compiler.Relations.EquivClass
 
     -- * Operations
     assign,
-    relate,
+    relateR,
+    relateB,
     markChanged,
 
     -- * Conversions,
     toConstraints,
 
     -- * Queries
+    Lookup (..),
+    lookup,
+    VarStatus (..),
+    lookupInternal,
     relationBetween,
     isValid,
     size,
-    lookup,
   )
 where
 
@@ -42,11 +44,13 @@ import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import GHC.TypeLits
 import Keelung.Compiler.Compile.Error (Error (..))
+import Keelung.Compiler.Relations.Slice (SliceRelations)
+import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Compiler.Relations.Util
 import Keelung.Data.Constraint (Constraint (..))
 import Keelung.Data.N (N (..))
 import Keelung.Data.PolyL qualified as PolyL
-import Keelung.Data.Reference (Ref)
+import Keelung.Data.Reference
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -64,16 +68,6 @@ markChanged :: M n ()
 markChanged = tell [()]
 
 --------------------------------------------------------------------------------
-
-data VarStatus n
-  = IsConstant n
-  | -- | contains the relations to the children
-    IsRoot (Map Ref (LinRel n))
-  | -- | child = relation parent
-    IsChildOf Ref (LinRel n)
-  deriving (Show, Eq, Generic, Functor)
-
-instance (NFData n) => NFData (VarStatus n)
 
 data EquivClass n = EquivClass
   { eqPoolName :: String,
@@ -190,10 +184,30 @@ relate a relation b relations =
         Just rel -> relateChildToParent b rel a relations
       EQ -> relateChildToParent a relation b relations
       where
-        childrenSizeOf ref = case lookup ref relations of
+        childrenSizeOf ref = case lookupInternal ref relations of
           IsRoot children -> Map.size children
           IsConstant _ -> 0
           IsChildOf parent _ -> childrenSizeOf parent
+
+-- | Specialized version of `relate` for relating a variable to a constant
+--    var = slope * var2 + intercept
+relateR :: (GaloisField n, Integral n) => SliceRelations -> Ref -> n -> Ref -> n -> EquivClass n -> M n (EquivClass n)
+relateR relationsS x slope y intercept xs =
+  case (x, y, slope, intercept) of
+    (_, _, 0, value) -> assign x value xs
+    (refA, refB, _, _) ->
+      composeLookup
+        xs
+        refA
+        refB
+        slope
+        intercept
+        (lookup relationsS refA xs)
+        (lookup relationsS refB xs)
+
+-- | Specialized version of `relate` for relating Boolean variables
+relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> EquivClass n -> M n (EquivClass n)
+relateB refA (polarity, refB) = relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB)
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
@@ -201,13 +215,13 @@ relateChildToParent :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> 
 relateChildToParent child relationToChild parent relations =
   if child == parent
     then return relations
-    else case lookup parent relations of
+    else case lookupInternal parent relations of
       -- The parent is a constant, so we make the child a constant:
       --    * for the parent: do nothing
       --    * for the child: assign it the value of the parent with `relationToChild` applied
       IsConstant value -> assign child (execLinRel relationToChild value) relations
       -- The parent has other children
-      IsRoot children -> case lookup child relations of
+      IsRoot children -> case lookupInternal child relations of
         -- The child also has its grandchildren, so we relate all these grandchildren to the parent, too:
         --    * for the parent: add the child and its grandchildren to the children map
         --    * for the child: point the child to the parent and add the relation
@@ -278,56 +292,53 @@ relateChildToParent child relationToChild parent relations =
 --------------------------------------------------------------------------------
 
 -- | Calculates the relation between two variables, O(lg n)
-relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> EquivClass n -> Maybe (LinRel n)
-relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
-  (IsConstant _, _) -> Nothing
-  (_, IsConstant _) -> Nothing
-  (IsRoot _, IsRoot _) ->
-    if var1 == var2
-      then Just mempty
-      else Nothing
-  (IsRoot _, IsChildOf parent2 relationWithParent2) ->
-    if var1 == parent2
-      then -- var2 = relationWithParent2 parent2
-      -- var1 = parent2
-      -- =>
-      -- var2 = relationWithParent2 var1
-        invertLinRel relationWithParent2
-      else Nothing
-  (IsChildOf parent1 relationWithParent1, IsRoot _) ->
-    if parent1 == var2
-      then -- var1 = relationWithParent1 parent1
-      -- parent1 = var2
-      -- =>
-      -- var1 = relationWithParent1 var2
-        Just relationWithParent1
-      else Nothing
-  (IsChildOf parent1 relationWithParent1, IsChildOf parent2 relationWithParent2) ->
-    if parent1 == parent2
-      then -- var1 = relationWithParent1 parent1
-      -- var2 = relationWithParent2 parent2
-      -- parent1 == parent2
-      --   =>
-      -- var1 = relationWithParent1 parent2
-      -- var2 = relationWithParent2 parent2
-      case invertLinRel relationWithParent2 of
-        Just rel ->
-          -- var1 = relationWithParent1 parent2
-          -- parent2 = rel var2
-          --   =>
-          -- var1 = (relationWithParent1 . rel) var2
-          Just $ relationWithParent1 <> rel
-        Nothing -> Nothing
-      else -- Just $ relationWithParent1 <> invertLinRel relationWithParent2
-        Nothing
-
--- | Export the internal representation of the relations as a map from variables to their relations
-toMap :: EquivClass n -> Map Ref (VarStatus n)
-toMap = eqPoolEquivClass
+relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> EquivClass n -> Maybe (n, n)
+relationBetween var1 var2 xs =
+  fromLinRel <$> case (lookupInternal var1 xs, lookupInternal var2 xs) of
+    (IsConstant _, _) -> Nothing
+    (_, IsConstant _) -> Nothing
+    (IsRoot _, IsRoot _) ->
+      if var1 == var2
+        then Just mempty
+        else Nothing
+    (IsRoot _, IsChildOf parent2 relationWithParent2) ->
+      if var1 == parent2
+        then -- var2 = relationWithParent2 parent2
+        -- var1 = parent2
+        -- =>
+        -- var2 = relationWithParent2 var1
+          invertLinRel relationWithParent2
+        else Nothing
+    (IsChildOf parent1 relationWithParent1, IsRoot _) ->
+      if parent1 == var2
+        then -- var1 = relationWithParent1 parent1
+        -- parent1 = var2
+        -- =>
+        -- var1 = relationWithParent1 var2
+          Just relationWithParent1
+        else Nothing
+    (IsChildOf parent1 relationWithParent1, IsChildOf parent2 relationWithParent2) ->
+      if parent1 == parent2
+        then -- var1 = relationWithParent1 parent1
+        -- var2 = relationWithParent2 parent2
+        -- parent1 == parent2
+        --   =>
+        -- var1 = relationWithParent1 parent2
+        -- var2 = relationWithParent2 parent2
+        case invertLinRel relationWithParent2 of
+          Just rel ->
+            -- var1 = relationWithParent1 parent2
+            -- parent2 = rel var2
+            --   =>
+            -- var1 = (relationWithParent1 . rel) var2
+            Just $ relationWithParent1 <> rel
+          Nothing -> Nothing
+        else -- Just $ relationWithParent1 <> invertLinRel relationWithParent2
+          Nothing
 
 -- | Convert the relations to specialized constraints
 toConstraints :: (GaloisField n, Integral n) => (Ref -> Bool) -> EquivClass n -> Seq (Constraint n)
-toConstraints shouldBeKept = Seq.fromList . toList . Map.mapMaybeWithKey convert . toMap
+toConstraints shouldBeKept = Seq.fromList . toList . Map.mapMaybeWithKey convert . eqPoolEquivClass
   where
     convert :: (GaloisField n, Integral n) => Ref -> VarStatus n -> Maybe (Constraint n)
     convert var status
@@ -362,7 +373,7 @@ allChildrenRecognizeTheirParent relations =
       isParent (IsRoot children) = Just children
       isParent _ = Nothing
 
-      recognizeParent parent child relation = case lookup child relations of
+      recognizeParent parent child relation = case lookupInternal child relations of
         IsChildOf parent' relation' -> parent == parent' && relation == relation'
         _ -> False
       childrenAllRecognizeParent parent = and . Map.elems . Map.mapWithKey (recognizeParent parent)
@@ -378,11 +389,109 @@ rootsAreSenior = Map.foldlWithKey' go True . eqPoolEquivClass
     go True var (IsRoot children) = all (\child -> compareSeniority var child /= LT) (Map.keys children)
     go True var (IsChildOf parent _) = compareSeniority parent var /= LT
 
--- | Returns the result of looking up a variable in the UIntEquivClass, O(lg n)
-lookup :: Ref -> EquivClass n -> VarStatus n
-lookup var (EquivClass _ relations) = case Map.lookup var relations of
+--------------------------------------------------------------------------------
+
+data VarStatus n
+  = IsConstant n
+  | -- | contains the relations to the children
+    IsRoot (Map Ref (LinRel n))
+  | -- | child = relation parent
+    IsChildOf Ref (LinRel n)
+  deriving (Show, Eq, Generic, Functor)
+
+instance (NFData n) => NFData (VarStatus n)
+
+-- | Returns the result of looking up a variable, O(lg n)
+lookupInternal :: Ref -> EquivClass n -> VarStatus n
+lookupInternal var (EquivClass _ relations) = case Map.lookup var relations of
   Nothing -> IsRoot mempty
   Just result -> result
+
+--------------------------------------------------------------------------------
+
+-- | Result of looking up a variable in the Relations
+data Lookup n = Root | Constant n | ChildOf n Ref n
+  deriving (Eq, Show)
+
+lookup :: (GaloisField n) => SliceRelations -> Ref -> EquivClass n -> Lookup n
+lookup relationsS (B (RefUBit refU index)) relationsR =
+  let -- look in the SliceRelations first
+      lookupSliceRelations = case SliceRelations.refUSegmentsRefUBit refU index relationsS of
+        Nothing -> lookupRefRelations
+        Just (Left (parent, index')) -> ChildOf 1 (B (RefUBit parent index')) 0
+        Just (Right bitVal) -> Constant (if bitVal then 1 else 0)
+      -- look in the RefRelations later if we cannot find any result in the SliceRelations
+      lookupRefRelations = case lookupInternal (B (RefUBit refU index)) relationsR of
+        IsConstant value -> Constant value
+        IsRoot _ -> Root
+        IsChildOf parent (LinRel a b) -> ChildOf a parent b
+   in lookupSliceRelations
+lookup _ var relations =
+  case lookupInternal var relations of
+    IsConstant value -> Constant value
+    IsRoot _ -> Root
+    IsChildOf parent (LinRel a b) -> ChildOf a parent b
+
+composeLookup :: (GaloisField n, Integral n) => EquivClass n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> M n (EquivClass n)
+composeLookup xs refA refB slope intercept relationA relationB = case (relationA, relationB) of
+  (Root, Root) ->
+    -- rootA = slope * rootB + intercept
+    relateF refA slope refB intercept xs
+  (Root, Constant n) ->
+    -- rootA = slope * n + intercept
+    assign refA (slope * n + intercept) xs
+  (Root, ChildOf slopeB rootB interceptB) ->
+    -- rootA = slope * refB + intercept && refB = slopeB * rootB + interceptB
+    -- =>
+    -- rootA = slope * (slopeB * rootB + interceptB) + intercept
+    -- =>
+    -- rootA = slope * slopeB * rootB + slope * interceptB + intercept
+    relateF refA (slope * slopeB) rootB (slope * interceptB + intercept) xs
+  (Constant n, Root) ->
+    -- n = slope * rootB + intercept
+    -- =>
+    -- rootB = (n - intercept) / slope
+    assign refB ((n - intercept) / slope) xs
+  (Constant n, Constant m) ->
+    -- n = slope * m + intercept
+    -- =>
+    -- n - intercept = slope * m
+    -- =>
+    -- m = (n - intercept) / slope
+    if m == (n - intercept) / slope
+      then return xs
+      else throwError $ ConflictingValuesF m ((n - intercept) / slope)
+  (Constant n, ChildOf slopeB rootB interceptB) ->
+    -- n = slope * (slopeB * rootB + interceptB) + intercept
+    -- =>
+    -- slope * (slopeB * rootB + interceptB) = n - intercept
+    -- =>
+    -- slopeB * rootB + interceptB = (n - intercept) / slope
+    -- =>
+    -- slopeB * rootB = (n - intercept) / slope - interceptB
+    -- =>
+    -- rootB = ((n - intercept) / slope - interceptB) / slopeB
+    assign rootB (((n - intercept) / slope - interceptB) / slopeB) xs
+  (ChildOf slopeA rootA interceptA, Root) ->
+    -- refA = slopeA * rootA + interceptA = slope * rootB + intercept
+    -- =>
+    -- rootA = (slope * rootB + intercept - interceptA) / slopeA
+    relateF rootA (slope / slopeA) refB ((intercept - interceptA) / slopeA) xs
+  (ChildOf slopeA rootA interceptA, Constant n) ->
+    -- refA = slopeA * rootA + interceptA = slope * n + intercept
+    -- =>
+    -- rootA = (slope * n + intercept - interceptA) / slopeA
+    assign rootA ((slope * n + intercept - interceptA) / slopeA) xs
+  (ChildOf slopeA rootA interceptA, ChildOf slopeB rootB interceptB) ->
+    -- refA = slopeA * rootA + interceptA = slope * (slopeB * rootB + interceptB) + intercept
+    -- =>
+    -- slopeA * rootA = slope * slopeB * rootB + slope * interceptB + intercept - interceptA
+    -- =>
+    -- rootA = (slope * slopeB * rootB + slope * interceptB + intercept - interceptA) / slopeA
+    relateF rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
+  where
+    relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> EquivClass n -> M n (EquivClass n)
+    relateF var1 slope' var2 intercept' = relate var1 (LinRel slope' intercept') var2
 
 --------------------------------------------------------------------------------
 
@@ -400,6 +509,10 @@ instance (Num n) => Semigroup (LinRel n) where
 
 instance (Num n) => Monoid (LinRel n) where
   mempty = LinRel 1 0
+
+-- | Extracts the coefficients from a LinRel
+fromLinRel :: LinRel n -> (n, n)
+fromLinRel (LinRel a b) = (a, b)
 
 -- | Render LinRel to some child as a string
 renderLinRel :: (GaloisField n, Integral n) => (String, LinRel n) -> String
