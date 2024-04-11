@@ -29,7 +29,7 @@ import Keelung.Compiler.Compile.Error qualified as Compile
 import Keelung.Compiler.ConstraintModule
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
-import Keelung.Compiler.Relations.EquivClass qualified as EquivClass
+import Keelung.Compiler.Relations.Reference qualified as RefRelations
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
 import Keelung.Data.LC (LC (..), (@))
@@ -358,7 +358,7 @@ learnFromMul poly = do
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ Relations.assignB var (value == 1) (cmRelations cm)
+  result <- lift $ lift $ RefRelations.runM $ Relations.assignB var (value == 1) (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -366,7 +366,7 @@ assign (B var) value = do
       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 assign (F var) value = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ Relations.assignR (F var) value (cmRelations cm)
+  result <- lift $ lift $ RefRelations.runM $ Relations.assignR (F var) value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -379,7 +379,7 @@ assignS slice value = do
   result <-
     lift $
       lift $
-        EquivClass.runM $
+        RefRelations.runM $
           Relations.assignS slice value (cmRelations cm)
   case result of
     Nothing -> return ()
@@ -391,7 +391,7 @@ assignS slice value = do
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cm <- get
-  result <- lift $ lift $ EquivClass.runM $ Relations.relateR var1 slope var2 intercept (cmRelations cm)
+  result <- lift $ lift $ RefRelations.runM $ Relations.relateR var1 slope var2 intercept (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do
@@ -406,7 +406,7 @@ relateS slice1 slice2 = do
   result <-
     lift $
       lift $
-        EquivClass.runM $
+        RefRelations.runM $
           Relations.relateS slice1 slice2 (cmRelations cm)
   case result of
     Nothing -> return False

@@ -60,7 +60,6 @@ library
       Keelung.Compiler.Options
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations
-      Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.Slice
       Keelung.Compiler.Relations.Util
@@ -153,7 +152,6 @@ executable keelungc
       Keelung.Compiler.Options
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations
-      Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.Slice
       Keelung.Compiler.Relations.Util
@@ -306,7 +304,6 @@ test-suite keelung-test
       Keelung.Compiler.Options
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations
-      Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.Slice
       Keelung.Compiler.Relations.Util
