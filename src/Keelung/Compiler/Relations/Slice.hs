@@ -88,14 +88,11 @@ assign slice value relations = flip execState relations $ do
 
 -- | Given 2 Slices, modify the SliceRelations so that they are related
 relate :: Slice -> Slice -> SliceRelations -> SliceRelations
-relate slice1 slice2 relations =
-  let -- modify the slices if they are overlapping
-      (slice1', slice2') =
-        if Slice.overlaps slice1 slice2
-          then modifyOverlappingSlices slice1 slice2
-          else (slice1, slice2)
-      pairs = toAlignedSegmentPairs (lookup slice1' relations) (lookup slice2' relations)
-   in execState (mapM_ relateSegment pairs) relations
+relate slice1 slice2 relations = case handleOverlappingSlices slice1 slice2 of
+  Nothing -> relations -- no-op
+  Just (slice1', slice2') ->
+    let pairs = toAlignedSegmentPairs (lookup slice1' relations) (lookup slice2' relations)
+     in execState (mapM_ relateSegment pairs) relations
   where
     -- When 2 Slices belong to the same variable and they are overlapping
     -- We return only the Slices that are affected by the overlap
@@ -107,15 +104,19 @@ relate slice1 slice2 relations =
     --      result     ├─────╠═══════════╬═════╬═════╣─────┤
     --                                   ↑     ↑     ↑
     --                                  new    rE    cE
-    modifyOverlappingSlices :: Slice -> Slice -> (Slice, Slice)
-    modifyOverlappingSlices sliceA sliceB =
-      let (root, child) = if sliceA > sliceB then (sliceA, sliceB) else (sliceB, sliceA)
-          newEndpoint = sliceEnd root - (sliceEnd child - sliceEnd root)
-          rootEnd = sliceEnd root
-          childEnd = sliceEnd child
-       in ( Slice (sliceRefU sliceA) newEndpoint rootEnd,
-            Slice (sliceRefU sliceB) rootEnd childEnd
-          )
+    handleOverlappingSlices :: Slice -> Slice -> Maybe (Slice, Slice)
+    handleOverlappingSlices sliceA sliceB
+      | sliceA == sliceB = Nothing
+      | not (sliceA `Slice.overlaps` sliceB) = Just (sliceA, sliceB)
+      | otherwise =
+          let (root, child) = if sliceA > sliceB then (sliceA, sliceB) else (sliceB, sliceA)
+              newEndpoint = sliceEnd root - (sliceEnd child - sliceEnd root)
+              rootEnd = sliceEnd root
+              childEnd = sliceEnd child
+           in Just
+                ( Slice (sliceRefU sliceA) newEndpoint rootEnd,
+                  Slice (sliceRefU sliceB) rootEnd childEnd
+                )
 
 size :: SliceRelations -> Int
 size (SliceRelations refO refI refP refX) = sum (map sizeMapping [refO, refI, refP, refX])

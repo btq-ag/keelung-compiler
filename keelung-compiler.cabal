@@ -264,7 +264,7 @@ test-suite keelung-test
       Test.Optimization.UInt.Misc
       Test.Optimization.UInt.Statement
       Test.Relations
-      Test.Relations.Field
+      Test.Relations.Reference
       Test.Relations.Slice
       Test.Solver
       Test.Solver.BinRep

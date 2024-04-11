@@ -29,7 +29,7 @@ import Test.QuickCheck
 
 -- | Default range of Var
 defaultVar :: Gen Var
-defaultVar = chooseInt (0, 10)
+defaultVar = chooseInt (0, 5)
 
 defaultWidth :: Gen Width
 defaultWidth = chooseInt (1, 8)
@@ -95,9 +95,9 @@ instance Arbitrary Slice where
 arbitrarySliceOfWidth :: Width -> Gen Slice
 arbitrarySliceOfWidth width = do
   -- choose the starting offset of the slice first
-  start <- chooseInt (0, 16)
+  start <- chooseInt (0, 8)
   let end = start + width
-  refUWidth <- chooseInt (end, end + 16)
+  refUWidth <- chooseInt (end, end + 8)
   ref <- arbitraryRefUOfWidth refUWidth
   pure $ Slice.Slice ref start end
 

@@ -84,6 +84,13 @@ tests = describe "SliceRelations" $ do
       let relations' = foldl (flip execCommand) relations commands
       SliceRelations.validate relations' `shouldBe` []
 
+    it "TODO" $ do
+      let relations = SliceRelations.new
+      -- [Relate UI₁₅0 [1 ... 14) UP₁₆5 [3 ... 16),Relate UP₁₆5 [6 ... 10) UI₁₅0 [3 ... 7)]
+      let commands = [Relate (Slice (RefUI 15 0) 1 14) (Slice (RefUP 16 5) 3 16), Relate (Slice (RefUP 16 5) 6 10) (Slice (RefUI 15 0) 3 7)]
+      let relations' = foldr execCommand relations (commands :: [Command])
+      SliceRelations.validate relations' `shouldBe` []
+
 --------------------------------------------------------------------------------
 
 data Command = Relate Slice Slice deriving (Show)
@@ -92,8 +99,7 @@ arbitraryCommandOfOverlapping :: Bool -> Gen Command
 arbitraryCommandOfOverlapping canOverlap = do
   width <- chooseInt (1, 16)
   slice1 <- arbitrarySliceOfWidth width
-  slice2 <-
-    arbitrarySliceOfWidth width `suchThat` \slice2 -> canOverlap || not (Slice.overlaps slice1 slice2)
+  slice2 <- arbitrarySliceOfWidth width `suchThat` \slice2 -> canOverlap || not (Slice.overlaps slice1 slice2)
   pure $ Relate slice1 slice2
 
 arbitraryNonOverlappingCommands :: Gen [Command]

@@ -1,4 +1,4 @@
-module Test.Relations.Field (tests, run) where
+module Test.Relations.Reference (tests, run) where
 
 import Control.Monad.Except
 import Control.Monad.State
