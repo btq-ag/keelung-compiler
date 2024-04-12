@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Keelung.Compiler.Relations
   ( Relations (..),
@@ -42,7 +43,7 @@ data Relations n = Relations
     relationsS :: SliceRelations.SliceRelations,
     relationsOptions :: Options
   }
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 instance (GaloisField n, Integral n) => Show (Relations n) where
   show (Relations refs slices _) =

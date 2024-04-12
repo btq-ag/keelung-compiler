@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -69,7 +70,7 @@ data ConstraintModule n = ConstraintModule
     -- hints for generating witnesses for ModInv constraints
     cmModInvs :: Seq (Either RefU U, Either RefU U, Either RefU U, U)
   }
-  deriving (Eq, Generic, NFData)
+  deriving (Eq, Generic, NFData, Functor)
 
 instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
   show cm =
