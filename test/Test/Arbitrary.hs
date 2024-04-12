@@ -86,7 +86,7 @@ arbitrarySegmentOfSlice (Slice.Slice _ start end) =
           do
             childrenCount <- chooseInt (1, 4)
             children <- vectorOf childrenCount $ arbitrarySliceOfWidth width
-            pure $ Segment.Parent width (Map.fromList (map (\child -> (Slice.sliceRefU child, Set.singleton child)) children))
+            pure $ Segment.ParentOf width (Map.fromList (map (\child -> (Slice.sliceRefU child, Set.singleton child)) children))
         ]
 
 instance Arbitrary Slice where
@@ -108,7 +108,8 @@ instance Arbitrary RefUSegments where
     let width = sum (map widthOf segments)
     ref <- arbitraryRefUOfWidth width
     pure $
-      RefUSegments.normalize $ RefUSegments.RefUSegments ref intmap
+      RefUSegments.normalize $
+        RefUSegments.RefUSegments ref intmap
     where
       -- prevent segments of the same kind from being adjacent
       removeAdjectSameKind :: [Segment] -> [Segment]

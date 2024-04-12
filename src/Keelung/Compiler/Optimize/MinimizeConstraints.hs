@@ -265,7 +265,7 @@ reduceDivMod (a, b, q, r) = do
        in case IntMap.elems segments of
             [Segment.ChildOf root] -> Left (Slice.sliceRefU root)
             [Segment.Constant value] -> Right value
-            [Segment.Parent _ _] -> Left var
+            [Segment.ParentOf _ _] -> Left var
             [Segment.Free _] -> Left var
             _ -> Left var
 
@@ -494,7 +494,7 @@ substSlice relations initState (sliceWhole, multiplier) =
             Segment.ChildOf root ->
               -- replace `slice` with `root`
               (acc <> LC.new 0 [] [(root, coefficient)], (addSlice root . removeSlice slice) changes)
-            Segment.Parent _ _ -> (acc <> LC.new 0 [] [(slice, coefficient)], changes)
+            Segment.ParentOf _ _ -> (acc <> LC.new 0 [] [(slice, coefficient)], changes)
             Segment.Free _ -> (acc <> LC.new 0 [] [(slice, coefficient)], changes)
 
 -- | Substitutes a Ref in a PolyL.

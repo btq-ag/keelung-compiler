@@ -151,7 +151,7 @@ lookupAt index (RefUSegments _ xs) = do
   case segment of
     Segment.Constant val -> Just $ Right (Bits.testBit val (index - start))
     Segment.ChildOf slice -> Just $ Left (Slice.sliceRefU slice, Slice.sliceStart slice + index - start)
-    Segment.Parent _ _ -> Nothing
+    Segment.ParentOf _ _ -> Nothing
     Segment.Free _ -> Nothing
 
 --------------------------------------------------------------------------------

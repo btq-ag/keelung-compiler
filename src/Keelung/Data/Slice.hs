@@ -51,7 +51,7 @@ data Slice = Slice
 instance NFData Slice
 
 instance Show Slice where
-  show (Slice ref start end) = show ref <> " [" <> show start <> " ... " <> show end <> ")"
+  show (Slice ref start end) = show ref <> "[" <> show start <> ":" <> show end <> "]"
 
 instance HasWidth Slice where
   widthOf (Slice _ start end) = end - start

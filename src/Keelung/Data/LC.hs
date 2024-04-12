@@ -34,7 +34,12 @@ import Keelung.Data.U (U)
 data LC n
   = Constant n
   | Polynomial (PolyL n)
-  deriving (Eq, Show, Generic, NFData, Functor)
+  deriving (Eq, Generic, NFData, Functor)
+
+-- | Show instance for LC.
+instance (Show n, Integral n, GaloisField n) => Show (LC n) where
+  show (Constant c) = show c
+  show (Polynomial xs) = show xs
 
 -- | A LC is a semigroup under addition.
 instance (Integral n, GaloisField n) => Semigroup (LC n) where

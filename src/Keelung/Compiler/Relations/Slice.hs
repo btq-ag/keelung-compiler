@@ -189,7 +189,7 @@ toConstraints fieldInfo occurrence sliceShouldBeKept = fold step mempty
           if sliceShouldBeKept slice && sliceShouldBeKept root
             then buildSliceEq slice root
             else mempty
-        Segment.Parent _ _ -> mempty
+        Segment.ParentOf _ _ -> mempty
         Segment.Free _ -> mempty
 
     -- Slices will be chopped into pieces no longer than `fieldWidth`
@@ -276,22 +276,22 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
     if root1 > root2
       then lookupFamilyWithSliceSegmentPairM (slice2, segment2) >>= relateRootToFamily root1
       else lookupFamilyWithSliceSegmentPairM (slice1, segment1) >>= relateRootToFamily root2
-  (Segment.ChildOf root1, Segment.Parent {}) ->
+  (Segment.ChildOf root1, Segment.ParentOf {}) ->
     if root1 > slice2
       then lookupFamilyWithSliceSegmentPairM (slice2, segment2) >>= relateRootToFamily root1
       else lookupFamilyWithSliceSegmentPairM (slice1, segment1) >>= relateRootToFamily slice2
   (Segment.ChildOf root1, Segment.Free _) -> relateRootToSegment root1 slice2
-  (Segment.Parent {}, Segment.ChildOf root2) ->
+  (Segment.ParentOf {}, Segment.ChildOf root2) ->
     if slice1 > root2
       then lookupFamilyWithSliceSegmentPairM (slice2, segment2) >>= relateRootToFamily slice1
       else lookupFamilyWithSliceSegmentPairM (slice1, segment1) >>= relateRootToFamily root2
-  (Segment.Parent {}, Segment.Parent {}) ->
+  (Segment.ParentOf {}, Segment.ParentOf {}) ->
     if slice1 > slice2
       then lookupFamilyWithSliceSegmentPairM (slice2, segment2) >>= relateRootToFamily slice1
       else lookupFamilyWithSliceSegmentPairM (slice1, segment1) >>= relateRootToFamily slice2
-  (Segment.Parent {}, Segment.Free _) -> relateRootToSegment slice1 slice2
+  (Segment.ParentOf {}, Segment.Free _) -> relateRootToSegment slice1 slice2
   (Segment.Free _, Segment.ChildOf root2) -> relateRootToSegment root2 slice1
-  (Segment.Free _, Segment.Parent {}) -> relateRootToSegment slice2 slice1
+  (Segment.Free _, Segment.ParentOf {}) -> relateRootToSegment slice2 slice1
   (Segment.Free _, Segment.Free _) ->
     if slice1 > slice2
       then relateRootToSegment slice1 slice2
@@ -325,11 +325,11 @@ relateRootToSegment root child = do
     addRootToChild _ = Segment.ChildOf root
 
     addChildToRoot :: Maybe Segment -> Segment
-    addChildToRoot Nothing = Segment.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
-    addChildToRoot (Just (Segment.Parent width children)) = Segment.Parent width (Map.insertWith (<>) (sliceRefU child) (Set.singleton child) children)
+    addChildToRoot Nothing = Segment.ParentOf (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
+    addChildToRoot (Just (Segment.ParentOf width children)) = Segment.ParentOf width (Map.insertWith (<>) (sliceRefU child) (Set.singleton child) children)
     addChildToRoot (Just (Segment.ChildOf _)) = error "[ panic ] relateRootToSegment: the root already has a parent"
     addChildToRoot (Just (Segment.Constant _)) = error "[ panic ] relateRootToSegment: the root already has a value"
-    addChildToRoot (Just (Segment.Free _)) = Segment.Parent (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
+    addChildToRoot (Just (Segment.Free _)) = Segment.ParentOf (widthOf root) (Map.singleton (sliceRefU child) (Set.singleton child))
 
     modifySegment :: (Maybe Segment -> Segment) -> Slice -> M ()
     modifySegment f (Slice ref start end) =
@@ -405,10 +405,10 @@ familySlicesOfSliceSegmentPair relations (slice, segment) = case segment of
     let PartialRefUSegments _ segments = lookup root relations
      in case IntMap.elems segments of
           [] -> error "[ panic ] getFamily: ChildOf root has no segments"
-          [Segment.Parent _ children] -> root : Set.toList (Set.unions (Map.elems children))
-          [_] -> error "[ panic ] getFamily: Should be Parent"
+          [Segment.ParentOf _ children] -> root : Set.toList (Set.unions (Map.elems children))
+          [_] -> error "[ panic ] getFamily: Should be ParentOf"
           _ -> error "[ panic ] getFamily: ChildOf root has more than one segment"
-  Segment.Parent _ children -> slice : Set.toList (Set.unions (Map.elems children))
+  Segment.ParentOf _ children -> slice : Set.toList (Set.unions (Map.elems children))
   Segment.Free _ -> [slice]
 
 lookupFamilyWithSlice :: Slice -> SliceRelations -> FamilyLookup
@@ -629,7 +629,7 @@ constructKinshipWithChildOf = fold addRelation (Kinship Map.empty Map.empty)
           { kinshipParents = Map.alter (insertChildToParent slice root) (sliceRefU root) (kinshipParents kinship),
             kinshipChildren = Map.alter (insertParentToChild root slice) (sliceRefU slice) (kinshipChildren kinship)
           }
-      Segment.Parent {} -> kinship
+      Segment.ParentOf {} -> kinship
       Segment.Free _ -> kinship
 
     insertChildToParent :: Slice -> Slice -> Maybe (IntMap [Slice]) -> Maybe (IntMap [Slice])
@@ -665,7 +665,7 @@ destroyKinshipWithParent = flip (fold removeRelation)
     removeRelation kinship slice segment = case segment of
       Segment.Constant _ -> kinship
       Segment.ChildOf _ -> kinship
-      Segment.Parent _ children ->
+      Segment.ParentOf _ children ->
         Kinship
           { kinshipParents = Map.alter removeChildFromParent (sliceRefU slice) (kinshipParents kinship),
             kinshipChildren = foldl removeParentFromChild (kinshipChildren kinship) (Set.toList (Set.unions (Map.elems children)))
