@@ -1,5 +1,8 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use <&>" #-}
 
 -- | Utilities for testing the compilation process:
 --   * Functions ending with `WithOpts` expect the options
@@ -7,9 +10,9 @@
 module Test.Util
   ( -- prints the compiled constraint module and R1CS
     debug,
-    -- debugI,
+    debugI,
     debugWithOpts,
-    -- debugWithOptsI,
+    debugWithOptsI,
     -- testing by cross-validating the interpreter and the solver
     check,
     checkI,
@@ -65,10 +68,10 @@ testReindexReportWithOpts options syntax = do
 --------------------------------------------------------------------------------
 
 -- | Print the copmiled constraint module and R1CS
--- debugWithOptsI :: (GaloisField n, Integral n) => Options -> Compiler.Internal n -> IO ()
--- debugWithOptsI options syntax = do
-  -- print (fmap N <$> Compiler.compileWithOptsI options syntax)
-  -- print (Compiler.compileWithOptsI options syntax >>= Compiler.link :: Either (Error (N n)) (Compiler.ConstraintSystem (N n)))
+debugWithOptsI :: (GaloisField n, Integral n) => Options -> Compiler.Internal n -> IO ()
+debugWithOptsI options syntax = do
+  print $ fmap N <$> Compiler.compileWithOptsI options syntax
+  print $ Compiler.compileWithOptsI options syntax >>= Compiler.link >>= return . fmap N
 
 debugWithOpts :: (Encode t) => Options -> Comp t -> IO ()
 debugWithOpts options program = caseFieldType fieldType handlePrime handleBinary
@@ -88,8 +91,8 @@ debugWithOpts options program = caseFieldType fieldType handlePrime handleBinary
 debug :: (Encode t) => FieldType -> Comp t -> IO ()
 debug = debugWithOpts . Options.new
 
--- debugI :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> IO ()
--- debugI = debugWithOptsI . Options.new
+debugI :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> IO ()
+debugI = debugWithOptsI . Options.new
 
 --------------------------------------------------------------------------------
 

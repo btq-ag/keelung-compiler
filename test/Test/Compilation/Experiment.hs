@@ -39,7 +39,7 @@ tests = describe "Experiment" $ do
   describe "variable-width multiplication" $ do
     it "0" $ do
       let internal2 = constructSyntaxVV 6 4 :: Internal GF181
-      -- debugI gf181 internal2
+      debugI gf181 internal2
       checkI gf181 internal2 [10, 7] [] [6]
       assertCountI gf181 internal2 3
 
