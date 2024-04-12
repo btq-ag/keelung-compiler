@@ -58,7 +58,7 @@ compileMul out x y = do
   let operandWidth = widthOf x -- assuming that the width of `x` is the same as the width of `y`
   fieldInfo <- gets (optFieldInfo . cmOptions)
 
-  -- limb width limitation:   
+  -- limb width limitation:
   --    2 ≤ limb width ≤ field width / 2
 
   -- determine the maximum and minimum limb widths
@@ -130,7 +130,7 @@ mulnxn maxHeight limbWidth limbNumber out var operand = do
                   else IntMap.insertWith (<>) index lowerLimb columns
           -- insert the upper limb into the columns
           let columns'' =
-                if upperLimb == mempty || index == limbNumber - 1 -- throw limbs higher than `limbNumber` away
+                if upperLimb == mempty || index == (limbNumber * 2) - 1 -- throw limbs higher than `limbNumber * 2` away
                   then columns'
                   else IntMap.insertWith (<>) (index + 1) upperLimb columns'
           return columns''
@@ -156,8 +156,7 @@ mulnxn maxHeight limbWidth limbNumber out var operand = do
               else addLimbColumn maxHeight outputLimb previousCarryLimbs
     )
     mempty
-    [0 .. limbNumber - 1]
-
+    [0 .. limbNumber * 2 - 1]
 
 mul2Limbs :: (GaloisField n, Integral n) => Width -> (n, Limb) -> Either n (n, Limb) -> M n (LimbColumn, LimbColumn)
 mul2Limbs currentLimbWidth (a, x) operand = do

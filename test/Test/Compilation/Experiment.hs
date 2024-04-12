@@ -41,7 +41,7 @@ tests = describe "Experiment" $ do
       let internal2 = constructSyntaxVV 6 4 :: Internal GF181
       debugI gf181 internal2
       checkI gf181 internal2 [10, 7] [] [6]
-      assertCountI gf181 internal2 3
+      assertCountI gf181 internal2 17
 
 constructSyntaxVV :: Width -> Width -> Internal n
 constructSyntaxVV outputWidth operandWidth =

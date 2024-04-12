@@ -11,6 +11,7 @@ module Test.Util
   ( -- prints the compiled constraint module and R1CS
     debug,
     debugI,
+    debugO0I,
     debugWithOpts,
     debugWithOptsI,
     -- testing by cross-validating the interpreter and the solver
@@ -93,6 +94,9 @@ debug = debugWithOpts . Options.new
 
 debugI :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> IO ()
 debugI = debugWithOptsI . Options.new
+
+debugO0I :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> IO ()
+debugO0I fieldType = debugWithOptsI ((Options.new fieldType) {Options.optOptimize = False})
 
 --------------------------------------------------------------------------------
 
