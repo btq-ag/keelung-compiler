@@ -122,6 +122,27 @@ compileExprU out expr = do
   compiler <- asks boostrapCompileU
   compiler out expr
 
+-- | Compile a UInt expression to either a RefU or a constant
+wireU :: (GaloisField n, Integral n) => ExprU n -> M n (Either RefU U)
+wireU (ValU val) = return (Right val)
+wireU (VarU w ref) = return (Left (RefUX w ref))
+wireU (VarUO w ref) = return (Left (RefUO w ref))
+wireU (VarUI w ref) = return (Left (RefUI w ref))
+wireU (VarUP w ref) = return (Left (RefUP w ref))
+wireU expr = do
+  out <- freshRefU (widthOf expr)
+  compileExprU out expr
+  return (Left out)
+
+wireUWithSign :: (GaloisField n, Integral n) => (ExprU n, Bool) -> M n (Either (RefU, Bool) U)
+wireUWithSign (ValU val, True) = return (Right val)
+wireUWithSign (ValU val, False) = return (Right (-val))
+wireUWithSign (others, sign) = do
+  result <- wireU others
+  case result of
+    Left var -> return (Left (var, sign))
+    Right val -> return (Right (if sign then val else -val))
+
 --------------------------------------------------------------------------------
 
 -- | Given a constant, a list of Refs, and a list of Slices, write a addative constraint of the sum

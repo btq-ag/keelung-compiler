@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.UInt.Comparison (assertLTE, assertGTE, assertNonZero) where
+module Keelung.Compiler.Compile.UInt.Comparison (assertLTE, assertLT, assertGTE, assertGT, assertNonZero) where
 
 import Control.Monad.Except
 import Control.Monad.RWS
@@ -117,6 +117,19 @@ assertLTE width (Left a) bound
               -- pass down the accumulator
               return $ Just acc
 
+-- | Assert that a UInt is less than some constant
+assertLT :: (GaloisField n, Integral n) => Width -> Either RefU U -> Integer -> M n ()
+assertLT width a c = do
+  -- check if the bound is within the range of the UInt
+  when (c < 1) $
+    throwError $
+      Error.AssertLTBoundTooSmallError c
+  when (c >= 2 ^ width) $
+    throwError $
+      Error.AssertLTBoundTooLargeError c width
+  -- otherwise, assert that a <= c - 1
+  assertLTE width a (c - 1)
+
 --------------------------------------------------------------------------------
 
 -- | Assert that a UInt is greater than or equal to some constant
@@ -232,6 +245,19 @@ assertGTE width (Left a) bound
               -- flag' := flag * (1 - bit)
               writeMul (0, [(flag, 1)]) (1, [(B aBit, -1)]) (0, [(F flag', 1)])
               return (F flag')
+
+-- | Assert that a UInt is greater than some constant
+assertGT :: (GaloisField n, Integral n) => Width -> Either RefU U -> Integer -> M n ()
+assertGT width a c = do
+  -- check if the bound is within the range of the UInt
+  when (c < 0) $
+    throwError $
+      Error.AssertGTBoundTooSmallError c
+  when (c >= 2 ^ width - 1) $
+    throwError $
+      Error.AssertGTBoundTooLargeError c width
+  -- otherwise, assert that a >= c + 1
+  assertGTE width a (c + 1)
 
 --------------------------------------------------------------------------------
 
