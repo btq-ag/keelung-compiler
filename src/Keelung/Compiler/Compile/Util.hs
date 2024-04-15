@@ -25,18 +25,12 @@ calculateBounds constant = foldl step (constant, constant)
     step (lower, upper) limb = case Limb.lmbSigns limb of
       Limb.Single True -> (lower, upper + 2 ^ Limb.lmbWidth limb - 1)
       Limb.Single False -> (lower - 2 ^ Limb.lmbWidth limb + 1, upper)
-      Limb.MultipleOld xs -> let (lower', upper') = calculateBoundsOfSignsOld (lower, upper) xs in (lower + lower', upper + upper')
-      Limb.MultipleNew xs -> let (lower', upper') = calculateBoundsOfSignsNew (lower, upper) (toList xs) in (lower + lower', upper + upper')
+      Limb.Multiple xs -> let (lower', upper') = calculateBoundsOfSigns (lower, upper) (toList xs) in (lower + lower', upper + upper')
 
-    calculateBoundsOfSignsOld :: (Integer, Integer) -> [Bool] -> (Integer, Integer)
-    calculateBoundsOfSignsOld (_, _) [] = (0, 0)
-    calculateBoundsOfSignsOld (lower, upper) (True : xs) = let (lower', upper') = calculateBoundsOfSignsOld (lower, upper) xs in (lower' * 2, upper' * 2 + 1)
-    calculateBoundsOfSignsOld (lower, upper) (False : xs) = let (lower', upper') = calculateBoundsOfSignsOld (lower, upper) xs in (lower' * 2 - 1, upper' * 2)
-
-    calculateBoundsOfSignsNew :: (Integer, Integer) -> [(Bool, Int)] -> (Integer, Integer)
-    calculateBoundsOfSignsNew (_, _) [] = (0, 0)
-    calculateBoundsOfSignsNew (lower, upper) ((True, width) : xs) = let (lower', upper') = calculateBoundsOfSignsNew (lower, upper) xs in (lower' * 2 ^ width, (upper' + 1) * 2 ^ width - 1)
-    calculateBoundsOfSignsNew (lower, upper) ((False, width) : xs) = let (lower', upper') = calculateBoundsOfSignsNew (lower, upper) xs in ((lower' - 1) * 2 ^ width + 1, upper' * 2 ^ width)
+    calculateBoundsOfSigns :: (Integer, Integer) -> [(Bool, Int)] -> (Integer, Integer)
+    calculateBoundsOfSigns (_, _) [] = (0, 0)
+    calculateBoundsOfSigns (lower, upper) ((True, width) : xs) = let (lower', upper') = calculateBoundsOfSigns (lower, upper) xs in (lower' * 2 ^ width, (upper' + 1) * 2 ^ width - 1)
+    calculateBoundsOfSigns (lower, upper) ((False, width) : xs) = let (lower', upper') = calculateBoundsOfSigns (lower, upper) xs in ((lower' - 1) * 2 ^ width + 1, upper' * 2 ^ width)
 
 -- | Like `calculateBounds`, but only retain the carry bits
 calculateCarrySigns :: Int -> Integer -> Seq Limb -> [Bool]

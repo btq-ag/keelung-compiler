@@ -29,8 +29,7 @@ import Prelude hiding (null)
 
 data Sign
   = Single Bool
-  | MultipleOld [Bool]
-  | MultipleNew (Seq (Bool, Width)) -- (sign, width, offset), LSB first
+  | Multiple (Seq (Bool, Width)) -- (sign, width, offset), LSB first
   deriving (Eq, Ord, Show, Generic, NFData)
 
 splitAtSigns :: Int -> Seq (Bool, Width) -> (Seq (Bool, Width), Seq (Bool, Width))
@@ -60,8 +59,7 @@ data Limb = Limb
     lmbWidth :: Width,
     -- | Which bit this limb starts at
     lmbOffset :: Int,
-    -- | Left: Sign of all bits
-    -- | Right: Signs of each bit, LSB first
+    -- | Signs of the bits in this limb
     lmbSigns :: Sign
   }
   deriving (Eq, Ord, Generic, NFData)
@@ -85,10 +83,10 @@ showAsTerms (Limb ref limbWidth i sign') = case (limbWidth, sign') of
   (1, Single sign) -> (sign, "{$" <> show (RefUBit ref i) <> "}")
   (2, Single sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + 2" <> toSuperscript 1 <> "$" <> show (RefUBit ref (i + 1)) <> "}")
   (_, Single sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + ... + 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit ref (i + limbWidth - 1)) <> "}")
-  (_, MultipleOld signs) ->
-    let terms = mconcat [(if signs !! j then " + " else " - ") <> "2" <> toSuperscript j <> "$" <> show (RefUBit ref (i + j)) | j <- [0 .. limbWidth - 1]]
-     in (True, "{" <> terms <> "}")
-  (_, MultipleNew signs) ->
+  -- (_, MultipleOld signs) ->
+  --   let terms = mconcat [(if signs !! j then " + " else " - ") <> "2" <> toSuperscript j <> "$" <> show (RefUBit ref (i + j)) | j <- [0 .. limbWidth - 1]]
+  --    in (True, "{" <> terms <> "}")
+  (_, Multiple signs) ->
     (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit ref (i + offset)) <> "[" <> show (i + offset) <> ":" <> show (i + offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
 
 -- | Helper function for converting integers to superscript strings
@@ -124,14 +122,12 @@ new refU width offset signs =
 isPositive :: Limb -> Bool
 isPositive limb = case lmbSigns limb of
   Single sign -> sign
-  MultipleOld signs -> and signs
-  MultipleNew signs -> and [sign | (sign, _) <- toList signs]
+  Multiple signs -> and [sign | (sign, _) <- toList signs]
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb
 trim width (Limb ref w offset (Single sign)) = Limb ref (w `min` width) offset (Single sign)
-trim width (Limb ref w offset (MultipleOld signs)) = Limb ref (w `min` width) offset (MultipleOld (take (w `min` width) signs))
-trim width (Limb ref w offset (MultipleNew signs)) = Limb ref (w `min` width) offset (MultipleNew (takeSigns (w `min` width) signs))
+trim width (Limb ref w offset (Multiple signs)) = Limb ref (w `min` width) offset (Multiple (takeSigns (w `min` width) signs))
 
 data SplitError = OffsetOutOfBound
   deriving (Eq)
@@ -149,16 +145,11 @@ safeSplit index (Limb ref w offset s)
           ( Limb ref index offset (Single sign),
             Limb ref (w - index) (offset + index) (Single sign)
           )
-      MultipleOld signs ->
-        Right
-          ( Limb ref index offset (MultipleOld (take index signs)),
-            Limb ref (w - index) (offset + index) (MultipleOld (drop index signs))
-          )
-      MultipleNew signs ->
+      Multiple signs ->
         let (leftSigns, rightSigns) = splitAtSigns index signs
          in Right
-              ( Limb ref index offset (MultipleNew leftSigns),
-                Limb ref (w - index) (offset + index) (MultipleNew rightSigns)
+              ( Limb ref index offset (Multiple leftSigns),
+                Limb ref (w - index) (offset + index) (Multiple rightSigns)
               )
 
 -- | Split a 'Limb' into two 'Limb's at a given index of the RefU (unsafe exception-throwing version of `safeSplit`)
@@ -202,16 +193,24 @@ safeMerge (Limb ref1 width1 offset1 signs1) (Limb ref2 width2 offset2 signs2)
       EQ -> Right $ Limb ref1 (width1 + width2) offset1 $ case (signs1, signs2) of
         (Single True, Single True) -> Single True
         (Single False, Single False) -> Single False
-        (Single True, Single False) -> MultipleOld (replicate width1 True <> replicate width2 False)
-        (Single False, Single True) -> MultipleOld (replicate width1 False <> replicate width2 True)
-        (Single sign, MultipleOld signs) -> MultipleOld (replicate width1 sign <> signs)
-        (MultipleOld signs, Single sign) -> MultipleOld (signs <> replicate width2 sign)
-        (MultipleOld ss1, MultipleOld ss2) -> MultipleOld (ss1 <> ss2)
-        -- (Single sign, MultipleNew signs) -> case Seq.viewl signs of
-        --   Seq.EmptyL -> Single sign
-        --   (s, w, o) Seq.:< signss ->
-        --     if sign == s
-        --       then MultipleNew ((s, w + 1, o) Seq.<| signss)
-        --       else MultipleNew ( _ Seq.<| (s, w, o)  Seq.<| signss)
-        -- MultipleNew $ Seq.singleton (sign, width1, 0) <> fmap (\(s, w, o) -> (s, w, o + width1)) signs
-        _ -> error "[ panic ] Limb.safeMerge: MultipleNew not supported yet"
+        (Single True, Single False) -> Multiple (Seq.fromList [(True, width1), (False, width2)])
+        (Single False, Single True) -> Multiple (Seq.fromList [(False, width1), (True, width2)])
+        (Single sign, Multiple signs) -> case Seq.viewl signs of
+          Seq.EmptyL -> Single sign
+          (s, w) Seq.:< signss ->
+            if sign == s
+              then Multiple ((s, w + width1) Seq.<| signss)
+              else Multiple ((sign, width1) Seq.<| (s, w) Seq.<| signss)
+        (Multiple signs, Single sign) -> case Seq.viewr signs of
+          Seq.EmptyR -> Single sign
+          signss Seq.:> (s, w) ->
+            if sign == s
+              then Multiple (signss Seq.|> (s, w + width2))
+              else Multiple (signss Seq.|> (s, w) Seq.|> (sign, width2))
+        (Multiple signsL, Multiple signsR) -> case (Seq.viewr signsL, Seq.viewl signsR) of
+          (signsLs Seq.:> (s1, w1), (s2, w2) Seq.:< signsRs) ->
+            if s1 == s2
+              then Multiple ((signsLs Seq.|> (s1, w1 + w2)) Seq.>< signsRs)
+              else Multiple (signsL Seq.>< signsR)
+          (Seq.EmptyR, _) -> Multiple signsR
+          (_, Seq.EmptyL) -> Multiple signsL
