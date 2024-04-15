@@ -99,21 +99,21 @@ aggregateSigns = step Nothing
 -- | Construct "Slice"s from a "Limb" with a list of coeffients
 fromLimb :: Limb -> [(Slice, Integer)]
 fromLimb limb = case Limb.lmbSigns limb of
-  Limb.Single sign -> [(Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb), if sign then 1 else -1)]
-  Limb.Multiple signs ->
-    snd $ foldr (\(sign, width, offset) (i, acc) -> (i + width, (Slice (Limb.lmbRef limb) i (i + width), if sign then 2 ^ offset else -(2 ^ offset)) : acc)) (0, []) (Limb.signsToListWithOffsets signs)
+  Limb.Single ref sign -> [(Slice ref (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb), if sign then 1 else -1)]
+  Limb.Multiple ref signs ->
+    snd $ foldr (\(sign, width, offset) (i, acc) -> (i + width, (Slice ref i (i + width), if sign then 2 ^ offset else -(2 ^ offset)) : acc)) (0, []) (Limb.signsToListWithOffsets signs)
 
 -- | Like "fromLimb", but pairs the slices with chunks of the value
 fromLimbWithValue :: Limb -> Integer -> [(Slice, Integer)]
 fromLimbWithValue limb val = case Limb.lmbSigns limb of
-  Limb.Single sign -> [(Slice (Limb.lmbRef limb) (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb), if sign then val else -val)]
-  Limb.Multiple signs ->
+  Limb.Single ref sign -> [(Slice ref (Limb.lmbOffset limb) (Limb.lmbOffset limb + widthOf limb), if sign then val else -val)]
+  Limb.Multiple ref signs ->
     let u = U.new (widthOf limb) val
      in snd $
           foldr
             ( \(sign, width, offset) (i, acc) ->
                 ( i + width,
-                  ( Slice (Limb.lmbRef limb) i (i + width),
+                  ( Slice ref i (i + width),
                     let slicedVal = toInteger (U.slice u (offset, offset + width))
                      in if sign then slicedVal else -slicedVal
                   )
@@ -125,7 +125,7 @@ fromLimbWithValue limb val = case Limb.lmbSigns limb of
 
 -- | Convert a "Slice" to a "Limb"
 toLimb :: Slice -> Limb
-toLimb (Slice ref start end) = Limb.new ref (end - start) start (Limb.Single True)
+toLimb (Slice ref start end) = Limb.new ref (end - start) start (Limb.Single ref True)
 
 --------------------------------------------------------------------------------
 

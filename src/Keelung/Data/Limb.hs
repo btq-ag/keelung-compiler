@@ -2,7 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Data.Limb
-  ( Limb (lmbRef, lmbWidth, lmbOffset, lmbSigns),
+  ( Limb (lmbOffset, lmbSigns),
+    limbRef,
     Signs,
     Sign (..),
     splitAtSigns,
@@ -32,8 +33,8 @@ import Prelude hiding (null)
 type Signs = Seq (Bool, Width) -- (sign, width), LSB first
 
 data Sign
-  = Single Bool
-  | Multiple Signs
+  = Single RefU Bool
+  | Multiple RefU Signs
   deriving (Eq, Ord, Show, Generic, NFData)
 
 splitAtSigns :: Int -> Signs -> (Signs, Signs)
@@ -58,9 +59,7 @@ signsToListWithOffsets = fst . foldl go ([], 0) . toList
 --------------------------------------------------------------------------------
 
 data Limb = Limb
-  { -- | Which RefU this limb belongs to
-    lmbRef :: RefU,
-    -- | How wide this limb is
+  { -- | How wide this limb is
     lmbWidth :: Width,
     -- | Which bit this limb starts at
     lmbOffset :: Int,
@@ -68,6 +67,10 @@ data Limb = Limb
     lmbSigns :: Sign
   }
   deriving (Eq, Ord, Generic, NFData)
+
+limbRef :: Limb -> RefU
+limbRef (Limb _ _ (Single ref _)) = ref
+limbRef (Limb _ _ (Multiple ref _)) = ref
 
 instance Show Limb where
   show limb =
@@ -83,11 +86,11 @@ instance Semigroup Limb where
 -- | For printing limbs as terms in a polynomial (signs are handled by the caller)
 --   returns (isPositive, string of the term)
 showAsTerms :: Limb -> (Bool, String)
-showAsTerms (Limb ref limbWidth i sign') = case (limbWidth, sign') of
+showAsTerms (Limb limbWidth i sign') = case (limbWidth, sign') of
   (0, _) -> (True, "{Empty Limb}")
-  (1, Single sign) -> (sign, show ref <> "[" <> show i <> "]")
-  (_, Single sign) -> (sign, show ref <> "[" <> show i <> ":" <> show (i + limbWidth) <> "]")
-  (_, Multiple signs) ->
+  (1, Single ref sign) -> (sign, show ref <> "[" <> show i <> "]")
+  (_, Single ref sign) -> (sign, show ref <> "[" <> show i <> ":" <> show (i + limbWidth) <> "]")
+  (_, Multiple ref signs) ->
     (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> show ref <> "[" <> show (i + offset) <> ":" <> show (i + offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
 
 -- | Helper function for converting integers to superscript strings
@@ -113,8 +116,7 @@ new refU width offset signs =
     then error "[ panic ] Limb.new: Limb width exceeds RefU width"
     else
       Limb
-        { lmbRef = refU,
-          lmbWidth = width,
+        { lmbWidth = width,
           lmbOffset = offset,
           lmbSigns = signs
         }
@@ -122,13 +124,13 @@ new refU width offset signs =
 -- | A limb is considered "positive" if all of its bits are positive
 isPositive :: Limb -> Bool
 isPositive limb = case lmbSigns limb of
-  Single sign -> sign
-  Multiple signs -> and [sign | (sign, _) <- toList signs]
+  Single _ sign -> sign
+  Multiple _ signs -> and [sign | (sign, _) <- toList signs]
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb
-trim width (Limb ref w offset (Single sign)) = Limb ref (w `min` width) offset (Single sign)
-trim width (Limb ref w offset (Multiple signs)) = Limb ref (w `min` width) offset (Multiple (takeSigns (w `min` width) signs))
+trim width (Limb w offset (Single ref sign)) = Limb (w `min` width) offset (Single ref sign)
+trim width (Limb w offset (Multiple ref signs)) = Limb (w `min` width) offset (Multiple ref (takeSigns (w `min` width) signs))
 
 data SplitError = OffsetOutOfBound
   deriving (Eq)
@@ -138,19 +140,19 @@ instance Show SplitError where
 
 -- | Split a 'Limb' into two 'Limb's at a given index
 safeSplit :: Int -> Limb -> Either SplitError (Limb, Limb)
-safeSplit index (Limb ref w offset s)
+safeSplit index (Limb w offset s)
   | index < 0 || index > w = Left OffsetOutOfBound
   | otherwise = case s of
-      Single sign ->
+      Single ref sign ->
         Right
-          ( Limb ref index offset (Single sign),
-            Limb ref (w - index) (offset + index) (Single sign)
+          ( Limb index offset (Single ref sign),
+            Limb (w - index) (offset + index) (Single ref sign)
           )
-      Multiple signs ->
+      Multiple ref signs ->
         let (leftSigns, rightSigns) = splitAtSigns index signs
          in Right
-              ( Limb ref index offset (Multiple leftSigns),
-                Limb ref (w - index) (offset + index) (Multiple rightSigns)
+              ( Limb index offset (Multiple ref leftSigns),
+                Limb (w - index) (offset + index) (Multiple ref rightSigns)
               )
 
 -- | Split a 'Limb' into two 'Limb's at a given index of the RefU (unsafe exception-throwing version of `safeSplit`)
@@ -163,7 +165,7 @@ split index limb = case safeSplit index limb of
 
 -- | See if a Limb is empty
 null :: Limb -> Bool
-null (Limb _ w _ _) = w == 0
+null (Limb w _ _) = w == 0
 
 --------------------------------------------------------------------------------
 
@@ -186,32 +188,32 @@ instance Show MergeError where
 --    2. the two Limbs are not adjacent
 --    3. the two Limbs are overlapping
 safeMerge :: Limb -> Limb -> Either MergeError Limb
-safeMerge (Limb ref1 width1 offset1 signs1) (Limb ref2 width2 offset2 signs2)
-  | ref1 /= ref2 = Left NotSameRefU
+safeMerge limb1@(Limb width1 offset1 signs1) limb2@(Limb width2 offset2 signs2)
+  | limbRef limb1 /= limbRef limb2 = Left NotSameRefU
   | otherwise = case (offset1 + width1) `compare` offset2 of
       LT -> Left NotAdjacent
       GT -> Left Overlapping
-      EQ -> Right $ Limb ref1 (width1 + width2) offset1 $ case (signs1, signs2) of
-        (Single True, Single True) -> Single True
-        (Single False, Single False) -> Single False
-        (Single True, Single False) -> Multiple (Seq.fromList [(True, width1), (False, width2)])
-        (Single False, Single True) -> Multiple (Seq.fromList [(False, width1), (True, width2)])
-        (Single sign, Multiple signs) -> case Seq.viewl signs of
-          Seq.EmptyL -> Single sign
+      EQ -> Right $ Limb (width1 + width2) offset1 $ case (signs1, signs2) of
+        (Single ref1 True, Single _ True) -> Single ref1 True
+        (Single ref1 False, Single _ False) -> Single ref1 False
+        (Single ref1 True, Single _ False) -> Multiple ref1 (Seq.fromList [(True, width1), (False, width2)])
+        (Single ref1 False, Single _ True) -> Multiple ref1 (Seq.fromList [(False, width1), (True, width2)])
+        (Single ref1 sign, Multiple _ signs) -> case Seq.viewl signs of
+          Seq.EmptyL -> Single ref1 sign
           (s, w) Seq.:< signss ->
             if sign == s
-              then Multiple ((s, w + width1) Seq.<| signss)
-              else Multiple ((sign, width1) Seq.<| (s, w) Seq.<| signss)
-        (Multiple signs, Single sign) -> case Seq.viewr signs of
-          Seq.EmptyR -> Single sign
+              then Multiple ref1 ((s, w + width1) Seq.<| signss)
+              else Multiple ref1 ((sign, width1) Seq.<| (s, w) Seq.<| signss)
+        (Multiple ref1 signs, Single _ sign) -> case Seq.viewr signs of
+          Seq.EmptyR -> Single ref1 sign
           signss Seq.:> (s, w) ->
             if sign == s
-              then Multiple (signss Seq.|> (s, w + width2))
-              else Multiple (signss Seq.|> (s, w) Seq.|> (sign, width2))
-        (Multiple signsL, Multiple signsR) -> case (Seq.viewr signsL, Seq.viewl signsR) of
+              then Multiple ref1 (signss Seq.|> (s, w + width2))
+              else Multiple ref1 (signss Seq.|> (s, w) Seq.|> (sign, width2))
+        (Multiple ref1 signsL, Multiple _ signsR) -> case (Seq.viewr signsL, Seq.viewl signsR) of
           (signsLs Seq.:> (s1, w1), (s2, w2) Seq.:< signsRs) ->
             if s1 == s2
-              then Multiple ((signsLs Seq.|> (s1, w1 + w2)) Seq.>< signsRs)
-              else Multiple (signsL Seq.>< signsR)
-          (Seq.EmptyR, _) -> Multiple signsR
-          (_, Seq.EmptyL) -> Multiple signsL
+              then Multiple ref1 ((signsLs Seq.|> (s1, w1 + w2)) Seq.>< signsRs)
+              else Multiple ref1 (signsL Seq.>< signsR)
+          (Seq.EmptyR, _) -> Multiple ref1 signsR
+          (_, Seq.EmptyL) -> Multiple ref1 signsL

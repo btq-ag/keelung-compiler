@@ -16,6 +16,7 @@ import Keelung (Width)
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.U (widthOfInteger)
+import Keelung.Syntax (widthOf)
 
 --------------------------------------------------------------------------------
 
@@ -25,9 +26,9 @@ calculateBounds constant = foldl step (constant, constant)
   where
     step :: (Integer, Integer) -> Limb -> (Integer, Integer)
     step (lower, upper) limb = case Limb.lmbSigns limb of
-      Limb.Single True -> (lower, upper + 2 ^ Limb.lmbWidth limb - 1)
-      Limb.Single False -> (lower - 2 ^ Limb.lmbWidth limb + 1, upper)
-      Limb.Multiple xs -> let (lower', upper') = calculateBoundsOfSigns (lower, upper) (toList xs) in (lower + lower', upper + upper')
+      Limb.Single _ True -> (lower, upper + 2 ^ widthOf limb - 1)
+      Limb.Single _ False -> (lower - 2 ^ widthOf limb + 1, upper)
+      Limb.Multiple _ xs -> let (lower', upper') = calculateBoundsOfSigns (lower, upper) (toList xs) in (lower + lower', upper + upper')
 
     calculateBoundsOfSigns :: (Integer, Integer) -> [(Bool, Int)] -> (Integer, Integer)
     calculateBoundsOfSigns (_, _) [] = (0, 0)

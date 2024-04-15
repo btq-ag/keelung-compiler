@@ -4,8 +4,9 @@ import Control.Monad.Except
 import Control.Monad.Writer
 import Data.Function (on)
 import Keelung.Compiler.Compile.Error (Error)
-import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Reference
+import qualified Keelung.Data.Limb as Limb
+import Keelung.Data.Limb (Limb)
 
 --------------------------------------------------------------------------------
 
@@ -61,7 +62,7 @@ instance HasLevel RefF where
   hasLevel _ = 100
 
 instance HasLevel Limb where
-  hasLevel = hasLevel . lmbRef
+  hasLevel = hasLevel . Limb.limbRef
 
 instance HasLevel Ref where
   hasLevel (F x) = hasLevel x

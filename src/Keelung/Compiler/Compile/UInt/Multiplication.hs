@@ -101,7 +101,7 @@ compileMul out x y = do
 --               .....
 -- ------------------------------------------
 mulnxn :: (GaloisField n, Integral n) => Int -> Width -> Int -> RefU -> RefU -> Either RefU U -> M n ()
-mulnxn maxHeight limbWidth limbNumber out var operand = do
+mulnxn maxHeight limbWidth limbNumber out ref operand = do
   let outWidth = widthOf out
   -- generate pairs of indices for choosing limbs
   let indices = [(xi, columnIndex - xi) | columnIndex <- [0 .. limbNumber - 1], xi <- [0 .. columnIndex]]
@@ -112,13 +112,13 @@ mulnxn maxHeight limbWidth limbNumber out var operand = do
           -- current limb width may be smaller than
           --    1. the default limb width in the highest limbs
           --    2. the width of the RefU
-          let currentLimbWidthX = limbWidth `min` widthOf var `min` (outWidth - (limbWidth * xi))
-          let currentLimbWidthY = limbWidth `min` widthOf var `min` (outWidth - (limbWidth * yi))
+          let currentLimbWidthX = limbWidth `min` widthOf ref `min` (outWidth - (limbWidth * xi))
+          let currentLimbWidthY = limbWidth `min` widthOf ref `min` (outWidth - (limbWidth * yi))
 
-          let x = Limb.new var currentLimbWidthX (limbWidth * xi) (Limb.Single True)
+          let x = Limb.new ref currentLimbWidthX (limbWidth * xi) (Limb.Single ref True)
           let y = case operand of
                 Right constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
-                Left variable -> Right (0, Limb.new variable currentLimbWidthY (limbWidth * yi) (Limb.Single True))
+                Left refY -> Right (0, Limb.new refY currentLimbWidthY (limbWidth * yi) (Limb.Single refY True))
           let index = xi + yi
 
           (lowerLimb, upperLimb) <- mul2Limbs limbWidth (0, x) y
@@ -142,7 +142,7 @@ mulnxn maxHeight limbWidth limbNumber out var operand = do
         -- calculate the segment of the output RefU to be written
         let limbStart = limbWidth * index
         let currentLimbWidth = limbWidth `min` (outWidth - limbStart)
-        let outputLimb = Limb.new out currentLimbWidth limbStart (Limb.Single True)
+        let outputLimb = Limb.new out currentLimbWidth limbStart (Limb.Single out True)
 
         -- see if there's a stack of limbs to be added to the output limb
         case IntMap.lookup index limbColumns of
@@ -185,7 +185,7 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       let upperLimb = Slice.toLimb upperSlice
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
-      let carryLimbWidth = lmbWidth x + lmbWidth y - currentLimbWidth
+      let carryLimbWidth = widthOf x + widthOf y - currentLimbWidth
       -- (a + x) * (b + y) = (lower + upper * 2^currentLimbWidth)
       let firstOperand = LC.fromLimbs a [(x, 1)]
       let secondOperand = LC.fromLimbs b [(y, 1)]
