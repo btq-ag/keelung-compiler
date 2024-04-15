@@ -23,7 +23,7 @@ import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice (Slice (Slice))
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
@@ -244,7 +244,7 @@ writeRefUVal x c = execRelations $ Relations.assignS (Slice.fromRefU x) (toInteg
 
 -- | Assign an Integer to a Limb
 writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
-writeLimbVal limb val = mapM_ (\(x, c) -> execRelations (Relations.assignS x (toInteger c))) (Slice.fromLimbWithValue limb val)
+writeLimbVal limb val = mapM_ (\(x, c) -> execRelations (Relations.assignS x (toInteger c))) (Limb.toSliceWithValue limb val)
 
 -- | Assign an Integer to a Slice
 writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
@@ -258,8 +258,8 @@ writeRefUEq x y = execRelations $ Relations.relateS (Slice.fromRefU x) (Slice.fr
 -- TODO: eliminate this function
 writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
 writeLimbEq a b =
-  let as = Slice.fromLimb a
-      bs = Slice.fromLimb b
+  let as = Limb.toSlice a
+      bs = Limb.toSlice b
    in case (as, bs) of
         ([(sliceA, coeffA)], [(sliceB, coeffB)]) ->
           if coeffA == coeffB
@@ -350,13 +350,13 @@ allocCarryLimbs refU signs = do
   return $ fst $ foldl (step refU) (mempty, 0) signs
   where
     step :: RefU -> ([Limb], Int) -> (Bool, Width) -> ([Limb], Int)
-    step ref (acc, offset) (sign, width) = (Limb.newOperand ref width offset sign : acc, offset + width)
+    step ref (acc, offset) (sign, width) = (Limb.newOperand (Slice ref offset (offset + width)) sign : acc, offset + width)
 
 -- | Allocates an ordinary positie limb
 allocLimb :: (GaloisField n, Integral n) => Width -> M n Limb
 allocLimb w = do
   ref <- freshRefU w
-  return $ Limb.newOperand ref w 0 True
+  return $ Limb.newOperand (Slice ref 0 w) True
 
 -- | Allocates a carry Slice with the given signs
 allocCarrySlice :: (GaloisField n, Integral n) => [Bool] -> M n [(Slice, n)]

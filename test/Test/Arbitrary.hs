@@ -24,6 +24,7 @@ import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (HasWidth (widthOf), Width)
 import Test.QuickCheck
+import qualified Keelung.Data.Limb as Limb
 
 --------------------------------------------------------------------------------
 
@@ -127,7 +128,7 @@ instance Arbitrary Limb where
   arbitrary = do
     width <- chooseInt (1, 8)
     slice <- arbitrarySliceOfWidth width
-    return $ Slice.toLimb slice
+    return $ Limb.newOperand slice True
 
 --------------------------------------------------------------------------------
 

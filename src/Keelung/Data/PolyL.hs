@@ -42,9 +42,9 @@ import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.Limb (Limb)
+import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
-import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.SlicePolynomial (SlicePoly)
 import Keelung.Data.SlicePolynomial qualified as SlicePoly
 import Prelude hiding (negate, null)
@@ -229,7 +229,7 @@ limbsToSlicePoly =
   SlicePoly.fromSlices
     . concatMap
       ( \(limb, n) ->
-          [(slice, n * fromInteger n') | (slice, n') <- Slice.fromLimb limb]
+          [(slice, n * fromInteger n') | (slice, n') <- Limb.toSlice limb]
       )
 
 mergeRefsAndClean :: (Integral n, Ord a) => Map a n -> Map a n -> Map a n

@@ -20,7 +20,7 @@ import Keelung.Data.LC qualified as LC
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
-import Keelung.Data.Slice qualified as Slice
+import Keelung.Data.Slice (Slice (Slice))
 import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
 
@@ -116,10 +116,10 @@ mulnxn maxHeight limbWidth limbNumber out ref operand = do
           let currentLimbWidthX = limbWidth `min` widthOf ref `min` (outWidth - (limbWidth * xi))
           let currentLimbWidthY = limbWidth `min` widthOf ref `min` (outWidth - (limbWidth * yi))
 
-          let x = Limb.newOperand ref currentLimbWidthX (limbWidth * xi) True
+          let x = Limb.newOperand (Slice ref (limbWidth * xi) (limbWidth * xi + currentLimbWidthX)) True
           let y = case operand of
                 Right constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
-                Left refY -> Right (0, Limb.newOperand refY currentLimbWidthY (limbWidth * yi) True)
+                Left refY -> Right (0, Limb.newOperand (Slice refY (limbWidth * yi) (limbWidth * yi + currentLimbWidthY)) True)
           let index = xi + yi
 
           (lowerLimb, upperLimb) <- mul2Limbs limbWidth (0, x) y
@@ -143,7 +143,8 @@ mulnxn maxHeight limbWidth limbNumber out ref operand = do
         -- calculate the segment of the output RefU to be written
         let limbStart = limbWidth * index
         let currentLimbWidth = limbWidth `min` (outWidth - limbStart)
-        let outputLimb = Limb.newOperand out currentLimbWidth limbStart True
+        let outputSlice = Slice out limbStart (limbStart + currentLimbWidth)
+        let outputLimb = Limb.newOperand outputSlice True
 
         -- see if there's a stack of limbs to be added to the output limb
         case IntMap.lookup index limbColumns of
@@ -151,7 +152,7 @@ mulnxn maxHeight limbWidth limbNumber out ref operand = do
           Nothing -> do
             if previousCarryLimbs == mempty
               then do
-                writeLimbVal outputLimb 0
+                writeSliceVal outputSlice 0
                 return mempty -- no carry
               else addLimbColumn maxHeight outputLimb previousCarryLimbs
     )
@@ -174,7 +175,7 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       lowerSlice <- allocSlice currentLimbWidth
       upperSlice <- allocSlice upperLimbWidth
 
-      let x' = fmap (second ((* constant) . fromInteger)) (Slice.fromLimb x)
+      let x' = fmap (second ((* constant) . fromInteger)) (Limb.toSlice x)
       writeAdd
         (a * constant)
         []
@@ -182,8 +183,8 @@ mul2Limbs currentLimbWidth (a, x) operand = do
             : (upperSlice, -(2 ^ currentLimbWidth))
             : x'
         )
-      let lowerLimb = Slice.toLimb lowerSlice
-      let upperLimb = Slice.toLimb upperSlice
+      let lowerLimb = Limb.newOperand lowerSlice True
+      let upperLimb = Limb.newOperand upperSlice True
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       let carryLimbWidth = widthOf x + widthOf y - currentLimbWidth
@@ -196,6 +197,6 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       let rightHandSide = LC.new 0 [] [(lowerSlice, 1), (upperSlice, 2 ^ currentLimbWidth)]
       writeMulWithLC firstOperand secondOperand rightHandSide
 
-      let lowerLimb = Slice.toLimb lowerSlice
-      let upperLimb = Slice.toLimb upperSlice
+      let lowerLimb = Limb.newOperand lowerSlice True
+      let upperLimb = Limb.newOperand upperSlice True
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)

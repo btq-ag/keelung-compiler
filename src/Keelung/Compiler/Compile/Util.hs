@@ -26,8 +26,8 @@ calculateBounds constant = foldl step (constant, constant)
   where
     step :: (Integer, Integer) -> Limb -> (Integer, Integer)
     step (lower, upper) limb = case limb of
-      Limb.OperandLimb _ _ _ True -> (lower, upper + 2 ^ widthOf limb - 1)
-      Limb.OperandLimb _ _ _ False -> (lower - 2 ^ widthOf limb + 1, upper)
+      Limb.OperandLimb _ True -> (lower, upper + 2 ^ widthOf limb - 1)
+      Limb.OperandLimb _ False -> (lower - 2 ^ widthOf limb + 1, upper)
       Limb.CarryLimb _ xs -> let (lower', upper') = calculateBoundsOfSigns (lower, upper) (toList xs) in (lower + lower', upper + upper')
 
     calculateBoundsOfSigns :: (Integer, Integer) -> [(Bool, Int)] -> (Integer, Integer)

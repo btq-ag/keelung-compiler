@@ -19,6 +19,7 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice (Slice))
 import Keelung.Data.U (U)
 import Keelung.Field (FieldType (..))
 import Keelung.Syntax (Width, widthOf)
@@ -76,9 +77,9 @@ compileAdd width out refs constant = do
                   let currentLimbWidth = limbWidth `min` (width - start)
                       -- positive limbs
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                      column = LimbColumn.new constantSegment [Limb.newOperand ref currentLimbWidth start sign | (ref, sign) <- refs]
+                      column = LimbColumn.new constantSegment [Limb.newOperand (Slice ref start (start + currentLimbWidth)) sign | (ref, sign) <- refs]
                       -- negative limbs
-                      resultLimb = Limb.newOperand out currentLimbWidth start True
+                      resultLimb = Limb.newOperand (Slice out start (start + currentLimbWidth)) True
                    in (column, resultLimb)
               )
               [0, limbWidth .. width - 1] -- index of the first bit of each limb

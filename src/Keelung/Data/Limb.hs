@@ -2,15 +2,26 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Keelung.Data.Limb
-  ( Limb (..),
+  ( -- * Constructions
+    Limb (..),
     limbRef,
+    newOperand,
+
+    -- * Conversion
+    toSlice,
+    toSliceWithValue,
+
+    -- * Operations
+    trim,
+
+    -- * Query
+    isPositive,
+    null,
+
+    -- * Signs of carry limbs
     Signs,
     splitAtSigns,
     signsToListWithOffsets,
-    newOperand,
-    isPositive,
-    trim,
-    null,
   )
 where
 
@@ -20,7 +31,10 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
-import Keelung.Syntax
+import Keelung.Data.Slice (Slice (..))
+import Keelung.Data.Slice qualified as Slice
+import Keelung.Data.U qualified as U
+import Keelung.Syntax hiding (slice)
 import Prelude hiding (null)
 
 --------------------------------------------------------------------------------
@@ -46,20 +60,16 @@ signsToListWithOffsets = fst . foldl go ([], 0) . toList
 --------------------------------------------------------------------------------
 
 data Limb
-  = OperandLimb
-      RefU -- the reference of the limb
-      Width -- width of the limb
-      Int -- offset of which the limb starts
-      Bool -- sign of the limb
+  = OperandLimb Slice Bool
   | CarryLimb RefU Signs
   deriving (Eq, Ord, Generic, NFData)
 
 limbRef :: Limb -> RefU
-limbRef (OperandLimb ref _ _ _) = ref
+limbRef (OperandLimb slice _) = Slice.sliceRefU slice
 limbRef (CarryLimb ref _) = ref
 
 instance HasWidth Limb where
-  widthOf (OperandLimb _ w _ _) = w
+  widthOf (OperandLimb slice _) = widthOf slice
   widthOf (CarryLimb ref _) = widthOf ref
 
 instance Show Limb where
@@ -71,10 +81,39 @@ instance Show Limb where
 --   returns (isPositive, string of the term)
 showAsTerms :: Limb -> (Bool, String)
 showAsTerms (CarryLimb ref signs) = (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> show ref <> "[" <> show offset <> ":" <> show (offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
-showAsTerms (OperandLimb ref width offset sign) = case width of
+showAsTerms (OperandLimb (Slice ref start end) sign) = case end - start of
   0 -> (True, "{Empty Limb}")
-  1 -> (sign, show ref <> "[" <> show offset <> "]")
-  _ -> (sign, show ref <> "[" <> show offset <> ":" <> show (offset + width) <> "]")
+  1 -> (sign, show ref <> "[" <> show start <> "]")
+  _ -> (sign, show ref <> "[" <> show start <> ":" <> show end <> "]")
+
+--------------------------------------------------------------------------------
+
+-- | Construct "Slice"s from a "Limb" with a list of coeffients
+toSlice :: Limb -> [(Slice, Integer)]
+toSlice (OperandLimb slice sign) = [(slice, if sign then 1 else -1)]
+toSlice (CarryLimb ref signs) = snd $ foldr (\(sign, width, offset) (i, acc) -> (i + width, (Slice ref i (i + width), if sign then 2 ^ offset else -(2 ^ offset)) : acc)) (0, []) (signsToListWithOffsets signs)
+
+-- | Like "fromLimb", but pairs the slices with chunks of the value
+toSliceWithValue :: Limb -> Integer -> [(Slice, Integer)]
+toSliceWithValue limb val = case limb of
+  OperandLimb slice sign -> [(slice, if sign then val else -val)]
+  CarryLimb ref signs ->
+    let u = U.new (widthOf limb) val
+     in snd $
+          foldr
+            ( \(sign, width, offset) (i, acc) ->
+                ( i + width,
+                  ( Slice ref i (i + width),
+                    let slicedVal = toInteger (U.slice u (offset, offset + width))
+                     in if sign then slicedVal else -slicedVal
+                  )
+                    : acc
+                )
+            )
+            (0, [])
+            (signsToListWithOffsets signs)
+
+--------------------------------------------------------------------------------
 
 -- | Helper function for converting integers to superscript strings
 toSuperscript :: Int -> String
@@ -92,24 +131,22 @@ toSuperscript = map convert . show
     convert _ = '⁹'
 
 -- | Construct a new operand Limb
---   invariant: the width of the limb must be less than or equal to the width of the RefU
-newOperand :: RefU -> Width -> Int -> Bool -> Limb
-newOperand refU width offset sign =
-  if width + offset > widthOf refU
-    then error "[ panic ] Limb.new: Limb width exceeds RefU width"
-    else OperandLimb refU width offset sign
+newOperand :: Slice -> Bool -> Limb
+newOperand = OperandLimb
 
--- | A limb is considered "positive" if all of its bits are positive
-isPositive :: Limb -> Bool
-isPositive (OperandLimb _ _ _ sign) = sign
-isPositive (CarryLimb _ signs) = and [sign | (sign, _) <- toList signs]
+--------------------------------------------------------------------------------
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb
-trim desiredWidth (OperandLimb ref width offset sign) = OperandLimb ref (width `min` desiredWidth) offset sign
+trim desiredWidth (OperandLimb (Slice ref start end) sign) = OperandLimb (Slice ref start (start + ((end - start) `min` desiredWidth))) sign
 trim _ (CarryLimb ref signs) = CarryLimb ref signs
 
 --------------------------------------------------------------------------------
+
+-- | A limb is considered "positive" if all of its bits are positive
+isPositive :: Limb -> Bool
+isPositive (OperandLimb _ sign) = sign
+isPositive (CarryLimb _ signs) = and [sign | (sign, _) <- toList signs]
 
 -- | See if a Limb is empty
 null :: Limb -> Bool

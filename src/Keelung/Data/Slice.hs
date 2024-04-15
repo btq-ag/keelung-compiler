@@ -5,12 +5,6 @@ module Keelung.Data.Slice
     Slice (..),
     fromRefU,
     fromRefUWithDesiredWidth,
-
-    -- * Conversion
-    fromLimb,
-    fromLimbWithValue,
-    toLimb,
-
     -- * Predicates
     null,
     overlaps,
@@ -31,10 +25,7 @@ where
 import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
 import Keelung (HasWidth, widthOf)
-import Keelung.Data.Limb (Limb)
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference (RefU (..))
-import Keelung.Data.U qualified as U
 import Keelung.Syntax (Width)
 import Prelude hiding (map, null)
 
@@ -95,35 +86,6 @@ aggregateSigns = step Nothing
       if sign == x
         then step (Just (i + 1, sign, width + 1, offset)) xs
         else (sign, width, offset) : step (Just (i + 1, x, 1, i)) xs
-
--- | Construct "Slice"s from a "Limb" with a list of coeffients
-fromLimb :: Limb -> [(Slice, Integer)]
-fromLimb (Limb.OperandLimb ref width offset sign) = [(Slice ref offset (offset + width), if sign then 1 else -1)]
-fromLimb (Limb.CarryLimb ref signs) = snd $ foldr (\(sign, width, offset) (i, acc) -> (i + width, (Slice ref i (i + width), if sign then 2 ^ offset else -(2 ^ offset)) : acc)) (0, []) (Limb.signsToListWithOffsets signs)
-
--- | Like "fromLimb", but pairs the slices with chunks of the value
-fromLimbWithValue :: Limb -> Integer -> [(Slice, Integer)]
-fromLimbWithValue limb val = case limb of
-  Limb.OperandLimb ref width offset sign -> [(Slice ref offset (offset + width), if sign then val else -val)]
-  Limb.CarryLimb ref signs ->
-    let u = U.new (widthOf limb) val
-     in snd $
-          foldr
-            ( \(sign, width, offset) (i, acc) ->
-                ( i + width,
-                  ( Slice ref i (i + width),
-                    let slicedVal = toInteger (U.slice u (offset, offset + width))
-                     in if sign then slicedVal else -slicedVal
-                  )
-                    : acc
-                )
-            )
-            (0, [])
-            (Limb.signsToListWithOffsets signs)
-
--- | Convert a "Slice" to a "Limb"
-toLimb :: Slice -> Limb
-toLimb (Slice ref start end) = Limb.newOperand ref (end - start) start True
 
 --------------------------------------------------------------------------------
 
