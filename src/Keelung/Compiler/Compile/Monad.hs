@@ -336,11 +336,11 @@ eqZero isEq (Polynomial polynomial) = do
 --------------------------------------------------------------------------------
 
 -- | Allocates a carry limb with the given signs
-allocCarryLimb :: (GaloisField n, Integral n) => Width -> [Bool] -> M n Limb
-allocCarryLimb w signs = do
-  refU <- freshRefU w
-  let aggregated = Slice.aggregateSigns signs
-  return $ Limb.new refU w 0 (Limb.Multiple (Seq.fromList (map (\(sign, width, _) -> (sign, width)) aggregated)))
+allocCarryLimb :: (GaloisField n, Integral n) => Limb.Signs -> M n Limb
+allocCarryLimb signs = do
+  let totalLength = sum (fmap snd signs)
+  refU <- freshRefU totalLength
+  return $ Limb.new refU totalLength 0 (Limb.Multiple signs)
 
 -- | Allocates an ordinary positie limb
 allocLimb :: (GaloisField n, Integral n) => Width -> M n Limb

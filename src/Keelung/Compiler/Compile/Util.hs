@@ -9,11 +9,13 @@ module Keelung.Compiler.Compile.Util
 where
 
 import Data.Bits qualified
+import Data.Foldable (toList)
 import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
+import Keelung (Width)
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.U (widthOfInteger)
-import Data.Foldable (toList)
 
 --------------------------------------------------------------------------------
 
@@ -33,24 +35,40 @@ calculateBounds constant = foldl step (constant, constant)
     calculateBoundsOfSigns (lower, upper) ((False, width) : xs) = let (lower', upper') = calculateBoundsOfSigns (lower, upper) xs in ((lower' - 1) * 2 ^ width + 1, upper' * 2 ^ width)
 
 -- | Like `calculateBounds`, but only retain the carry bits
-calculateCarrySigns :: Int -> Integer -> Seq Limb -> [Bool]
-calculateCarrySigns limbWidth constant limbs = drop limbWidth $ calculateSignsOfLimbs limbWidth constant limbs
+calculateCarrySigns :: Int -> Integer -> Seq Limb -> Limb.Signs
+calculateCarrySigns limbWidth constant limbs = snd $ Limb.splitAtSigns limbWidth $ calculateSignsOfLimbs limbWidth constant limbs
 
 -- | TODO: optimize this function (along with `calculateBounds` and `widthOfInteger` ...)
 -- | Calculate the signs of bits of the summation of some Limbs and a constant
-calculateSignsOfLimbs :: Int -> Integer -> Seq Limb -> [Bool]
+calculateSignsOfLimbs :: Int -> Integer -> Seq Limb -> Limb.Signs
 calculateSignsOfLimbs limbWidth constant limbs =
   let (lower_, upper) = calculateBounds constant limbs
    in if lower_ >= 0
         then
           let width = widthOfInteger upper
-           in replicate (width `max` limbWidth) True
+           in Seq.singleton (True, width `max` limbWidth)
         else -- if the lower bound is negative, round it to the nearest multiple of `2 ^ limbWidth` smaller than it!
 
           let lower = (lower_ `div` (2 ^ limbWidth)) * 2 ^ limbWidth
               width = widthOfInteger (upper - lower)
+              firstPart = Seq.fromList $ aggregateSigns $ map (not . Data.Bits.testBit (-lower)) [0 .. width - 1]
+              secondPart = Seq.singleton (True, limbWidth - width)
            in -- pad the signs to the width of limbs if necessary
-              map (not . Data.Bits.testBit (-lower)) [0 .. width - 1] <> replicate (limbWidth - width) True
+              if limbWidth - width > 0
+                then firstPart Seq.>< secondPart
+                else firstPart
+  where
+    aggregateSigns :: [Bool] -> [(Bool, Width)]
+    aggregateSigns = step Nothing
+      where
+        step :: Maybe (Bool, Width) -> [Bool] -> [(Bool, Width)]
+        step Nothing [] = []
+        step Nothing (x : xs) = step (Just (x, 1)) xs
+        step (Just (sign, width)) [] = [(sign, width)]
+        step (Just (sign, width)) (x : xs) =
+          if sign == x
+            then step (Just (sign, width + 1)) xs
+            else (sign, width) : step (Just (x, 1)) xs
 
 -- | Given a range, calculate the signs of bits such that the range can be represented by the bits
 rangeToBitSigns :: (Integer, Integer) -> [Bool]

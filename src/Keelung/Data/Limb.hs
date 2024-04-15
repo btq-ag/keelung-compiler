@@ -3,7 +3,9 @@
 
 module Keelung.Data.Limb
   ( Limb (lmbRef, lmbWidth, lmbOffset, lmbSigns),
+    Signs,
     Sign (..),
+    splitAtSigns,
     signsToListWithOffsets,
     showAsTerms,
     new,
@@ -27,25 +29,28 @@ import Prelude hiding (null)
 
 --------------------------------------------------------------------------------
 
+type Signs = Seq (Bool, Width) -- (sign, width), LSB first
+
 data Sign
   = Single Bool
-  | Multiple (Seq (Bool, Width)) -- (sign, width, offset), LSB first
+  | Multiple Signs
   deriving (Eq, Ord, Show, Generic, NFData)
 
-splitAtSigns :: Int -> Seq (Bool, Width) -> (Seq (Bool, Width), Seq (Bool, Width))
+splitAtSigns :: Int -> Signs -> (Signs, Signs)
 splitAtSigns 0 xs = (Seq.Empty, xs)
 splitAtSigns n xss = case Seq.viewl xss of
   Seq.EmptyL -> (Seq.Empty, Seq.Empty)
   (s, w) Seq.:< xs ->
-    if n > w
-      then let (left, right) = splitAtSigns (n - w) xs in ((s, w) Seq.<| left, right)
-      else (Seq.singleton (s, n), (s, w - n) Seq.<| xs)
+    case n `compare` w of 
+      GT -> let (left, right) = splitAtSigns (n - w) xs in ((s, w) Seq.<| left, right)
+      EQ -> ((s, w) Seq.<| Seq.Empty, xs)
+      LT -> (Seq.singleton (s, n), (s, w - n) Seq.<| xs)
 
-takeSigns :: Int -> Seq (Bool, Width) -> Seq (Bool, Width)
+takeSigns :: Int -> Signs -> Signs
 takeSigns n xs = fst $ splitAtSigns n xs
 
 -- | TODO: remove this function
-signsToListWithOffsets :: Seq (Bool, Width) -> [(Bool, Width, Int)]
+signsToListWithOffsets :: Signs -> [(Bool, Width, Int)]
 signsToListWithOffsets = fst . foldl go ([], 0) . toList
   where
     go (acc, offset) (sign, width) = ((sign, width, offset) : acc, offset + width)
