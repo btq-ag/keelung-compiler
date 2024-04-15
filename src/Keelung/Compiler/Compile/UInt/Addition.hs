@@ -133,11 +133,23 @@ addLimbColumnView resultLimb (LimbColumn.OneLimbOnly limb) = do
   return mempty
 addLimbColumnView resultLimb (LimbColumn.Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (lmbWidth resultLimb) constant limbs
-  carryLimb <- allocCarryLimb carrySigns
+  carryLimbsOld <- allocCarryLimb carrySigns
+  carryLimbs <- allocCarryLimbs (Limb.lmbRef carryLimbsOld) carrySigns
+  let weightedLimbs = [(limb, -(2 ^ (lmbWidth resultLimb + Limb.lmbOffset limb))) | limb <- carryLimbs]
   writeAddWithLimbs (fromInteger constant) [] $
     -- negative side
     (resultLimb, -1)
-      : (carryLimb, -(2 ^ lmbWidth resultLimb))
-      -- positive side
-      : fmap (,1) (toList limbs)
-  return $ LimbColumn.singleton carryLimb
+      : weightedLimbs
+        <>
+        -- positive side
+        fmap (,1) (toList limbs)
+  return $ LimbColumn.singleton carryLimbsOld
+
+-- carryLimb <- allocCarryLimb carrySigns
+-- writeAddWithLimbs (fromInteger constant) [] $
+--   -- negative side
+--   (resultLimb, -1)
+--     : (carryLimb, -(2 ^ lmbWidth resultLimb))
+--     -- positive side
+--     : fmap (,1) (toList limbs)
+-- return $ LimbColumn.singleton carryLimb

@@ -41,7 +41,7 @@ splitAtSigns 0 xs = (Seq.Empty, xs)
 splitAtSigns n xss = case Seq.viewl xss of
   Seq.EmptyL -> (Seq.Empty, Seq.Empty)
   (s, w) Seq.:< xs ->
-    case n `compare` w of 
+    case n `compare` w of
       GT -> let (left, right) = splitAtSigns (n - w) xs in ((s, w) Seq.<| left, right)
       EQ -> ((s, w) Seq.<| Seq.Empty, xs)
       LT -> (Seq.singleton (s, n), (s, w - n) Seq.<| xs)
@@ -85,14 +85,10 @@ instance Semigroup Limb where
 showAsTerms :: Limb -> (Bool, String)
 showAsTerms (Limb ref limbWidth i sign') = case (limbWidth, sign') of
   (0, _) -> (True, "{Empty Limb}")
-  (1, Single sign) -> (sign, "{$" <> show (RefUBit ref i) <> "}")
-  (2, Single sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + 2" <> toSuperscript 1 <> "$" <> show (RefUBit ref (i + 1)) <> "}")
-  (_, Single sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + ... + 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit ref (i + limbWidth - 1)) <> "}")
-  -- (_, MultipleOld signs) ->
-  --   let terms = mconcat [(if signs !! j then " + " else " - ") <> "2" <> toSuperscript j <> "$" <> show (RefUBit ref (i + j)) | j <- [0 .. limbWidth - 1]]
-  --    in (True, "{" <> terms <> "}")
+  (1, Single sign) -> (sign, show ref <> "[" <> show i <> "]")
+  (_, Single sign) -> (sign, show ref <> "[" <> show i <> ":" <> show (i + limbWidth) <> "]")
   (_, Multiple signs) ->
-    (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit ref (i + offset)) <> "[" <> show (i + offset) <> ":" <> show (i + offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
+    (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> show ref <> "[" <> show (i + offset) <> ":" <> show (i + offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
 
 -- | Helper function for converting integers to superscript strings
 toSuperscript :: Int -> String

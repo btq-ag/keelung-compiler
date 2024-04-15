@@ -7,9 +7,9 @@ import Control.Monad (replicateM)
 import Data.Word (Word8)
 import Keelung hiding (compile)
 import Test.Compilation.UInt.Addition.LimbBound qualified as LimbBound
-import Test.Util
 import Test.Hspec
 import Test.QuickCheck
+import Test.Util
 
 run :: IO ()
 run = hspec tests

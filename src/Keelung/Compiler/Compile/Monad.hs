@@ -342,6 +342,16 @@ allocCarryLimb signs = do
   refU <- freshRefU totalLength
   return $ Limb.new refU totalLength 0 (Limb.Multiple signs)
 
+-- | Allocates carry limbs with the given signs
+allocCarryLimbs :: (GaloisField n, Integral n) => RefU -> Limb.Signs -> M n [Limb]
+allocCarryLimbs refU signs = do
+  -- let totalLength = sum (fmap snd signs)
+  -- refU <- freshRefU totalLength
+  return $ fst $ foldl (step refU) (mempty, 0) signs
+  where
+    step :: RefU -> ([Limb], Int) -> (Bool, Width) -> ([Limb], Int)
+    step ref (acc, offset) (sign, width) = (Limb.new ref width offset (Limb.Single sign) : acc, offset + width)
+
 -- | Allocates an ordinary positie limb
 allocLimb :: (GaloisField n, Integral n) => Width -> M n Limb
 allocLimb w = do
