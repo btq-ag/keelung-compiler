@@ -98,16 +98,14 @@ aggregateSigns = step Nothing
 
 -- | Construct "Slice"s from a "Limb" with a list of coeffients
 fromLimb :: Limb -> [(Slice, Integer)]
-fromLimb limb = case Limb.unLimb limb of
-  Limb.Single ref width offset sign -> [(Slice ref offset (offset + width), if sign then 1 else -1)]
-  Limb.Multiple ref signs ->
-    snd $ foldr (\(sign, width, offset) (i, acc) -> (i + width, (Slice ref i (i + width), if sign then 2 ^ offset else -(2 ^ offset)) : acc)) (0, []) (Limb.signsToListWithOffsets signs)
+fromLimb (Limb.OperandLimb ref width offset sign) = [(Slice ref offset (offset + width), if sign then 1 else -1)]
+fromLimb (Limb.CarryLimb ref signs) = snd $ foldr (\(sign, width, offset) (i, acc) -> (i + width, (Slice ref i (i + width), if sign then 2 ^ offset else -(2 ^ offset)) : acc)) (0, []) (Limb.signsToListWithOffsets signs)
 
 -- | Like "fromLimb", but pairs the slices with chunks of the value
 fromLimbWithValue :: Limb -> Integer -> [(Slice, Integer)]
-fromLimbWithValue limb val = case Limb.unLimb limb of
-  Limb.Single ref width offset sign -> [(Slice ref offset (offset + width), if sign then val else -val)]
-  Limb.Multiple ref signs ->
+fromLimbWithValue limb val = case limb of
+  Limb.OperandLimb ref width offset sign -> [(Slice ref offset (offset + width), if sign then val else -val)]
+  Limb.CarryLimb ref signs ->
     let u = U.new (widthOf limb) val
      in snd $
           foldr
@@ -125,7 +123,7 @@ fromLimbWithValue limb val = case Limb.unLimb limb of
 
 -- | Convert a "Slice" to a "Limb"
 toLimb :: Slice -> Limb
-toLimb (Slice ref start end) = Limb.new ref (end - start) start (Limb.Single ref (widthOf ref) start True)
+toLimb (Slice ref start end) = Limb.newOperand ref (end - start) start True
 
 --------------------------------------------------------------------------------
 

@@ -76,9 +76,9 @@ compileAdd width out refs constant = do
                   let currentLimbWidth = limbWidth `min` (width - start)
                       -- positive limbs
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                      column = LimbColumn.new constantSegment [Limb.new ref currentLimbWidth start (Limb.Single ref currentLimbWidth start sign) | (ref, sign) <- refs]
+                      column = LimbColumn.new constantSegment [Limb.newOperand ref currentLimbWidth start sign | (ref, sign) <- refs]
                       -- negative limbs
-                      resultLimb = Limb.new out currentLimbWidth start (Limb.Single out currentLimbWidth start True)
+                      resultLimb = Limb.newOperand out currentLimbWidth start True
                    in (column, resultLimb)
               )
               [0, limbWidth .. width - 1] -- index of the first bit of each limb

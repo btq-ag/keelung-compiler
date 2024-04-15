@@ -5,14 +5,12 @@ module Keelung.Data.Limb
   ( Limb (..),
     limbRef,
     Signs,
-    Sign (..),
     splitAtSigns,
     signsToListWithOffsets,
-    showAsTerms,
-    new,
+    newOperand,
     isPositive,
-    null,
     trim,
+    null,
   )
 where
 
@@ -28,15 +26,6 @@ import Prelude hiding (null)
 --------------------------------------------------------------------------------
 
 type Signs = Seq (Bool, Width) -- (sign, width), LSB first
-
-data Sign
-  = Single RefU Width Int Bool
-  | Multiple RefU Signs
-  deriving (Eq, Ord, Show, Generic, NFData)
-
-instance HasWidth Sign where
-  widthOf (Single _ w _ _) = w
-  widthOf (Multiple ref _) = widthOf ref
 
 splitAtSigns :: Int -> Signs -> (Signs, Signs)
 splitAtSigns 0 xs = (Seq.Empty, xs)
@@ -56,29 +45,36 @@ signsToListWithOffsets = fst . foldl go ([], 0) . toList
 
 --------------------------------------------------------------------------------
 
-newtype Limb = Limb {unLimb :: Sign} deriving (Eq, Ord, Generic, NFData)
+data Limb
+  = OperandLimb
+      RefU -- the reference of the limb
+      Width -- width of the limb
+      Int -- offset of which the limb starts
+      Bool -- sign of the limb
+  | CarryLimb RefU Signs
+  deriving (Eq, Ord, Generic, NFData)
 
 limbRef :: Limb -> RefU
-limbRef (Limb (Single ref _ _ _)) = ref
-limbRef (Limb (Multiple ref _)) = ref
+limbRef (OperandLimb ref _ _ _) = ref
+limbRef (CarryLimb ref _) = ref
+
+instance HasWidth Limb where
+  widthOf (OperandLimb _ w _ _) = w
+  widthOf (CarryLimb ref _) = widthOf ref
 
 instance Show Limb where
   show limb =
     let (sign, terms) = showAsTerms limb
      in if sign then terms else "-" <> terms
 
-instance HasWidth Limb where
-  widthOf (Limb signs) = widthOf signs
-
 -- | For printing limbs as terms in a polynomial (signs are handled by the caller)
 --   returns (isPositive, string of the term)
 showAsTerms :: Limb -> (Bool, String)
-showAsTerms (Limb sign') = case sign' of
-  Multiple ref signs -> (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> show ref <> "[" <> show offset <> ":" <> show (offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
-  Single ref width offset sign -> case width of
-    0 -> (True, "{Empty Limb}")
-    1 -> (sign, show ref <> "[" <> show offset <> "]")
-    _ -> (sign, show ref <> "[" <> show offset <> ":" <> show (offset + width) <> "]")
+showAsTerms (CarryLimb ref signs) = (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> show ref <> "[" <> show offset <> ":" <> show (offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
+showAsTerms (OperandLimb ref width offset sign) = case width of
+  0 -> (True, "{Empty Limb}")
+  1 -> (sign, show ref <> "[" <> show offset <> "]")
+  _ -> (sign, show ref <> "[" <> show offset <> ":" <> show (offset + width) <> "]")
 
 -- | Helper function for converting integers to superscript strings
 toSuperscript :: Int -> String
@@ -95,24 +91,23 @@ toSuperscript = map convert . show
     convert '8' = '⁸'
     convert _ = '⁹'
 
--- | Construct a new 'Limb'
+-- | Construct a new operand Limb
 --   invariant: the width of the limb must be less than or equal to the width of the RefU
-new :: RefU -> Width -> Int -> Sign -> Limb
-new refU width offset signs =
+newOperand :: RefU -> Width -> Int -> Bool -> Limb
+newOperand refU width offset sign =
   if width + offset > widthOf refU
     then error "[ panic ] Limb.new: Limb width exceeds RefU width"
-    else Limb signs
+    else OperandLimb refU width offset sign
 
 -- | A limb is considered "positive" if all of its bits are positive
 isPositive :: Limb -> Bool
-isPositive limb = case unLimb limb of
-  Single _ _ _ sign -> sign
-  Multiple _ signs -> and [sign | (sign, _) <- toList signs]
+isPositive (OperandLimb _ _ _ sign) = sign
+isPositive (CarryLimb _ signs) = and [sign | (sign, _) <- toList signs]
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb
-trim desiredWidth (Limb (Single ref width offset sign)) = Limb (Single ref (width `min` desiredWidth) offset sign)
-trim _ (Limb (Multiple ref signs)) = Limb (Multiple ref signs)
+trim desiredWidth (OperandLimb ref width offset sign) = OperandLimb ref (width `min` desiredWidth) offset sign
+trim _ (CarryLimb ref signs) = CarryLimb ref signs
 
 --------------------------------------------------------------------------------
 
