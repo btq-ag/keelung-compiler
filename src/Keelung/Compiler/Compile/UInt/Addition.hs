@@ -16,7 +16,6 @@ import Keelung.Compiler.Compile.Util
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
-import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (Slice))
@@ -79,12 +78,12 @@ compileAdd width out refs constant = do
                       constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
                       column = LimbColumn.new constantSegment [Limb.newOperand (Slice ref start (start + currentLimbWidth)) sign | (ref, sign) <- refs]
                       -- negative limbs
-                      resultLimb = Limb.newOperand (Slice out start (start + currentLimbWidth)) True
-                   in (column, resultLimb)
+                      resultSlice = Slice out start (start + currentLimbWidth)
+                   in (column, resultSlice)
               )
               [0, limbWidth .. width - 1] -- index of the first bit of each limb
       foldM_
-        ( \prevCarries (column, resultLimb) -> addLimbColumn maxHeight resultLimb (prevCarries <> column)
+        ( \prevCarries (column, resultSlice) -> addLimbColumn maxHeight resultSlice (prevCarries <> column)
         )
         mempty
         ranges
@@ -99,22 +98,22 @@ compileSub width out (Left a) (Left b) = compileAdd width out [(a, True), (b, Fa
 --------------------------------------------------------------------------------
 
 -- | Add a column of limbs, and return a column of carry limbs
-addLimbColumn :: (GaloisField n, Integral n) => Int -> Limb -> LimbColumn -> M n LimbColumn
-addLimbColumn maxHeight finalResultLimb limbs = do
+addLimbColumn :: (GaloisField n, Integral n) => Int -> Slice -> LimbColumn -> M n LimbColumn
+addLimbColumn maxHeight finalResultSlice limbs = do
   -- trim the limbs so that their width does not exceed that of the result limb
-  let trimmedLimbs = LimbColumn.trim (widthOf finalResultLimb) limbs
+  let trimmedLimbs = LimbColumn.trim (widthOf finalResultSlice) limbs
   -- split the limbs into a stack of limbs and the rest of the column
   let (stack, rest) = LimbColumn.view maxHeight trimmedLimbs
   case rest of
     Nothing -> do
       -- base case, there are no more limbs to be processed
-      addLimbColumnView finalResultLimb stack
+      addLimbColumnView finalResultSlice stack
     Just rest' -> do
       -- inductive case, there are more limbs to be processed
-      resultLimb <- allocLimb (widthOf finalResultLimb)
-      carryLimbs <- addLimbColumnView resultLimb stack
+      resultSlice <- allocSlice (widthOf finalResultSlice)
+      carryLimbs <- addLimbColumnView resultSlice stack
       -- insert the result limb of the current batch to the next batch
-      moreCarryLimbs <- addLimbColumn maxHeight finalResultLimb (LimbColumn.insert resultLimb rest')
+      moreCarryLimbs <- addLimbColumn maxHeight finalResultSlice (LimbColumn.insert (Limb.newOperand resultSlice True) rest')
       return $ carryLimbs <> moreCarryLimbs
 
 -- | Compress a column of limbs into a single limb and some carry
@@ -124,34 +123,22 @@ addLimbColumn maxHeight finalResultLimb limbs = do
 --  +           [ operand ]
 -- -----------------------------
 --    [ carry  ][  result  ]
-addLimbColumnView :: (GaloisField n, Integral n) => Limb -> LimbColumn.View -> M n LimbColumn
-addLimbColumnView resultLimb (LimbColumn.OneConstantOnly constant) = do
+addLimbColumnView :: (GaloisField n, Integral n) => Slice -> LimbColumn.View -> M n LimbColumn
+addLimbColumnView resultSlice (LimbColumn.OneConstantOnly constant) = do
   -- no limb => result = constant, no carry
-  writeLimbVal resultLimb constant
+  writeSliceVal resultSlice constant
   return mempty
-addLimbColumnView resultLimb (LimbColumn.OneLimbOnly limb) = do
-  writeLimbEq resultLimb limb
+addLimbColumnView resultSlice (LimbColumn.OnePositiveLimbOnly slice) = do
+  writeSliceEq resultSlice slice
   return mempty
-addLimbColumnView resultLimb (LimbColumn.Ordinary constant limbs) = do
-  -- let carrySigns = calculateCarrySigns (widthOf resultLimb) constant limbs
-  -- carryLimbsOld <- allocCarryLimb carrySigns
-  -- carryLimbs <- allocCarryLimbs (Limb.lmbRef carryLimbsOld) carrySigns
-  -- let weightedLimbs = [(limb, -(2 ^ (widthOf resultLimb + Limb.lmbOffset limb))) | limb <- carryLimbs]
-  -- writeAddWithLimbs (fromInteger constant) [] $
-  --   -- negative side
-  --   (resultLimb, -1)
-  --     : weightedLimbs
-  --       <>
-  --       -- positive side
-  --       fmap (,1) (toList limbs)
-  -- return $ LimbColumn.singleton carryLimbsOld
-
-  let carrySigns = calculateCarrySigns (widthOf resultLimb) constant limbs
+addLimbColumnView resultSlice (LimbColumn.Ordinary constant limbs) = do
+  let carrySigns = calculateCarrySigns (widthOf resultSlice) constant limbs
   carryLimb <- allocCarryLimb carrySigns
+  let resultLimb = Limb.newOperand resultSlice True
   writeAddWithLimbs (fromInteger constant) [] $
     -- negative side
     (resultLimb, -1)
-      : (carryLimb, -(2 ^ widthOf resultLimb))
+      : (carryLimb, -(2 ^ widthOf resultSlice))
       -- positive side
       : fmap (,1) (toList limbs)
   return $ LimbColumn.singleton carryLimb

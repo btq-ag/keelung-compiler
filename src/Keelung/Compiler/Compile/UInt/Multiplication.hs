@@ -143,17 +143,15 @@ mulnxn maxHeight limbWidth limbNumber out ref operand = do
         let limbStart = limbWidth * index
         let currentLimbWidth = limbWidth `min` (outWidth - limbStart)
         let outputSlice = Slice out limbStart (limbStart + currentLimbWidth)
-        let outputLimb = Limb.newOperand outputSlice True
-
         -- see if there's a stack of limbs to be added to the output limb
         case IntMap.lookup index limbColumns of
-          Just limbs -> addLimbColumn maxHeight outputLimb (previousCarryLimbs <> limbs)
+          Just limbs -> addLimbColumn maxHeight outputSlice (previousCarryLimbs <> limbs)
           Nothing -> do
             if previousCarryLimbs == mempty
               then do
                 writeSliceVal outputSlice 0
                 return mempty -- no carry
-              else addLimbColumn maxHeight outputLimb previousCarryLimbs
+              else addLimbColumn maxHeight outputSlice previousCarryLimbs
     )
     mempty
     [0 .. limbNumber - 1]

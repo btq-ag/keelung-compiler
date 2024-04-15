@@ -4,6 +4,8 @@ import Data.Sequence (Seq, (<|))
 import Data.Sequence qualified as Seq
 import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
+import Keelung.Data.Slice (Slice)
+import Keelung.Data.Slice qualified as Slice
 
 --------------------------------------------------------------------------------
 
@@ -40,7 +42,7 @@ trim width (LimbColumn c xs) = LimbColumn c (fmap (Limb.trim width) xs)
 
 data View
   = Ordinary Integer (Seq Limb)
-  | OneLimbOnly Limb
+  | OnePositiveLimbOnly Slice
   | OneConstantOnly Integer
   deriving (Show, Eq)
 
@@ -53,7 +55,9 @@ view :: Int -> LimbColumn -> (View, Maybe LimbColumn)
 view _ (LimbColumn constant Seq.Empty) = (OneConstantOnly constant, Nothing)
 view _ (LimbColumn constant (limb Seq.:<| Seq.Empty)) =
   if constant == 0 && Limb.isPositive limb
-    then (OneLimbOnly limb, Nothing)
+    then case limb of
+      Limb.CarryLimb ref _ -> (OnePositiveLimbOnly (Slice.fromRefU ref), Nothing)
+      Limb.OperandLimb slice _ -> (OnePositiveLimbOnly slice, Nothing)
     else (Ordinary constant (Seq.singleton limb), Nothing)
 view maxHeight (LimbColumn constant limbs) =
   let (currentBatch, nextBatch) = Seq.splitAt (maxHeight - 1) limbs

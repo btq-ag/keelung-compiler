@@ -5,6 +5,7 @@ module Keelung.Data.Slice
     Slice (..),
     fromRefU,
     fromRefUWithDesiredWidth,
+
     -- * Predicates
     null,
     overlaps,
@@ -42,7 +43,10 @@ data Slice = Slice
 instance NFData Slice
 
 instance Show Slice where
-  show (Slice ref start end) = show ref <> "[" <> show start <> ":" <> show end <> "]"
+  show (Slice ref start end) =
+    if start + 1 == end
+      then show ref <> "[" <> show start <> "]"
+      else show ref <> "[" <> show start <> ":" <> show end <> "]"
 
 instance HasWidth Slice where
   widthOf (Slice _ start end) = end - start

@@ -23,7 +23,7 @@ import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
-import Keelung.Data.Slice (Slice (Slice))
+import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
@@ -242,10 +242,6 @@ writeRefBNEq x y = do
 writeRefUVal :: (GaloisField n, Integral n) => RefU -> U -> M n ()
 writeRefUVal x c = execRelations $ Relations.assignS (Slice.fromRefU x) (toInteger c)
 
--- | Assign an Integer to a Limb
-writeLimbVal :: (GaloisField n, Integral n) => Limb -> Integer -> M n ()
-writeLimbVal limb val = mapM_ (\(x, c) -> execRelations (Relations.assignS x (toInteger c))) (Limb.toSliceWithValue limb val)
-
 -- | Assign an Integer to a Slice
 writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
 writeSliceVal x c = execRelations $ Relations.assignS x (toInteger c)
@@ -253,19 +249,6 @@ writeSliceVal x c = execRelations $ Relations.assignS x (toInteger c)
 -- | Assert that two RefUs are equal
 writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
 writeRefUEq x y = execRelations $ Relations.relateS (Slice.fromRefU x) (Slice.fromRefU y)
-
--- | Assert that two Limbs are equal
--- TODO: eliminate this function
-writeLimbEq :: (GaloisField n, Integral n) => Limb -> Limb -> M n ()
-writeLimbEq a b =
-  let as = Limb.toSlice a
-      bs = Limb.toSlice b
-   in case (as, bs) of
-        ([(sliceA, coeffA)], [(sliceB, coeffB)]) ->
-          if coeffA == coeffB
-            then writeSliceEq sliceA sliceB
-            else error $ "[ panic ] writeLimbEq: coefficient mismatch, " <> show coeffA <> " /= " <> show coeffB
-        _ -> error $ "[ panic ] writeLimbEq: unexpected number of slices, " <> show (length as) <> " /= " <> show (length bs)
 
 -- | Assert that two Slices are equal
 writeSliceEq :: (GaloisField n, Integral n) => Slice -> Slice -> M n ()
@@ -338,25 +321,8 @@ eqZero isEq (Polynomial polynomial) = do
 -- | Allocates a carry limb with the given signs
 allocCarryLimb :: (GaloisField n, Integral n) => Limb.Signs -> M n Limb
 allocCarryLimb signs = do
-  let totalLength = sum (fmap snd signs)
-  ref <- freshRefU totalLength
+  ref <- freshRefU (widthOf signs)
   return (Limb.CarryLimb ref signs)
-
--- | Allocates carry limbs with the given signs
-allocCarryLimbs :: (GaloisField n, Integral n) => RefU -> Limb.Signs -> M n [Limb]
-allocCarryLimbs refU signs = do
-  -- let totalLength = sum (fmap snd signs)
-  -- refU <- freshRefU totalLength
-  return $ fst $ foldl (step refU) (mempty, 0) signs
-  where
-    step :: RefU -> ([Limb], Int) -> (Bool, Width) -> ([Limb], Int)
-    step ref (acc, offset) (sign, width) = (Limb.newOperand (Slice ref offset (offset + width)) sign : acc, offset + width)
-
--- | Allocates an ordinary positie limb
-allocLimb :: (GaloisField n, Integral n) => Width -> M n Limb
-allocLimb w = do
-  ref <- freshRefU w
-  return $ Limb.newOperand (Slice ref 0 w) True
 
 -- | Allocates a carry Slice with the given signs
 allocCarrySlice :: (GaloisField n, Integral n) => [Bool] -> M n [(Slice, n)]

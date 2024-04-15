@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Keelung.Data.Limb
   ( -- * Constructions
@@ -41,6 +42,9 @@ import Prelude hiding (null)
 
 type Signs = Seq (Bool, Width) -- (sign, width), LSB first
 
+instance HasWidth Signs where
+  widthOf = sum . fmap snd
+
 splitAtSigns :: Int -> Signs -> (Signs, Signs)
 splitAtSigns 0 xs = (Seq.Empty, xs)
 splitAtSigns n xss = case Seq.viewl xss of
@@ -76,15 +80,12 @@ instance Show Limb where
   show limb =
     let (sign, terms) = showAsTerms limb
      in if sign then terms else "-" <> terms
-
--- | For printing limbs as terms in a polynomial (signs are handled by the caller)
---   returns (isPositive, string of the term)
-showAsTerms :: Limb -> (Bool, String)
-showAsTerms (CarryLimb ref signs) = (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> show ref <> "[" <> show offset <> ":" <> show (offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
-showAsTerms (OperandLimb (Slice ref start end) sign) = case end - start of
-  0 -> (True, "{Empty Limb}")
-  1 -> (sign, show ref <> "[" <> show start <> "]")
-  _ -> (sign, show ref <> "[" <> show start <> ":" <> show end <> "]")
+    where
+      -- \| For printing limbs as terms in a polynomial (signs are handled by the caller)
+      --   returns (isPositive, string of the term)
+      showAsTerms :: Limb -> (Bool, String)
+      showAsTerms (CarryLimb ref signs) = (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> show ref <> "[" <> show offset <> ":" <> show (offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
+      showAsTerms (OperandLimb slice sign) = (sign, show slice)
 
 --------------------------------------------------------------------------------
 

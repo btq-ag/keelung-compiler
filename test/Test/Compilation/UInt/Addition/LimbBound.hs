@@ -10,6 +10,7 @@ import Keelung.Data.Reference (RefU (RefUX))
 import Keelung.Data.Slice (Slice (Slice))
 import Test.Hspec
 import Test.QuickCheck
+import Keelung (widthOf)
 
 run :: IO ()
 run = hspec tests
@@ -113,7 +114,7 @@ tests = describe "Limb Bound Calculation" $ do
     forAll genLimbs $ \(width, constant, limbs) -> do
       let signs = calculateSignsOfLimbs width constant limbs
       -- should be long enough
-      sum (fmap snd signs) >= width `shouldBe` True
+      widthOf signs >= width `shouldBe` True
       -- should be positive
       fst (Limb.splitAtSigns width signs) `shouldBe` Seq.fromList [(True, width)]
 
