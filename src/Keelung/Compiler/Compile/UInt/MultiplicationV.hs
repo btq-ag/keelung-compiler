@@ -116,10 +116,10 @@ mulnxn maxHeight limbWidth limbNumber out var operand = do
           let currentLimbWidthX = limbWidth `min` widthOf var `min` (outWidth - (limbWidth * xi))
           let currentLimbWidthY = limbWidth `min` widthOf var `min` (outWidth - (limbWidth * yi))
 
-          let x = Limb.new var currentLimbWidthX (limbWidth * xi) (Left True)
+          let x = Limb.new var currentLimbWidthX (limbWidth * xi) (Limb.Single True)
           let y = case operand of
                 Right constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
-                Left variable -> Right (0, Limb.new variable currentLimbWidthY (limbWidth * yi) (Left True))
+                Left variable -> Right (0, Limb.new variable currentLimbWidthY (limbWidth * yi) (Limb.Single True))
           let index = xi + yi
 
           (lowerLimb, upperLimb) <- mul2Limbs limbWidth (0, x) y
@@ -143,7 +143,7 @@ mulnxn maxHeight limbWidth limbNumber out var operand = do
         -- calculate the segment of the output RefU to be written
         let limbStart = limbWidth * index
         let currentLimbWidth = limbWidth `min` (outWidth - limbStart)
-        let outputLimb = Limb.new out currentLimbWidth limbStart (Left True)
+        let outputLimb = Limb.new out currentLimbWidth limbStart (Limb.Single True)
 
         -- see if there's a stack of limbs to be added to the output limb
         case IntMap.lookup index limbColumns of

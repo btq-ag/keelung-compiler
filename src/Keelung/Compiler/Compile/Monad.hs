@@ -339,13 +339,13 @@ eqZero isEq (Polynomial polynomial) = do
 allocCarryLimb :: (GaloisField n, Integral n) => Width -> [Bool] -> M n Limb
 allocCarryLimb w signs = do
   refU <- freshRefU w
-  return $ Limb.new refU w 0 (Right signs)
+  return $ Limb.new refU w 0 (Limb.MultipleOld signs)
 
 -- | Allocates an ordinary positie limb
 allocLimb :: (GaloisField n, Integral n) => Width -> M n Limb
 allocLimb w = do
   refU <- freshRefU w
-  return $ Limb.new refU w 0 (Left True)
+  return $ Limb.new refU w 0 (Limb.Single True)
 
 -- | Allocates a carry Slice with the given signs
 allocCarrySlice :: (GaloisField n, Integral n) => [Bool] -> M n [(Slice, n)]

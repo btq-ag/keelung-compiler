@@ -3,6 +3,8 @@
 
 module Keelung.Data.Limb
   ( Limb (lmbRef, lmbWidth, lmbOffset, lmbSigns),
+    Sign (..),
+    signsToListWithOffsets,
     showAsTerms,
     new,
     isPositive,
@@ -15,10 +17,39 @@ module Keelung.Data.Limb
 where
 
 import Control.DeepSeq (NFData)
+import Data.Foldable (toList)
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
 import Keelung.Syntax
 import Prelude hiding (null)
+
+--------------------------------------------------------------------------------
+
+data Sign
+  = Single Bool
+  | MultipleOld [Bool]
+  | MultipleNew (Seq (Bool, Width)) -- (sign, width, offset), LSB first
+  deriving (Eq, Ord, Show, Generic, NFData)
+
+splitAtSigns :: Int -> Seq (Bool, Width) -> (Seq (Bool, Width), Seq (Bool, Width))
+splitAtSigns 0 xs = (Seq.Empty, xs)
+splitAtSigns n xss = case Seq.viewl xss of
+  Seq.EmptyL -> (Seq.Empty, Seq.Empty)
+  (s, w) Seq.:< xs ->
+    if n > w
+      then let (left, right) = splitAtSigns (n - w) xs in ((s, w) Seq.<| left, right)
+      else (Seq.singleton (s, n), (s, w - n) Seq.<| xs)
+
+takeSigns :: Int -> Seq (Bool, Width) -> Seq (Bool, Width)
+takeSigns n xs = fst $ splitAtSigns n xs
+
+-- | TODO: remove this function
+signsToListWithOffsets :: Seq (Bool, Width) -> [(Bool, Width, Int)]
+signsToListWithOffsets = fst . foldl go ([], 0) . toList
+  where
+    go (acc, offset) (sign, width) = ((sign, width, offset) : acc, offset + width)
 
 --------------------------------------------------------------------------------
 
@@ -31,7 +62,7 @@ data Limb = Limb
     lmbOffset :: Int,
     -- | Left: Sign of all bits
     -- | Right: Signs of each bit, LSB first
-    lmbSigns :: Either Bool [Bool]
+    lmbSigns :: Sign
   }
   deriving (Eq, Ord, Generic, NFData)
 
@@ -51,12 +82,14 @@ instance Semigroup Limb where
 showAsTerms :: Limb -> (Bool, String)
 showAsTerms (Limb ref limbWidth i sign') = case (limbWidth, sign') of
   (0, _) -> (True, "{Empty Limb}")
-  (1, Left sign) -> (sign, "{$" <> show (RefUBit ref i) <> "}")
-  (2, Left sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + 2" <> toSuperscript 1 <> "$" <> show (RefUBit ref (i + 1)) <> "}")
-  (_, Left sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + ... + 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit ref (i + limbWidth - 1)) <> "}")
-  (_, Right signs) ->
+  (1, Single sign) -> (sign, "{$" <> show (RefUBit ref i) <> "}")
+  (2, Single sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + 2" <> toSuperscript 1 <> "$" <> show (RefUBit ref (i + 1)) <> "}")
+  (_, Single sign) -> (sign, "{$" <> show (RefUBit ref i) <> " + ... + 2" <> toSuperscript (limbWidth - 1) <> "$" <> show (RefUBit ref (i + limbWidth - 1)) <> "}")
+  (_, MultipleOld signs) ->
     let terms = mconcat [(if signs !! j then " + " else " - ") <> "2" <> toSuperscript j <> "$" <> show (RefUBit ref (i + j)) | j <- [0 .. limbWidth - 1]]
      in (True, "{" <> terms <> "}")
+  (_, MultipleNew signs) ->
+    (True, mconcat [(if sign then " + " else " - ") <> "2" <> toSuperscript offset <> "$" <> show (RefUBit ref (i + offset)) <> "[" <> show (i + offset) <> ":" <> show (i + offset + width) <> "]" | (sign, width, offset) <- signsToListWithOffsets signs])
 
 -- | Helper function for converting integers to superscript strings
 toSuperscript :: Int -> String
@@ -75,7 +108,7 @@ toSuperscript = map convert . show
 
 -- | Construct a new 'Limb'
 --   invariant: the width of the limb must be less than or equal to the width of the RefU
-new :: RefU -> Width -> Int -> Either Bool [Bool] -> Limb
+new :: RefU -> Width -> Int -> Sign -> Limb
 new refU width offset signs =
   if width + offset > widthOf refU
     then error "[ panic ] Limb.new: Limb width exceeds RefU width"
@@ -90,13 +123,15 @@ new refU width offset signs =
 -- | A limb is considered "positive" if all of its bits are positive
 isPositive :: Limb -> Bool
 isPositive limb = case lmbSigns limb of
-  Left sign -> sign
-  Right signs -> and signs
+  Single sign -> sign
+  MultipleOld signs -> and signs
+  MultipleNew signs -> and [sign | (sign, _) <- toList signs]
 
 -- | Trim a 'Limb' to a given width.
 trim :: Width -> Limb -> Limb
-trim width (Limb ref w offset (Left sign)) = Limb ref (w `min` width) offset (Left sign)
-trim width (Limb ref w offset (Right signs)) = Limb ref (w `min` width) offset (Right (take (w `min` width) signs))
+trim width (Limb ref w offset (Single sign)) = Limb ref (w `min` width) offset (Single sign)
+trim width (Limb ref w offset (MultipleOld signs)) = Limb ref (w `min` width) offset (MultipleOld (take (w `min` width) signs))
+trim width (Limb ref w offset (MultipleNew signs)) = Limb ref (w `min` width) offset (MultipleNew (takeSigns (w `min` width) signs))
 
 data SplitError = OffsetOutOfBound
   deriving (Eq)
@@ -109,16 +144,22 @@ safeSplit :: Int -> Limb -> Either SplitError (Limb, Limb)
 safeSplit index (Limb ref w offset s)
   | index < 0 || index > w = Left OffsetOutOfBound
   | otherwise = case s of
-      Left sign ->
+      Single sign ->
         Right
-          ( Limb ref index offset (Left sign),
-            Limb ref (w - index) (offset + index) (Left sign)
+          ( Limb ref index offset (Single sign),
+            Limb ref (w - index) (offset + index) (Single sign)
           )
-      Right signs ->
+      MultipleOld signs ->
         Right
-          ( Limb ref index offset (Right (take index signs)),
-            Limb ref (w - index) (offset + index) (Right (drop index signs))
+          ( Limb ref index offset (MultipleOld (take index signs)),
+            Limb ref (w - index) (offset + index) (MultipleOld (drop index signs))
           )
+      MultipleNew signs ->
+        let (leftSigns, rightSigns) = splitAtSigns index signs
+         in Right
+              ( Limb ref index offset (MultipleNew leftSigns),
+                Limb ref (w - index) (offset + index) (MultipleNew rightSigns)
+              )
 
 -- | Split a 'Limb' into two 'Limb's at a given index of the RefU (unsafe exception-throwing version of `safeSplit`)
 split :: Int -> Limb -> (Limb, Limb)
@@ -159,10 +200,18 @@ safeMerge (Limb ref1 width1 offset1 signs1) (Limb ref2 width2 offset2 signs2)
       LT -> Left NotAdjacent
       GT -> Left Overlapping
       EQ -> Right $ Limb ref1 (width1 + width2) offset1 $ case (signs1, signs2) of
-        (Left True, Left True) -> Left True
-        (Left False, Left False) -> Left False
-        (Left True, Left False) -> Right (replicate width1 True <> replicate width2 False)
-        (Left False, Left True) -> Right (replicate width1 False <> replicate width2 True)
-        (Left sign, Right signs) -> Right (replicate width1 sign <> signs)
-        (Right signs, Left sign) -> Right (signs <> replicate width2 sign)
-        (Right ss1, Right ss2) -> Right (ss1 <> ss2)
+        (Single True, Single True) -> Single True
+        (Single False, Single False) -> Single False
+        (Single True, Single False) -> MultipleOld (replicate width1 True <> replicate width2 False)
+        (Single False, Single True) -> MultipleOld (replicate width1 False <> replicate width2 True)
+        (Single sign, MultipleOld signs) -> MultipleOld (replicate width1 sign <> signs)
+        (MultipleOld signs, Single sign) -> MultipleOld (signs <> replicate width2 sign)
+        (MultipleOld ss1, MultipleOld ss2) -> MultipleOld (ss1 <> ss2)
+        -- (Single sign, MultipleNew signs) -> case Seq.viewl signs of
+        --   Seq.EmptyL -> Single sign
+        --   (s, w, o) Seq.:< signss ->
+        --     if sign == s
+        --       then MultipleNew ((s, w + 1, o) Seq.<| signss)
+        --       else MultipleNew ( _ Seq.<| (s, w, o)  Seq.<| signss)
+        -- MultipleNew $ Seq.singleton (sign, width1, 0) <> fmap (\(s, w, o) -> (s, w, o + width1)) signs
+        _ -> error "[ panic ] Limb.safeMerge: MultipleNew not supported yet"
