@@ -350,13 +350,13 @@ allocCarryLimbs refU signs = do
   return $ fst $ foldl (step refU) (mempty, 0) signs
   where
     step :: RefU -> ([Limb], Int) -> (Bool, Width) -> ([Limb], Int)
-    step ref (acc, offset) (sign, width) = (Limb.new ref width offset (Limb.Single ref sign) : acc, offset + width)
+    step ref (acc, offset) (sign, width) = (Limb.new ref width offset (Limb.Single ref width offset sign) : acc, offset + width)
 
 -- | Allocates an ordinary positie limb
 allocLimb :: (GaloisField n, Integral n) => Width -> M n Limb
 allocLimb w = do
   ref <- freshRefU w
-  return $ Limb.new ref w 0 (Limb.Single ref True)
+  return $ Limb.new ref w 0 (Limb.Single ref w 0 True)
 
 -- | Allocates a carry Slice with the given signs
 allocCarrySlice :: (GaloisField n, Integral n) => [Bool] -> M n [(Slice, n)]
