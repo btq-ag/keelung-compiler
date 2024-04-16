@@ -16,6 +16,7 @@ module Test.Util
     debugWithOptsI,
     -- testing by cross-validating the interpreter and the solver
     check,
+    checkO0,
     checkI,
     checkWithOpts,
     checkWithOptsI,
@@ -147,6 +148,9 @@ checkWithOpts options program rawPublicInputs rawPrivateInputs expected = caseFi
 
 check :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
 check = checkWithOpts . Options.new
+
+checkO0 :: (Encode t) => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
+checkO0 fieldType = checkWithOpts ((Options.new fieldType) {Options.optOptimize = False})
 
 --------------------------------------------------------------------------------
 

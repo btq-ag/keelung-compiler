@@ -10,12 +10,12 @@ import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.UInt.CLMul qualified as CLMul
 import Keelung.Compiler.Compile.UInt.Comparison qualified as Comparison
 import Keelung.Compiler.Compile.UInt.Logical qualified as Logical
+import Keelung.Compiler.Compile.UInt.Mul qualified as Mul
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
-import qualified Keelung.Compiler.Compile.UInt.Mul as Mul
 
 --------------------------------------------------------------------------------
 
@@ -38,23 +38,31 @@ assertDivModU width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder
-  dividendRef <- wireU dividend
-  divisorRef <- wireU divisor
-  quotientRef <- wireU quotient
-  remainderRef <- wireU remainder
+
+  let useAllocDoubleWidth = True
+  let applyFlag x = do
+        x' <- x
+        if useAllocDoubleWidth
+          then allocDoubleWidth x'
+          else return x'
+
+  dividendRef <- applyFlag $ wireU dividend
+  divisorRef <- applyFlag $ wireU divisor
+  quotientRef <- applyFlag $ wireU quotient
+  remainderRef <- applyFlag $ wireU remainder
 
   -- double the widths of these variables
-  dividendRef' <- allocDoubleWidth dividendRef
-  divisorRef' <- allocDoubleWidth divisorRef
-  quotientRef' <- allocDoubleWidth quotientRef
-  remainderRef' <- allocDoubleWidth remainderRef
+  -- dividendRef' <- allocDoubleWidth dividendRef
+  -- divisorRef' <- allocDoubleWidth divisorRef
+  -- quotientRef' <- allocDoubleWidth quotientRef
+  -- remainderRef' <- allocDoubleWidth remainderRef
 
   productDQ <- freshRefU (width * 2)
-  Mul.compile productDQ divisorRef' quotientRef'
-  compileSub (width * 2) productDQ dividendRef' remainderRef'
+  Mul.compile productDQ divisorRef quotientRef
+  compileSub (width * 2) productDQ dividendRef remainderRef
 
   -- 0 ≤ remainder < divisor
-  case (remainderRef', divisorRef') of
+  case (remainderRef, divisorRef) of
     (Left xVar, Left yVar) -> do
       result <- Boolean.computeLTUVarVar xVar yVar
       case result of
@@ -70,7 +78,7 @@ assertDivModU width dividend divisor quotient remainder = do
   -- 0 < divisor
   Comparison.assertGT width divisorRef 0
   -- add hint for DivMod
-  addDivModHint dividendRef' divisorRef' quotientRef' remainderRef'
+  addDivModHint dividendRef divisorRef quotientRef remainderRef
 
 -- | Carry-less division with remainder on UInts
 --    1. dividend = divisor .*. quotient .^. remainder

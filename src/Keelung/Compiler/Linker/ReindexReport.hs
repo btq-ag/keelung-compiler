@@ -77,7 +77,7 @@ instance Monoid ReindexReport where
 
 data Error
   = VarSkipped IntSet -- Vars skipped after reindexing
-  | CarryLimbRefs [(Var, Set TaggedRef)] -- CarryLimb refs mapped to the same Var
+  | MultipleRefs [(Var, Set TaggedRef)] -- Multiple refs mapped to the same Var
   deriving (Show, Eq)
 
 -- | See if the report is valid, else return an error:
@@ -94,7 +94,7 @@ checkReport counters (ReindexReport xs) =
           if IntSet.null skippedVarsExcludingPinnedVars
             then Nothing
             else Just (VarSkipped skippedVars)
-        else Just (CarryLimbRefs multipleRefs)
+        else Just (MultipleRefs multipleRefs)
 
 --------------------------------------------------------------------------------
 
