@@ -9,7 +9,6 @@ module Keelung.Data.LC
     neg,
     (*.),
     fromRefU,
-    fromLimbs,
     fromEither,
   )
 where
@@ -20,7 +19,6 @@ import Data.Field.Galois
 import GHC.Generics (Generic)
 import Keelung (HasWidth (widthOf))
 import Keelung.Data.FieldInfo
-import Keelung.Data.Limb (Limb)
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -52,7 +50,7 @@ instance (Integral n, GaloisField n) => Semigroup (LC n) where
 instance (Integral n, GaloisField n) => Monoid (LC n) where
   mempty = Constant 0
 
--- | Construct a LC from a constant, Refs, and Limbs
+-- | Construct a LC from a constant, Refs, and Slices
 new :: (Integral n, GaloisField n) => n -> [(Ref, n)] -> [(Slice, n)] -> LC n
 new constant refs slices = fromEither (PolyL.new constant refs slices)
 
@@ -76,10 +74,6 @@ fromRefU fieldInfo (Right val) =
 fromRefU fieldInfo (Left var) =
   let slices = Slice.fromRefUWithDesiredWidth (fieldWidth fieldInfo) var
    in map (Polynomial . PolyL.fromSlice 0) slices
-
--- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
-fromLimbs :: (Integral n, GaloisField n) => n -> [(Limb, n)] -> LC n
-fromLimbs c = fromEither . PolyL.fromLimbs c
 
 --------------------------------------------------------------------------------
 

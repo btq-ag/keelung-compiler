@@ -7,8 +7,6 @@ import Data.Bifunctor (second)
 import Data.Field.Galois (Prime)
 import Data.Map (Map)
 import Data.Map qualified as Map
-import Keelung.Data.Limb (Limb)
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.PolyL (PolyL)
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -25,9 +23,6 @@ run = hspec tests
 toRefMap :: (Integral n) => [(Ref, n)] -> Map Ref n
 toRefMap = Map.filter (/= 0) . Map.fromListWith (+)
 
-toLimbMap :: (Integral n) => [(Limb, n)] -> Map Limb n
-toLimbMap = Map.filterWithKey (\limb n -> not (Limb.null limb) && n /= 0) . Map.fromListWith (+)
-
 mergeRefMap :: (Integral n) => Map Ref n -> Map Ref n -> Map Ref n
 mergeRefMap xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
 
@@ -36,19 +31,6 @@ tests = describe "PolyRS" $ do
   it "should be valid" $ do
     property $ \poly -> do
       PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
-
-  describe "fromLimbs" $ do
-    it "should result in valid PolyL" $ do
-      property $ \(constant, limbs) -> do
-        case PolyL.fromLimbs constant limbs of
-          Left constant' -> do
-            constant' `shouldBe` constant
-            null (toLimbMap limbs) `shouldBe` True
-          Right poly -> do
-            PolyL.polyConstant poly `shouldBe` constant
-            -- PolyL.polyLimbs poly `shouldBe` toLimbMap limbs
-            -- SlicePoly.fromSlices (PolyL.toSlices poly) `shouldBe` SlicePoly.fromSlices (PolyL.toSlices poly1)
-            PolyL.validate (poly :: PolyL (Prime 17)) `shouldBe` Nothing
 
   describe "fromRefs" $ do
     it "should result in valid PolyL" $ do

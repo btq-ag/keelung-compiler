@@ -5,8 +5,6 @@ import Control.Monad.Writer
 import Data.Function (on)
 import Keelung.Compiler.Compile.Error (Error)
 import Keelung.Data.Reference
-import qualified Keelung.Data.Limb as Limb
-import Keelung.Data.Limb (Limb)
 
 --------------------------------------------------------------------------------
 
@@ -40,9 +38,6 @@ instance Seniority RefF where
 instance Seniority Ref where
   compareSeniority = compare `on` hasLevel
 
-instance Seniority Limb where
-  compareSeniority = compare `on` hasLevel
-
 --------------------------------------------------------------------------------
 
 class HasLevel a where
@@ -60,9 +55,6 @@ instance HasLevel RefU where
 instance HasLevel RefF where
   hasLevel (RefFX _) = 0
   hasLevel _ = 100
-
-instance HasLevel Limb where
-  hasLevel = hasLevel . Limb.limbRef
 
 instance HasLevel Ref where
   hasLevel (F x) = hasLevel x

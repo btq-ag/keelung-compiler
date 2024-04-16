@@ -461,7 +461,7 @@ substPolyM poly = do
       applyChanges changes
       return (Just substituted)
 
--- | Substitutes Limbs in a PolyL.
+-- | Substitutes Slices in a PolyL.
 --   Returns 'Nothing' if nothing changed else returns the substituted polynomial and the list of substituted variables.
 substPolyL :: (GaloisField n, Integral n) => Relations n -> PolyL n -> Maybe (LC n, Changes)
 substPolyL relations poly = do

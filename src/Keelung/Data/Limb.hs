@@ -5,7 +5,6 @@
 module Keelung.Data.Limb
   ( -- * Constructions
     Limb (..),
-    limbRef,
     newOperand,
 
     -- * Conversion
@@ -16,7 +15,6 @@ module Keelung.Data.Limb
 
     -- * Query
     isPositive,
-    null,
 
     -- * Signs of carry limbs
     Signs,
@@ -31,7 +29,6 @@ import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (..))
-import Keelung.Data.Slice qualified as Slice
 import Keelung.Syntax hiding (slice)
 import Prelude hiding (null)
 
@@ -64,10 +61,6 @@ data Limb
   = OperandLimb Slice Bool
   | CarryLimb RefU Signs
   deriving (Eq, Ord, Generic, NFData)
-
-limbRef :: Limb -> RefU
-limbRef (OperandLimb slice _) = Slice.sliceRefU slice
-limbRef (CarryLimb ref _) = ref
 
 instance HasWidth Limb where
   widthOf (OperandLimb slice _) = widthOf slice
@@ -125,7 +118,3 @@ trim _ (CarryLimb ref signs) = CarryLimb ref signs
 isPositive :: Limb -> Bool
 isPositive (OperandLimb _ sign) = sign
 isPositive (CarryLimb _ signs) = and [sign | (sign, _) <- toList signs]
-
--- | See if a Limb is empty
-null :: Limb -> Bool
-null limb = widthOf limb == 0

@@ -16,7 +16,6 @@ import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
 import Keelung.Data.LC qualified as LC
-import Keelung.Data.Limb (Limb (..))
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (Slice))
@@ -115,10 +114,10 @@ mulnxn maxHeight limbWidth limbNumber out ref operand = do
           let currentLimbWidthX = limbWidth `min` widthOf ref `min` (outWidth - (limbWidth * xi))
           let currentLimbWidthY = limbWidth `min` widthOf ref `min` (outWidth - (limbWidth * yi))
 
-          let x = Limb.newOperand (Slice ref (limbWidth * xi) (limbWidth * xi + currentLimbWidthX)) True
+          let x = Slice ref (limbWidth * xi) (limbWidth * xi + currentLimbWidthX)
           let y = case operand of
                 Right constant -> Left $ sum [(if Data.Bits.testBit constant (limbWidth * yi + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidthY - 1]]
-                Left refY -> Right (0, Limb.newOperand (Slice refY (limbWidth * yi) (limbWidth * yi + currentLimbWidthY)) True)
+                Left refY -> Right (0, Slice refY (limbWidth * yi) (limbWidth * yi + currentLimbWidthY))
           let index = xi + yi
 
           (lowerLimb, upperLimb) <- mul2Limbs limbWidth (0, x) y
@@ -157,7 +156,7 @@ mulnxn maxHeight limbWidth limbNumber out ref operand = do
     mempty
     [0 .. limbNumber * 2 - 1]
 
-mul2Limbs :: (GaloisField n, Integral n) => Width -> (n, Limb) -> Either n (n, Limb) -> M n (LimbColumn, LimbColumn)
+mul2Limbs :: (GaloisField n, Integral n) => Width -> (n, Slice) -> Either n (n, Slice) -> M n (LimbColumn, LimbColumn)
 mul2Limbs currentLimbWidth (a, x) operand = do
   case operand of
     Left 0 -> do
@@ -165,7 +164,7 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       return (mempty, mempty)
     Left 1 -> do
       -- if the constant is 1, then the resulting limbs should be the same as the input
-      return (LimbColumn.new 0 [x], mempty)
+      return (LimbColumn.new 0 [Limb.newOperand x True], mempty)
     Left constant -> do
       -- (a + x) * constant = (lower + upper * 2^currentLimbWidth)
       -- the total amount of bits to represent the product = currentLimbWidth * (1 + ceil(lg(constant)))
@@ -173,22 +172,21 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       lowerSlice <- allocSlice currentLimbWidth
       upperSlice <- allocSlice upperLimbWidth
 
-      let x' = Limb.toSlice constant x
       writeAdd
         (a * constant)
         []
-        ( (lowerSlice, -1)
-            : (upperSlice, -(2 ^ currentLimbWidth))
-            : x'
-        )
+        [ (lowerSlice, -1),
+          (upperSlice, -(2 ^ currentLimbWidth)),
+          (x, constant)
+        ]
       let lowerLimb = Limb.newOperand lowerSlice True
       let upperLimb = Limb.newOperand upperSlice True
       return (LimbColumn.singleton lowerLimb, LimbColumn.singleton upperLimb)
     Right (b, y) -> do
       let carryLimbWidth = widthOf x + widthOf y - currentLimbWidth
       -- (a + x) * (b + y) = (lower + upper * 2^currentLimbWidth)
-      let firstOperand = LC.fromLimbs a [(x, 1)]
-      let secondOperand = LC.fromLimbs b [(y, 1)]
+      let firstOperand = LC.new a [] [(x, 1)]
+      let secondOperand = LC.new b [] [(y, 1)]
 
       lowerSlice <- allocSlice currentLimbWidth
       upperSlice <- allocSlice carryLimbWidth

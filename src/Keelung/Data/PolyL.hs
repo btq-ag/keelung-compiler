@@ -9,7 +9,6 @@ module Keelung.Data.PolyL
     new,
 
     -- * Constructors
-    fromLimbs,
     fromRef,
     fromRefs,
     fromSlice,
@@ -41,8 +40,6 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import Keelung.Data.IntervalSet qualified as IntervalSet
-import Keelung.Data.Limb (Limb)
-import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.SlicePolynomial (SlicePoly)
@@ -50,7 +47,7 @@ import Keelung.Data.SlicePolynomial qualified as SlicePoly
 import Prelude hiding (negate, null)
 import Prelude qualified
 
--- | Polynomial made of Limbs + a constant
+-- | Polynomial made of constant + Refs + Slices
 data PolyL n = PolyL
   { -- | constant term
     polyConstant :: n,
@@ -118,14 +115,6 @@ new constant refs slices =
 -- | Construct a PolyL from a single Ref
 fromRef :: (Integral n, GaloisField n) => Ref -> PolyL n
 fromRef ref = PolyL 0 (Map.singleton ref 1) mempty
-
--- | Construct a PolyL from a constant and a list of (Limb, coefficient) pairs
-fromLimbs :: (Integral n, GaloisField n) => n -> [(Limb, n)] -> Either n (PolyL n)
-fromLimbs constant xs =
-  let slicePoly = limbsToSlicePoly xs
-   in if SlicePoly.null slicePoly
-        then Left constant
-        else Right (PolyL constant mempty (limbsToSlicePoly xs))
 
 -- | Convert a PolyL to a list of (Slice, coefficient) pairs
 toSlices :: (Num n) => PolyL n -> [(Slice, n)]
@@ -223,9 +212,6 @@ toRefMap xs =
    in if Map.null result
         then Nothing
         else Just result
-
-limbsToSlicePoly :: (Integral n, GaloisField n) => [(Limb, n)] -> SlicePoly n
-limbsToSlicePoly = SlicePoly.fromSlices . concatMap (\(limb, n) -> Limb.toSlice n limb)
 
 mergeRefsAndClean :: (Integral n, Ord a) => Map a n -> Map a n -> Map a n
 mergeRefsAndClean xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
