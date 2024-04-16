@@ -2,7 +2,6 @@ module Keelung.Compiler.Compile.UInt.MultiplicationV (compile) where
 
 import Control.Monad.Except
 import Control.Monad.RWS
-import Data.Bifunctor (second)
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
@@ -174,7 +173,7 @@ mul2Limbs currentLimbWidth (a, x) operand = do
       lowerSlice <- allocSlice currentLimbWidth
       upperSlice <- allocSlice upperLimbWidth
 
-      let x' = fmap (second ((* constant) . fromInteger)) (Limb.toSlice x)
+      let x' = Limb.toSlice constant x
       writeAdd
         (a * constant)
         []

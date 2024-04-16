@@ -155,11 +155,6 @@ writeAddWithLC xs = case xs of
   Constant n -> error $ "[ panic ] writeAddWithLC: expect constant to be 0, got " <> show n
   Polynomial poly -> modify' (\cs -> addOccurrence poly $ cs {cmAddL = poly Seq.<| cmAddL cs})
 
-writeAddWithLimbs :: (GaloisField n, Integral n) => n -> [(Ref, n)] -> [(Limb, n)] -> M n ()
-writeAddWithLimbs constant refs limbs = case PolyL.fromLimbs constant limbs of
-  Left _ -> return ()
-  Right poly -> writeAddWithLC $ Polynomial poly <> LC.new 0 refs []
-
 --------------------------------------------------------------------------------
 
 writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()

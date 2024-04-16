@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 module Keelung.Compiler.Compile.UInt.Addition (addLimbColumn, compileAdd, compileSub) where
 
 import Control.Monad.Except
@@ -134,11 +132,11 @@ addLimbColumnView resultSlice (LimbColumn.OnePositiveLimbOnly slice) = do
 addLimbColumnView resultSlice (LimbColumn.Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (widthOf resultSlice) constant limbs
   carryLimb <- allocCarryLimb carrySigns
-  let resultLimb = Limb.newOperand resultSlice True
-  writeAddWithLimbs (fromInteger constant) [] $
-    -- negative side
-    (resultLimb, -1)
-      : (carryLimb, -(2 ^ widthOf resultSlice))
-      -- positive side
-      : fmap (,1) (toList limbs)
+  let carrySlices = Limb.toSlice (-(2 ^ widthOf resultSlice)) carryLimb
+  let otherSlices = toList limbs >>= Limb.toSlice 1
+  writeAdd (fromInteger constant) [] $
+    (resultSlice, -1)
+      : carrySlices
+        <> otherSlices
+
   return $ LimbColumn.singleton carryLimb

@@ -10,7 +10,6 @@ module Keelung.Data.Limb
 
     -- * Conversion
     toSlice,
-    toSliceWithValue,
 
     -- * Operations
     trim,
@@ -22,7 +21,6 @@ module Keelung.Data.Limb
     -- * Signs of carry limbs
     Signs,
     splitAtSigns,
-    signsToListWithOffsets,
   )
 where
 
@@ -34,7 +32,6 @@ import GHC.Generics (Generic)
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
-import Keelung.Data.U qualified as U
 import Keelung.Syntax hiding (slice)
 import Prelude hiding (null)
 
@@ -89,30 +86,10 @@ instance Show Limb where
 
 --------------------------------------------------------------------------------
 
--- | Construct "Slice"s from a "Limb" with a list of coeffients
-toSlice :: Limb -> [(Slice, Integer)]
-toSlice (OperandLimb slice sign) = [(slice, if sign then 1 else -1)]
-toSlice (CarryLimb ref signs) = snd $ foldr (\(sign, width, offset) (i, acc) -> (i + width, (Slice ref i (i + width), if sign then 2 ^ offset else -(2 ^ offset)) : acc)) (0, []) (signsToListWithOffsets signs)
-
--- | Like "fromLimb", but pairs the slices with chunks of the value
-toSliceWithValue :: Limb -> Integer -> [(Slice, Integer)]
-toSliceWithValue limb val = case limb of
-  OperandLimb slice sign -> [(slice, if sign then val else -val)]
-  CarryLimb ref signs ->
-    let u = U.new (widthOf limb) val
-     in snd $
-          foldr
-            ( \(sign, width, offset) (i, acc) ->
-                ( i + width,
-                  ( Slice ref i (i + width),
-                    let slicedVal = toInteger (U.slice u (offset, offset + width))
-                     in if sign then slicedVal else -slicedVal
-                  )
-                    : acc
-                )
-            )
-            (0, [])
-            (signsToListWithOffsets signs)
+-- | Construct "Slice"s from a "Limb" and a multiplier
+toSlice :: (Integral n) => n -> Limb -> [(Slice, n)]
+toSlice multiplier (OperandLimb slice sign) = [(slice, if sign then multiplier else -multiplier)]
+toSlice multiplier (CarryLimb ref signs) = snd $ foldr (\(sign, width, offset) (i, acc) -> (i + width, (Slice ref i (i + width), if sign then multiplier * (2 ^ offset) else multiplier * (-(2 ^ offset))) : acc)) (0, []) (signsToListWithOffsets signs)
 
 --------------------------------------------------------------------------------
 

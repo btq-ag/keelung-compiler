@@ -225,12 +225,7 @@ toRefMap xs =
         else Just result
 
 limbsToSlicePoly :: (Integral n, GaloisField n) => [(Limb, n)] -> SlicePoly n
-limbsToSlicePoly =
-  SlicePoly.fromSlices
-    . concatMap
-      ( \(limb, n) ->
-          [(slice, n * fromInteger n') | (slice, n') <- Limb.toSlice limb]
-      )
+limbsToSlicePoly = SlicePoly.fromSlices . concatMap (\(limb, n) -> Limb.toSlice n limb)
 
 mergeRefsAndClean :: (Integral n, Ord a) => Map a n -> Map a n -> Map a n
 mergeRefsAndClean xs ys = Map.filter (/= 0) (Map.unionWith (+) xs ys)
