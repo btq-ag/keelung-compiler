@@ -23,8 +23,7 @@ import Keelung.Compiler.Compile.UInt.CLMul
 import Keelung.Compiler.Compile.UInt.Comparison
 import Keelung.Compiler.Compile.UInt.DivMod qualified as DivMod
 import Keelung.Compiler.Compile.UInt.Logical
-import Keelung.Compiler.Compile.UInt.Multiplication
-import Keelung.Compiler.Compile.UInt.MultiplicationV qualified as MulUV
+import Keelung.Compiler.Compile.UInt.Mul qualified as Mul
 import Keelung.Compiler.ConstraintModule qualified as CM
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
@@ -52,11 +51,11 @@ compile out expr = case expr of
   MulU _ x y -> do
     x' <- wireU x
     y' <- wireU y
-    compileMulU out x' y'
+    Mul.compile out x' y'
   MulUV _ x y -> do
     x' <- wireU x
     y' <- wireU y
-    MulUV.compile out x' y'
+    Mul.compile out x' y'
   AESMulU x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -182,11 +181,11 @@ compileModInv :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -
 compileModInv width out a p = do
   -- prod = a * out
   prod <- freshRefU width
-  compileMulU prod a (Left out)
+  Mul.compile prod a (Left out)
   -- prod = np + 1
   n <- freshRefU width
   np <- freshRefU width
-  compileMulU np (Left n) (Right p)
+  Mul.compile np (Left n) (Right p)
   compileAdd width prod [(np, True)] 1
   -- n ≤ p
   assertLTE width (Left n) (toInteger p)

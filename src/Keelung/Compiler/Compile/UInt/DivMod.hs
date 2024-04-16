@@ -10,12 +10,12 @@ import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.UInt.CLMul qualified as CLMul
 import Keelung.Compiler.Compile.UInt.Comparison qualified as Comparison
 import Keelung.Compiler.Compile.UInt.Logical qualified as Logical
-import Keelung.Compiler.Compile.UInt.Multiplication qualified as Mul
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
+import qualified Keelung.Compiler.Compile.UInt.Mul as Mul
 
 --------------------------------------------------------------------------------
 
@@ -50,7 +50,7 @@ assertDivModU width dividend divisor quotient remainder = do
   remainderRef' <- allocDoubleWidth remainderRef
 
   productDQ <- freshRefU (width * 2)
-  Mul.compileMulU productDQ divisorRef' quotientRef'
+  Mul.compile productDQ divisorRef' quotientRef'
   compileSub (width * 2) productDQ dividendRef' remainderRef'
 
   -- 0 ≤ remainder < divisor

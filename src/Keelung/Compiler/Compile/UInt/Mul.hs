@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.UInt.MultiplicationV (compile) where
+module Keelung.Compiler.Compile.UInt.Mul (compile) where
 
 import Control.Monad.Except
 import Control.Monad.RWS
@@ -66,7 +66,6 @@ compileMul out x y = do
   let limbNumber = operandWidth `ceilDiv` (minLimbWidth `max` outWidth `min` maxLimbWidth)
   -- the optimal width
   let limbWidth = operandWidth `ceilDiv` limbNumber
-
   let maxHeight = if limbWidth > 20 then 1048576 else 2 ^ limbWidth -- HACK
   case fieldTypeData fieldInfo of
     Binary _ -> compileMulB outWidth out x y
@@ -140,18 +139,21 @@ mulnxn maxHeight limbWidth limbNumber out ref operand = do
     ( \previousCarryLimbs index -> do
         -- calculate the segment of the output RefU to be written
         let limbStart = limbWidth * index
-        let currentLimbWidth = limbWidth `min` (outWidth - limbStart)
-        let outputSlice = Slice out limbStart (limbStart + currentLimbWidth)
+        let currentLimbWidth = limbWidth `min` (outWidth - limbStart) `max` 0
 
-        -- see if there's a stack of limbs to be added to the output limb
-        case IntMap.lookup index limbColumns of
-          Just limbs -> addLimbColumn maxHeight outputSlice (previousCarryLimbs <> limbs)
-          Nothing -> do
-            if previousCarryLimbs == mempty
-              then do
-                writeSliceVal outputSlice 0
-                return mempty -- no carry
-              else addLimbColumn maxHeight outputSlice previousCarryLimbs
+        if currentLimbWidth == 0
+          then return mempty
+          else do
+            let outputSlice = Slice out limbStart (limbStart + currentLimbWidth)
+            -- see if there's a stack of limbs to be added to the output limb
+            case IntMap.lookup index limbColumns of
+              Just limbs -> addLimbColumn maxHeight outputSlice (previousCarryLimbs <> limbs)
+              Nothing -> do
+                if previousCarryLimbs == mempty
+                  then do
+                    writeSliceVal outputSlice 0
+                    return mempty -- no carry
+                  else addLimbColumn maxHeight outputSlice previousCarryLimbs
     )
     mempty
     [0 .. limbNumber * 2 - 1]
