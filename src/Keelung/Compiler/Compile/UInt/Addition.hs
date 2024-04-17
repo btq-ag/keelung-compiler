@@ -17,6 +17,7 @@ import Keelung.Data.FieldInfo
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (Slice))
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Field (FieldType (..))
 import Keelung.Syntax (Width, widthOf)
@@ -127,7 +128,22 @@ addLimbColumnView resultSlice (LimbColumn.OneConstantOnly constant) = do
   writeSliceVal resultSlice constant
   return mempty
 addLimbColumnView resultSlice (LimbColumn.OnePositiveLimbOnly slice) = do
-  writeSliceEq resultSlice slice
+  let operandWidth = widthOf slice
+  let resultWidth = widthOf resultSlice
+  case operandWidth `compare` resultWidth of
+    LT -> do
+      -- the operand is shorter than result
+      -- write 0 to the higher bits of the result
+      let resultSliceLO = resultSlice {Slice.sliceEnd = Slice.sliceEnd resultSlice - (resultWidth - operandWidth)}
+      let resultSliceHI = resultSlice {Slice.sliceStart = Slice.sliceStart resultSlice - (resultWidth - operandWidth)}
+      writeSliceEq resultSliceLO slice
+      writeSliceVal resultSliceHI 0
+    EQ -> writeSliceEq resultSlice slice
+    GT -> do
+      -- the operand is longer than result
+      -- write the lower bits of the operand to the result
+      let operandSliceLO = slice {Slice.sliceEnd = Slice.sliceEnd slice - (operandWidth - resultWidth)}
+      writeSliceEq resultSlice operandSliceLO
   return mempty
 addLimbColumnView resultSlice (LimbColumn.Ordinary constant limbs) = do
   let carrySigns = calculateCarrySigns (widthOf resultSlice) constant limbs

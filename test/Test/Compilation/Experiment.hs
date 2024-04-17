@@ -3,11 +3,12 @@
 
 module Test.Compilation.Experiment (run, tests) where
 
+import Control.Monad (forM_)
+import Data.Word (Word8)
 import Keelung hiding (MulU, VarUI)
-import Keelung.Compiler.Syntax.Internal
-import Keelung.Syntax.Counters qualified as Counters
 import Test.Arbitrary ()
 import Test.Hspec
+import Test.QuickCheck
 import Test.Util
 
 run :: IO ()
@@ -15,47 +16,60 @@ run = hspec tests
 
 --------------------------------------------------------------------------------
 
--- | Equalities:
---    introduce a new variable m
---    if input = 0 then m = 0 else m = recip input
---    Equality:
---      input * m = 1 - output
---      input * output = 0
 tests :: SpecWith ()
 tests = describe "Experiment" $ do
-  -- describe "performDivMod" $ do
-  --   it "variable dividend / variable divisor" $ do
-  --     let program = do
-  --           dividend <- input Public :: Comp (UInt 8)
-  --           divisor <- input Public
-  --           performDivMod dividend divisor
-
-  --     let (dividend, divisor) = (4, 35)
-  --     let expected = [dividend `div` divisor, dividend `mod` divisor]
-  --     -- forM_ [gf181, Prime 17] $ \field -> do
-  --     checkO0 gf181 program [dividend, divisor] [] expected
-  --       -- check field program [dividend, divisor] [] expected
-
-  describe "variable-width multiplication" $ do
-    -- it "0" $ do
-    --   let internal2 = constructSyntaxVV 6 4 :: Internal GF181
-    --   checkI gf181 internal2 [10, 7] [] [6]
-    --   assertCountI gf181 internal2 17
+  describe "Double-width" $ do
+    it "2 constants / Byte" $ do
+      let program x y = return $ x `mulD` (y :: UInt 8)
+      property $ \(x :: Word8, y :: Word8) -> do
+        let expected = [toInteger x * toInteger y]
+        forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
     it "2 positive variables / Byte" $ do
-      let internal2 = _constructSyntaxVV 17 (8, 8) :: Internal GF181
-      debugI gf181 internal2
-      checkI gf181 internal2 [0, 0] [] [0]
+      let program = do
+            x <- input Public :: Comp (UInt 8)
+            y <- input Public
+            return $ x `mulD` y
+      debug (Prime 257) program
 
-_constructSyntaxVV :: Width -> (Width, Width) -> Internal n
-_constructSyntaxVV outputWidth (operandWidth1, operandWidth2) =
-  Internal
-    { internalExpr = [(0, ExprU (MulU outputWidth (VarUI operandWidth1 0) (VarUI operandWidth2 1)))],
-      internalFieldBitWidth = 181,
-      internalCounters =
-        Counters.addCount (Counters.Output, Counters.WriteUInt outputWidth) 1 $
-          Counters.addCount (Counters.PublicInput, Counters.WriteUInt operandWidth1) 1 $
-            Counters.addCount (Counters.PublicInput, Counters.WriteUInt operandWidth2) 1 mempty,
-      internalAssertions = [],
-      internalSideEffects = mempty
-    }
+-- property $ \(x, y :: Word8) -> do
+--   let expected = [toInteger x * toInteger y]
+--   -- forM_ [gf181] $ \field -> check field program (map toInteger [x, y]) [] expected
+--   forM_ [Prime 257] $ \field -> check field program (map toInteger [x, y]) [] expected
+--   -- forM_ [gf181, Prime 17, Binary 7] $ \field -> check field program (map toInteger [x, y]) [] expected
+
+-- it "1 constant + 1 variable / Byte" $ do
+--   let program x = do
+--         y <- input Public :: Comp (UInt 8)
+--         return $ x `mulD` y
+--   property $ \(x, y :: Word8) -> do
+--     let expected = [toInteger (x * y)]
+--     forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x)) [toInteger y] [] expected
+
+-- it "1 variable + 1 constant / Byte" $ do
+--   let program y = do
+--         x <- input Public :: Comp (UInt 8)
+--         return $ x `mulD` y
+--   property $ \(x, y :: Word8) -> do
+--     let expected = [toInteger (x * y)]
+--     forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral y)) [toInteger x] [] expected
+
+-- it "with addition / Byte" $ do
+--   let program = do
+--         x <- input Public :: Comp (UInt 8)
+--         y <- input Public
+--         z <- input Public
+--         return $ x `mulD` y + z
+--   property $ \(x, y, z :: Word8) -> do
+--     let expected = [toInteger (x * y + z)]
+--     forM_ [gf181, Prime 257, Prime 17, Binary 7] $ \field -> check field program (map toInteger [x, y, z]) [] expected
+
+-- it "with subtraction / Byte" $ do
+--   let program = do
+--         x <- input Public :: Comp (UInt 8)
+--         y <- input Public
+--         z <- input Public
+--         return $ x `mulD` y - z
+--   property $ \(x, y, z :: Word8) -> do
+--     let expected = [toInteger (x * y - z)]
+--     forM_ [gf181, Prime 257, Prime 17, Binary 7] $ \field -> check field program (map toInteger [x, y, z]) [] expected

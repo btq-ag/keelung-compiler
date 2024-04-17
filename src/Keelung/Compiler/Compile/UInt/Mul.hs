@@ -20,6 +20,7 @@ import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (Slice))
 import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Keelung.Syntax (Width)
 
 --------------------------------------------------------------------------------
@@ -45,7 +46,7 @@ import Keelung.Syntax (Width)
 --
 -- the maximum number of operands when adding these 2w-bit limbs is 2L (with carry from the previous limb)
 compile :: (GaloisField n, Integral n) => RefU -> Either RefU U -> Either RefU U -> M n ()
-compile out (Right a) (Right b) = writeRefUVal out (a * b)
+compile out (Right a) (Right b) = writeRefUVal out (U.mulV (widthOf out) a b)
 compile out (Right a) (Left b) = compileMul out b (Right a)
 compile out (Left a) (Right b) = compileMul out a (Right b)
 compile out (Left a) (Left b) = compileMul out a (Left b)
