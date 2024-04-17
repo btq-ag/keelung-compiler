@@ -13,6 +13,8 @@ module Keelung.Data.U
     split,
     modInv,
     aesMul,
+    mulD,
+    mulV,
     clAdd,
     clMul,
     clDivMod,
@@ -131,10 +133,21 @@ sub a b =
   let width = mergeWidths a b
    in U (Just width) ((uValue a - uValue b) `Prelude.mod` 2 ^ width)
 
+-- | Single-width truncated multiplication
 mul :: U -> U -> U
 mul a b =
   let width = mergeWidths a b
    in U (Just width) ((uValue a * uValue b) `Prelude.mod` 2 ^ width)
+
+-- | Double-width truncated multiplication
+mulD :: U -> U -> U
+mulD a b =
+  let width = mergeWidths a b
+   in U (Just (width * 2)) (uValue a * uValue b)
+
+-- | Variable-width multiplication with truncation or zero extension.
+mulV :: Width -> U -> U -> U
+mulV outputWidth a b = U (Just outputWidth) ((uValue a * uValue b) `Prelude.mod` 2 ^ outputWidth)
 
 divModU :: U -> U -> (U, U)
 divModU a b
