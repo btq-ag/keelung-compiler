@@ -38,7 +38,7 @@ assertDivModU width dividend divisor quotient remainder = do
   --    dividend = divisor * quotient + remainder
   --  =>
   --    divisor * quotient = dividend - remainder
-
+  -- double the widths of these variables when the flag is set
   let useAllocDoubleWidth = True
   let applyFlag x = do
         x' <- x
@@ -50,12 +50,6 @@ assertDivModU width dividend divisor quotient remainder = do
   divisorRef <- applyFlag $ wireU divisor
   quotientRef <- applyFlag $ wireU quotient
   remainderRef <- applyFlag $ wireU remainder
-
-  -- double the widths of these variables
-  -- dividendRef' <- allocDoubleWidth dividendRef
-  -- divisorRef' <- allocDoubleWidth divisorRef
-  -- quotientRef' <- allocDoubleWidth quotientRef
-  -- remainderRef' <- allocDoubleWidth remainderRef
 
   productDQ <- freshRefU (width * 2)
   Mul.compile productDQ divisorRef quotientRef

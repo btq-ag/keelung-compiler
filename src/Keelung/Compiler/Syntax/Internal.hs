@@ -148,7 +148,6 @@ data ExprU n
   | -- arithmetic operators
     AddU Width (Seq (ExprU n, Bool))
   | MulU Width (ExprU n) (ExprU n)
-  | MulUV Width (ExprU n) (ExprU n) -- variable-width multiplication
   | AESMulU (ExprU n) (ExprU n) -- hardcoded multiplication for AES
   | CLMulU Width (ExprU n) (ExprU n)
   | CLModU Width (ExprU n) (ExprU n)
@@ -180,7 +179,6 @@ instance (Show n, Integral n) => Show (ExprU n) where
     VarUP _ var -> showString "UP" . shows var
     AddU _ xs -> chain prec " + " 6 xs
     MulU _ x y -> chain prec " * " 7 $ x :<| y :<| Empty
-    MulUV _ x y -> chain prec " ~*~ " 7 $ x :<| y :<| Empty
     AESMulU x y -> chain prec " AES* " 7 $ x :<| y :<| Empty
     CLMulU _ x y -> chain prec " .*. " 7 $ x :<| y :<| Empty
     CLModU _ x y -> chain prec " .%. " 8 $ x :<| y :<| Empty
@@ -206,7 +204,6 @@ instance HasWidth (ExprU n) where
     VarUP w _ -> w
     AddU w _ -> w
     MulU w _ _ -> w
-    MulUV w _ _ -> w
     AESMulU x _ -> widthOf x
     CLMulU w _ _ -> w
     CLModU w _ _ -> w

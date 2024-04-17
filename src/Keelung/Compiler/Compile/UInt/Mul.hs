@@ -75,7 +75,15 @@ compileMul out x y = do
     Prime 7 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 11 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
-    _ -> mulnxn maxHeight limbWidth limbNumber out x y
+    _ -> do
+      -- if the width of `out` is larger than the width of `x` + `y`, then we should fill the extra bits with 0
+      let widthOfY = case y of
+            Left ref -> widthOf ref
+            Right val -> widthOf val
+      when (outWidth > widthOf x + widthOfY) $ do
+        let extraPart = Slice out (widthOf x + widthOfY) outWidth
+        writeSliceVal extraPart 0
+      mulnxn maxHeight limbWidth limbNumber out x y
   where
     -- like div, but rounds up
     ceilDiv :: Int -> Int -> Int

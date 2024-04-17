@@ -52,10 +52,6 @@ compile out expr = case expr of
     x' <- wireU x
     y' <- wireU y
     Mul.compile out x' y'
-  MulUV _ x y -> do
-    x' <- wireU x
-    y' <- wireU y
-    Mul.compile out x' y'
   AESMulU x y -> do
     x' <- wireU x
     y' <- wireU y

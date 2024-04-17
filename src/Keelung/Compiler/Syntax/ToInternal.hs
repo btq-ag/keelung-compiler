@@ -104,6 +104,8 @@ convertExprU expr = case expr of
   T.SubU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure False
   T.AESMulU _ x y -> AESMulU <$> convertExprU x <*> convertExprU y
   T.MulU w x y -> MulU w <$> convertExprU x <*> convertExprU y
+  T.MulD w x y -> MulU w <$> convertExprU x <*> convertExprU y
+  T.MulV w x y -> MulU w <$> convertExprU x <*> convertExprU y
   T.CLMulU w x y -> CLMulU w <$> convertExprU x <*> convertExprU y
   T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure (U.new w p)
   T.AndU w x y -> chainExprsOfAssocOpAndU w <$> convertExprU x <*> convertExprU y
