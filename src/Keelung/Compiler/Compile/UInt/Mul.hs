@@ -19,6 +19,7 @@ import Keelung.Data.LC qualified as LC
 import Keelung.Data.Limb qualified as Limb
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (Slice))
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Syntax (Width)
@@ -26,25 +27,6 @@ import Keelung.Syntax (Width)
 --------------------------------------------------------------------------------
 
 -- Model of multiplication: elementary school schoolbook multiplication
-
--- assume that each number has been divided into L w-bit limbs
--- multiplying two numbers will result in L^2 2w-bit limbs
---
---                          a1 a2 a3
--- x                        b1 b2 b3
--- ------------------------------------------
---                             a3*b3
---                          a2*b3
---                       a1*b3
---                          a3*b2
---                       a2*b2
---                    a1*b2
---                       a3*b1
---                    a2*b1
---                 a1*b1
--- ------------------------------------------
---
--- the maximum number of operands when adding these 2w-bit limbs is 2L (with carry from the previous limb)
 compile :: (GaloisField n, Integral n) => RefU -> Either RefU U -> Either RefU U -> M n ()
 compile out (Right a) (Right b) = writeRefUVal out (U.mulV (widthOf out) a b)
 compile out (Right a) (Left b) = compileMul out b (Right a)
@@ -77,18 +59,121 @@ compileMul out x y = do
     Prime 11 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     _ -> do
-      -- if the width of `out` is larger than the width of `x` + `y`, then we should fill the extra bits with 0
-      let widthOfY = case y of
-            Left ref -> widthOf ref
-            Right val -> widthOf val
-      when (outWidth > widthOf x + widthOfY) $ do
-        let extraPart = Slice out (widthOf x + widthOfY) outWidth
-        writeSliceVal extraPart 0
-      mulnxn maxHeight limbWidth limbNumber out x y
+      let oldAlgorithm = do
+            -- if the width of `out` is larger than the width of `x` + `y`, then we should fill the extra bits with 0
+            let widthOfY = case y of
+                  Left ref -> widthOf ref
+                  Right val -> widthOf val
+            when (outWidth > widthOf x + widthOfY) $ do
+              let extraPart = Slice out (widthOf x + widthOfY) outWidth
+              writeSliceVal extraPart 0
+            mulnxn maxHeight limbWidth limbNumber out x y
+
+      case y of
+        Left refY ->
+          if enableNewAlgorithm
+            then multiply maxHeight out (x, refY) limbWidth
+            else oldAlgorithm
+        Right _ -> oldAlgorithm
   where
     -- like div, but rounds up
     ceilDiv :: Int -> Int -> Int
     ceilDiv a b = ((a - 1) `div` b) + 1
+
+-- | TODO: enable the new algorithm
+enableNewAlgorithm :: Bool
+enableNewAlgorithm = True
+
+-- | Multiply slices of two operands and return resulting slice
+multiplyLimbs :: (GaloisField n, Integral n) => (Slice, Slice) -> M n Slice
+multiplyLimbs (sliceX, sliceY) = do
+  let productWidth = widthOf sliceX + widthOf sliceY
+  productSlice <- allocSlice productWidth
+
+  -- write constraints
+  writeMulWithLC
+    (LC.new 0 [] [(sliceX, 1)])
+    (LC.new 0 [] [(sliceY, 1)])
+    (LC.new 0 [] [(productSlice, 1)])
+
+  return productSlice
+
+--  Here's what multiplication looks like in the elementary school:
+--
+--                    ... 2   1   0     limb indices of the first operand
+--    x               ... 2   1   0     limb indices of the second operand
+--  ------------------------------------------
+--                          00H 00L
+--                      10H 10L
+--                  20H 20L
+--              ....
+--                      01H 01L
+--                  11H 11L
+--              21H 21L
+--          ....
+--                  02H 02L
+--              12H 12L
+--          22H 22L                     -- 22H may not exist
+-- +    ....
+-- ------------------------------------------
+--
+-- Observe that the nth column of the result is the sum of:
+--    * lower limbs of products of two limbs whose indices sum to n
+--    * upper limbs of lower limbs of the previous column
+--    * carry from the previous column
+--
+-- Because the width of output varies, we only calculate the limbs that are needed.
+--    * The number of columns = outputWidth / limbWidth + 1
+--
+-- The highest limb of an operand may be shorter than the default limb width.
+--    * Width of the highest limb of an operand = outputWidth % limbWidth
+--
+-- It's possible that the product of the highest two limbs may be shorter than the default limb width.
+--    * Width of the product of the highest limbs = (outputWidth % limbWidth) * 2
+--
+multiply :: (GaloisField n, Integral n) => Int -> RefU -> (RefU, RefU) -> Width -> M n ()
+multiply maxHeight refOutput (refX, refY) limbWidth = foldM_ step (mempty, mempty) [0 .. outputWidth `div` limbWidth - 1] -- the number of columns
+  where
+    outputWidth = widthOf refOutput
+    operandWidth = widthOf refX
+
+    step :: (GaloisField n, Integral n) => ([Slice], LimbColumn) -> Int -> M n ([Slice], LimbColumn)
+    step (prevUpperLimbs, prevCarries) columnIndex = do
+      let indexPairs = [(xi, columnIndex - xi) | xi <- [0 .. columnIndex]]
+      let slicePairs =
+            [ ( Slice refX startX ((startX + limbWidth) `min` operandWidth),
+                Slice refY startY ((startY + limbWidth) `min` operandWidth)
+              )
+              | (indexX, indexY) <- indexPairs,
+                let startX = limbWidth * indexX,
+                let startY = limbWidth * indexY,
+                (limbWidth * indexX) < operandWidth,
+                (limbWidth * indexY) < operandWidth
+            ]
+      -- calculate the product of the limbs
+      productSlices <- mapM multiplyLimbs slicePairs
+      let (lowerLimbs, upperLimbs) = unzip $ map (Slice.split limbWidth) productSlices
+
+      -- add these limbs to the output:
+      --  1. lower limbs of the product
+      --  2. upper limbs of the previous column
+      --  3. carry from the previous column
+      let limbs = map (`Limb.newOperand` True) (prevUpperLimbs <> lowerLimbs)
+      let outputSlice = Slice refOutput (limbWidth * columnIndex) (limbWidth * columnIndex + limbWidth)
+      nextCarries <- addLimbColumn maxHeight outputSlice (prevCarries <> LimbColumn.new 0 limbs)
+
+      -- traceM $ show columnIndex <> "             =============================="
+      -- traceM $ "     lower    " <> show lowerLimbs
+      -- traceM $ "prev upper    " <> show prevUpperLimbs
+      -- traceM $ "prev carry    " <> show prevCarries
+      -- traceM "              ------------------------"
+
+      -- traceM $ "    output    " <> show outputSlice
+      -- traceM ""
+      -- traceM $ "     upper    " <> show upperLimbs
+      -- traceM $ "next carry    " <> show nextCarries
+
+      return (upperLimbs, nextCarries)
 
 -- | n-limb by n-limb multiplication
 --                       .. x2 x1 x0
