@@ -154,8 +154,9 @@ tests = describe "UInt" $ do
             x <- input Public :: Comp (UInt 8)
             y <- input Public
             return $ x * y
-      assertCountO0 (Prime 1031) program 55
-      assertCount (Prime 1031) program 50
+      -- debug (Prime 1031) program
+      assertCountO0 (Prime 1031) program 57
+      assertCount (Prime 1031) program 51
 
     it "variable / constant" $ do
       let program = do

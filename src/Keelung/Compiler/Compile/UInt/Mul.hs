@@ -34,7 +34,6 @@ compile out (Left a) (Left b) = compileMul out a (Left b)
 
 compileMul :: (GaloisField n, Integral n) => RefU -> RefU -> Either RefU U -> M n ()
 compileMul out x y = do
-  let outWidth = widthOf out
   let operandWidth = widthOf x -- assuming that the width of `x` is the same as the width of `y`
   fieldInfo <- gets (optFieldInfo . cmOptions)
 
@@ -44,10 +43,12 @@ compileMul out x y = do
   -- determine the maximum and minimum limb widths
   let maxLimbWidth = fieldWidth fieldInfo `div` 2 -- cannot exceed half of the field width
   let minLimbWidth = 2 -- TEMPORARY HACK FOR ADDITION
-  -- the number of limbs needed to represent an operand
-  let limbNumber = operandWidth `ceilDiv` (minLimbWidth `max` outWidth `min` maxLimbWidth)
   -- the optimal width
-  let limbWidth = operandWidth `ceilDiv` limbNumber
+  let limbWidth = minLimbWidth `max` (operandWidth * 2) `min` maxLimbWidth
+  -- traceM $ "maxLimbWidth: " <> show maxLimbWidth
+  -- traceM $ "minLimbWidth: " <> show minLimbWidth
+  -- traceM $ "limbWidth: " <> show limbWidth
+  -- traceM $ "operandWidth: " <> show operandWidth
   let maxHeight = if limbWidth > 20 then 1048576 else 2 ^ limbWidth -- HACK
   case fieldTypeData fieldInfo of
     Binary _ -> Binary.compile out x y
@@ -58,10 +59,6 @@ compileMul out x y = do
     Prime 11 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 13 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     _ -> multiply maxHeight out (x, y) limbWidth
-  where
-    -- like div, but rounds up
-    ceilDiv :: Int -> Int -> Int
-    ceilDiv a b = ((a - 1) `div` b) + 1
 
 -- | Multiply slices of two operands and return the resulting slice
 multiplyLimbs :: (GaloisField n, Integral n) => (Slice, Either Slice U) -> M n (Maybe Slice)
@@ -124,7 +121,7 @@ multiplyLimbs (sliceX, Right valueY) = do
 --    * Width of the product of the highest limbs = (outputWidth % limbWidth) * 2
 --
 multiply :: (GaloisField n, Integral n) => Int -> RefU -> (RefU, Either RefU U) -> Width -> M n ()
-multiply maxHeight refOutput (refX, operandY) limbWidth = foldM_ step (mempty, mempty) [0 .. outputWidth `div` limbWidth - 1] -- the number of columns
+multiply maxHeight refOutput (refX, operandY) limbWidth = foldM_ step (mempty, mempty) [0 .. (outputWidth `ceilDiv` limbWidth) - 1] -- the number of columns
   where
     outputWidth = widthOf refOutput
     operandWidth = widthOf refX
@@ -155,7 +152,7 @@ multiply maxHeight refOutput (refX, operandY) limbWidth = foldM_ step (mempty, m
       --  2. upper limbs of the previous column
       --  3. carry from the previous column
       let limbs = map (`Limb.newOperand` True) (prevUpperLimbs <> lowerLimbs)
-      let outputSlice = Slice refOutput (limbWidth * columnIndex) (limbWidth * columnIndex + limbWidth)
+      let outputSlice = Slice refOutput (limbWidth * columnIndex) ((limbWidth * columnIndex + limbWidth) `min` outputWidth)
       nextCarries <- addLimbColumn maxHeight outputSlice (prevCarries <> LimbColumn.new 0 limbs)
 
       -- traceM $ show columnIndex <> "             =============================="
@@ -179,3 +176,7 @@ multiply maxHeight refOutput (refX, operandY) limbWidth = foldM_ step (mempty, m
       if n < widthOf slice
         then let (a, b) = Slice.split n slice in (Just a, Just b)
         else (Just slice, Nothing)
+
+-- like div, but rounds up
+ceilDiv :: Int -> Int -> Int
+ceilDiv a b = ((a - 1) `div` b) + 1
