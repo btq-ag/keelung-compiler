@@ -41,13 +41,12 @@ tests = describe "Experiment" $ do
       let program x = do
             y <- input Public :: Comp (UInt 8)
             return $ x `mulD` y
-      -- debug (Prime 17) (program 1)
+      -- debug (Binary 7) (program 129)
       property $ \(x :: Word8, y :: Word8) -> do
         let expected = [toInteger x * toInteger y]
-        check gf181 (program (fromIntegral x)) [toInteger y] [] expected
-        check (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
-
--- check (Binary 7) (program (fromIntegral x)) [toInteger y] [] expected
+        -- check gf181 (program (fromIntegral x)) [toInteger y] [] expected
+        -- check (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
+        check (Binary 7) (program (fromIntegral x)) [toInteger y] [] expected
 
 --   let program y = do
 --         x <- input Public :: Comp (UInt 8)

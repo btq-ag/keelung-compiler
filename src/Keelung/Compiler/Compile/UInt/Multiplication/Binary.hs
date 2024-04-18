@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.UInt.Multiplication.Binary (compile, compileExtended) where
+module Keelung.Compiler.Compile.UInt.Multiplication.Binary (compile) where
 
 import Control.Monad
 import Data.Bits qualified
@@ -8,33 +8,38 @@ import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (Slice))
 import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 
 -- | Multiply two unsigned integers, get the result of the same width
 compile :: (GaloisField n, Integral n) => RefU -> RefU -> Either RefU U -> M n ()
-compile out x y = do
+compile out _ (Right 0) = writeRefUVal out 0
+compile out refX operandY = do
   let outputWidth = widthOf out
-  let operandWidth = widthOf x
 
-  if outputWidth == operandWidth
-    then formHalfColumns outputWidth x y >>= foldColumns out
-    else -- else formAllColumns x y >>= foldColumns out
-    case outputWidth `compare` (operandWidth * 2) of
-      LT -> do
-        columns <- take outputWidth <$> formAllColumns x y
-        foldColumns out columns
-      EQ -> do
-        columns <- formAllColumns x y
-        foldColumns out columns
-      GT -> do
-        columns <- formAllColumns x y
-        foldColumns out columns
-        -- the result is shorter than `out`
-        -- write 0 to the higher bits of `out`
-        let outSliceHI = Slice out (operandWidth * 2) outputWidth
-        writeSliceVal outSliceHI 0
+  if outputWidth == widthOf refX
+    then formHalfColumns outputWidth refX operandY >>= foldColumns out
+    else -- range of product: 0 ... ((2 ^ widthOf sliceX) - 1) * valueY
 
-compileExtended :: (GaloisField n, Integral n) => RefU -> RefU -> Either RefU U -> M n ()
-compileExtended out x y = formAllColumns x y >>= foldColumns out
+      let productWidth = case operandY of
+            Left refY -> widthOf refX + widthOf refY
+            Right valueY -> U.widthOfInteger (((2 ^ widthOf refX) - 1) * toInteger valueY)
+       in case outputWidth `compare` productWidth of
+            LT -> do
+              columns <- take outputWidth <$> formAllColumns productWidth refX operandY
+              foldColumns out columns
+            EQ -> do
+              columns <- formAllColumns productWidth refX operandY
+              foldColumns out columns
+            GT -> do
+              columns <- formAllColumns productWidth refX operandY
+              foldColumns out columns
+              -- the result is shorter than `out`
+              -- write 0 to the higher bits of `out`
+              let outSliceHI = Slice out productWidth outputWidth
+              writeSliceVal outSliceHI 0
+
+-- compileExtended :: (GaloisField n, Integral n) => RefU -> RefU -> Either RefU U -> M n ()
+-- compileExtended out x y = formAllColumns x y >>= foldColumns out
 
 -- | Form columns of bits to be added together after multiplication
 --
@@ -45,18 +50,16 @@ compileExtended out x y = formAllColumns x y >>= foldColumns out
 --                      x₃y₁    x₂y₁    x₁y₁    x₀y₁
 --              x₃y₂    x₂y₂    x₁y₂    x₀y₂
 --      x₃y₃    x₂y₃    x₁y₃    x₀y₃
-formAllColumns :: (GaloisField n, Integral n) => RefU -> Either RefU U -> M n [(Int, [RefB])]
-formAllColumns x (Left y) = do
+formAllColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> M n [(Int, [RefB])]
+formAllColumns productWidth x (Left y) = do
   let width = widthOf x
-  let numberOfColumns = 2 * width
-  let pairs = [(indexSum, [(RefUBit x (indexSum - i), RefUBit y i) | i <- [(indexSum - width + 1) `max` 0 .. indexSum `min` (width - 1)]]) | indexSum <- [0 .. numberOfColumns - 1]]
+  let pairs = [(indexSum, [(RefUBit x (indexSum - i), RefUBit y i) | i <- [(indexSum - width + 1) `max` 0 .. indexSum `min` (width - 1)]]) | indexSum <- [0 .. productWidth - 1]]
   forM pairs $ \(i, xs) -> do
     xs' <- mapM multiplyBits xs
     return (i, xs')
-formAllColumns x (Right y) = do
+formAllColumns productWidth x (Right y) = do
   let width = widthOf x
-  let numberOfColumns = 2 * width - 1
-  forM [0 .. numberOfColumns - 1] $ \i -> do
+  forM [0 .. productWidth - 1] $ \i -> do
     -- put the bits of x into the column if `Data.Bits.testBit y j` is True
     let vars = [RefUBit x (i - j) | j <- [(i - width + 1) `max` 0 .. i `min` (width - 1)], Data.Bits.testBit y j]
     return (i, vars)

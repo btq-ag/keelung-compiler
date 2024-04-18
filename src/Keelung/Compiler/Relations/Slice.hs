@@ -310,10 +310,12 @@ assignValueToSegment val (Slice ref start end) =
 
 assignValueToFamily :: U -> FamilyLookup -> M ()
 assignValueToFamily _ (FamilyLookup []) = return ()
-assignValueToFamily val (FamilyLookup (x : xs)) = do
-  let (val1, val2) = U.split val (widthOf (head x))
-  mapM_ (assignValueToSegment val1) x
-  assignValueToFamily val2 (FamilyLookup xs)
+assignValueToFamily val (FamilyLookup ([] : xs)) = do
+  assignValueToFamily val (FamilyLookup xs)
+assignValueToFamily val (FamilyLookup ((x : xs) : xss)) = do
+  let (val1, val2) = U.split val (widthOf x)
+  mapM_ (assignValueToSegment val1) (x : xs)
+  assignValueToFamily val2 (FamilyLookup xss)
 
 -- | Relate a child Slice with a parent Slice
 relateRootToSegment :: Slice -> Slice -> M ()
@@ -341,10 +343,12 @@ relateRootToSegment root child = do
 
 relateRootToFamily :: Slice -> FamilyLookup -> M ()
 relateRootToFamily _ (FamilyLookup []) = return ()
-relateRootToFamily root (FamilyLookup (x : xs)) = do
-  let (root1, root2) = Slice.split (widthOf (head x)) root
-  mapM_ (relateRootToSegment root1) x
-  relateRootToFamily root2 (FamilyLookup xs)
+relateRootToFamily root (FamilyLookup ([] : xss)) = do
+  relateRootToFamily root (FamilyLookup xss)
+relateRootToFamily root (FamilyLookup ((x : xs) : xss)) = do
+  let (root1, root2) = Slice.split (widthOf x) root
+  mapM_ (relateRootToSegment root1) (x : xs)
+  relateRootToFamily root2 (FamilyLookup xss)
 
 --------------------------------------------------------------------------------
 
@@ -394,6 +398,7 @@ segmentsToPairs (PartialRefUSegments slice segments) = map (\(offset, segment) -
 
 -- | The equivalence class version of RefUSegments
 newtype FamilyLookup = FamilyLookup [[Slice]] -- the equivalence class of each segment
+  deriving (Eq, Show)
 
 -- | Given a Slice and its corresponding Segment, return all member Slices of the equivalence class of that Slice
 --   so that we can, for example, assign a value to all members of the equivalence class
