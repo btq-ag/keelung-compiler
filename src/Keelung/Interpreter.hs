@@ -459,11 +459,10 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
     VarUI w var -> pure <$> lookupUI w var
     VarUP w var -> pure <$> lookupUP w var
     AddU _ x y -> zipWith (+) <$> interpretU x <*> interpretU y
+    AddV w xs -> foldr (zipWith (+)) [U.new w 0] <$> mapM interpretU xs
     SubU _ x y -> zipWith (-) <$> interpretU x <*> interpretU y
     CLMulU _ x y -> zipWith U.clMul <$> interpretU x <*> interpretU y
-    MulU _ x y -> zipWith (*) <$> interpretU x <*> interpretU y
-    MulD _ x y -> zipWith U.mulD <$> interpretU x <*> interpretU y
-    MulV w x y -> zipWith (U.mulV w) <$> interpretU x <*> interpretU y
+    MulU w x y -> zipWith (U.mulV w) <$> interpretU x <*> interpretU y
     AESMulU _ x y -> zipWith U.aesMul <$> interpretU x <*> interpretU y
     MMIU w x p -> do
       x' <- map toInteger <$> interpretU x
@@ -599,10 +598,9 @@ instance FreeVar UInt where
     VarUI w var -> modifyI (modifyU w mempty (IntSet.insert var)) mempty
     VarUP w var -> modifyP (modifyU w mempty (IntSet.insert var)) mempty
     AddU _ x y -> freeVars x <> freeVars y
+    AddV _ xs -> mconcat (map freeVars xs)
     SubU _ x y -> freeVars x <> freeVars y
     MulU _ x y -> freeVars x <> freeVars y
-    MulD _ x y -> freeVars x <> freeVars y
-    MulV _ x y -> freeVars x <> freeVars y
     AESMulU _ x y -> freeVars x <> freeVars y
     CLMulU _ x y -> freeVars x <> freeVars y
     MMIU _ x _ -> freeVars x
