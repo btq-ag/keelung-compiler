@@ -459,7 +459,7 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
     VarUI w var -> pure <$> lookupUI w var
     VarUP w var -> pure <$> lookupUP w var
     AddU _ x y -> zipWith (+) <$> interpretU x <*> interpretU y
-    AddV w xs -> foldr (zipWith (+)) [U.new w 0] <$> mapM interpretU xs
+    AddV w xs -> map (U.slice (0, w)) <$> (foldr (zipWith (+)) [U.new w 0] <$> mapM interpretU xs)
     SubU _ x y -> zipWith (-) <$> interpretU x <*> interpretU y
     CLMulU _ x y -> zipWith U.clMul <$> interpretU x <*> interpretU y
     MulU w x y -> zipWith (U.mulV w) <$> interpretU x <*> interpretU y
@@ -491,7 +491,7 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
         _ -> return [U.new w 0]
     SliceU _ x i j -> do
       xs <- interpretU x
-      return [U.slice x' (i, j) | x' <- xs]
+      return (map (U.slice (i, j)) xs)
     JoinU _ x y -> do
       xs <- interpretU x
       ys <- interpretU y

@@ -216,7 +216,7 @@ toConstraints fieldInfo occurrence sliceShouldBeKept = fold step mempty
             Binary _ -> if val < 0 then -val else val
             Prime _ -> val
           -- resize the value to the width of the slice
-          resized = U.slice flipped (0, widthOf slice)
+          resized = U.slice (0, widthOf slice) flipped
           -- split the constant into smaller chunks of size `fieldWidth`
           constantChunks = zip [0 ..] (U.chunks fieldWidth resized)
        in Seq.fromList [CSliceVal (Slice (sliceRefU slice) (sliceStart slice + fieldWidth * i) ((sliceStart slice + fieldWidth * (i + 1)) `min` sliceEnd slice)) (toInteger chunk) | (i, chunk) <- constantChunks]

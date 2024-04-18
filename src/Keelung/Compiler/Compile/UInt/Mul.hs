@@ -133,7 +133,7 @@ multiply maxHeight refOutput (refX, operandY) limbWidth = foldM_ step (mempty, m
             [ ( Slice refX startX ((startX + limbWidth) `min` operandWidth),
                 case operandY of
                   Left refY -> Left $ Slice refY startY ((startY + limbWidth) `min` operandWidth)
-                  Right valY -> Right $ U.slice valY (startY, (startY + limbWidth) `min` operandWidth)
+                  Right valY -> Right $ U.slice (startY, (startY + limbWidth) `min` operandWidth) valY
               )
               | (indexX, indexY) <- indexPairs,
                 let startX = limbWidth * indexX,

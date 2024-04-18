@@ -1,9 +1,12 @@
+{-# LANGUAGE TupleSections #-}
+
 module Keelung.Compiler.Syntax.ToInternal (run) where
 
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
+import Data.Sequence qualified as Seq
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo
 import Keelung.Data.U qualified as U
@@ -185,8 +188,12 @@ chainExprsOfAssocOpAddU w x xSign y ySign = case (x, y) of
   -- there's nothing left we can do
   _ -> AddU w ((x, xSign) :<| (y, ySign) :<| mempty)
 
-chainExprsOfAssocOpAddV :: Width -> [ExprU n] -> ExprU n
-chainExprsOfAssocOpAddV w = foldl (\x y -> chainExprsOfAssocOpAddU w x True y True) (ValU (U.new w 0))
+chainExprsOfAssocOpAddV :: (GaloisField n, Integral n) => Width -> [ExprU n] -> ExprU n
+chainExprsOfAssocOpAddV w [] = ValU (U.new w 0)
+chainExprsOfAssocOpAddV w xs = AddU w (Seq.fromList (map (,True) xs))
+
+-- chainExprsOfAssocOpAddV w (x:y:xs) =
+-- foldl (\x y -> chainExprsOfAssocOpAddU w x True y True) (ValU (U.new w 0))
 
 chainExprsOfAssocOpAndB :: ExprB n -> ExprB n -> ExprB n
 chainExprsOfAssocOpAndB x y = case (x, y) of

@@ -47,7 +47,7 @@ compile out expr = case expr of
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = Either.partitionEithers mixed
-    compileAdd w out vars (sum constants)
+    compileAdd w out vars (U.slice (0, w)  (sum constants) )
   MulU _ x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -114,7 +114,7 @@ compile out expr = case expr of
     result <- wireU x
     case result of
       Left var -> writeSliceEq (Slice.fromRefU out) (Slice.Slice var i j)
-      Right val -> writeSliceVal (Slice.fromRefU out) (toInteger (U.slice val (i, j)))
+      Right val -> writeSliceVal (Slice.fromRefU out) (toInteger (U.slice (i, j) val))
   JoinU _ x y -> do
     let widthX = widthOf x
     let widthY = widthOf y

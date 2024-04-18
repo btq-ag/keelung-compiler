@@ -38,12 +38,6 @@ tests = describe "Experiment" $ do
         let expected = [(toInteger x + toInteger y) `mod` 1024]
         check gf181 (program (fromIntegral x) (fromIntegral y)) [] [] expected
 
-    -- it "2 constants / Byte -> UInt 10" $ do
-    --   let program x y = return $ x `mulV` (y :: UInt 8) :: Comp (UInt 10)
-    --   property $ \(x :: Word8, y :: Word8) -> do
-    --     let expected = [(toInteger x * toInteger y) `mod` 1024]
-    --     forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x) (fromIntegral y)) [] [] expected
-
     -- it "2 positive variables / Byte -> UInt 6" $ do
     --   let program = do
     --         x <- input Public :: Comp (UInt 8)

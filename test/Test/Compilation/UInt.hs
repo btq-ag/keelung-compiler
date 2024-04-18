@@ -21,9 +21,9 @@ import Test.Compilation.UInt.Inequality qualified as Inequality
 import Test.Compilation.UInt.Logical qualified as Logical
 import Test.Compilation.UInt.ModInv qualified as ModInv
 import Test.Compilation.UInt.Multiplication qualified as Multiplication
-import Test.Util
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
+import Test.Util
 
 run :: IO ()
 run = hspec tests
@@ -259,7 +259,7 @@ tests = do
               let u = fromInteger x :: UInt 8
               return $ slice u (i, j) :: Comp (UInt 4)
         forAll genParam $ \(val, i) -> do
-          let expected = [toInteger (U.slice (U.new 8 val) (i, i + 4))]
+          let expected = [toInteger (U.slice (i, i + 4) (U.new 8 val))]
           check (Binary 7) (program val (i, i + 4)) [] [] expected
           check (Prime 17) (program val (i, i + 4)) [] [] expected
           check gf181 (program val (i, i + 4)) [] [] expected
@@ -274,7 +274,7 @@ tests = do
               x <- input Public :: Comp (UInt 8)
               return $ slice x (i, j) :: Comp (UInt 4)
         forAll genParam $ \(val, i) -> do
-          let expected = [toInteger (U.slice (U.new 8 val) (i, i + 4))]
+          let expected = [toInteger (U.slice (i, i + 4) (U.new 8 val))]
           check (Binary 7) (program (i, i + 4)) [val] [] expected
           check (Prime 17) (program (i, i + 4)) [val] [] expected
           check gf181 (program (i, i + 4)) [val] [] expected
