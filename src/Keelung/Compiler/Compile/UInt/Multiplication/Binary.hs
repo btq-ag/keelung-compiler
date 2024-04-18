@@ -1,4 +1,4 @@
-module Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB, compileMulBExtended) where
+module Keelung.Compiler.Compile.UInt.Multiplication.Binary (compile, compileExtended) where
 
 import Control.Monad
 import Data.Bits qualified
@@ -6,14 +6,35 @@ import Data.Field.Galois (GaloisField)
 import Keelung (Width, widthOf)
 import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice (Slice))
 import Keelung.Data.U (U)
 
 -- | Multiply two unsigned integers, get the result of the same width
-compileMulB :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU U -> M n ()
-compileMulB width out x y = formHalfColumns width x y >>= foldColumns out
+compile :: (GaloisField n, Integral n) => RefU -> RefU -> Either RefU U -> M n ()
+compile out x y = do
+  let outputWidth = widthOf out
+  let operandWidth = widthOf x
 
-compileMulBExtended :: (GaloisField n, Integral n) => Width -> RefU -> RefU -> Either RefU U -> M n ()
-compileMulBExtended width out x y = formAllColumns width x y >>= foldColumns out
+  if outputWidth == operandWidth
+    then formHalfColumns outputWidth x y >>= foldColumns out
+    else -- else formAllColumns x y >>= foldColumns out
+    case outputWidth `compare` (operandWidth * 2) of
+      LT -> do
+        columns <- take outputWidth <$> formAllColumns x y
+        foldColumns out columns
+      EQ -> do
+        columns <- formAllColumns x y
+        foldColumns out columns
+      GT -> do
+        columns <- formAllColumns x y
+        foldColumns out columns
+        -- the result is shorter than `out`
+        -- write 0 to the higher bits of `out`
+        let outSliceHI = Slice out (operandWidth * 2) outputWidth
+        writeSliceVal outSliceHI 0
+
+compileExtended :: (GaloisField n, Integral n) => RefU -> RefU -> Either RefU U -> M n ()
+compileExtended out x y = formAllColumns x y >>= foldColumns out
 
 -- | Form columns of bits to be added together after multiplication
 --
@@ -24,14 +45,16 @@ compileMulBExtended width out x y = formAllColumns width x y >>= foldColumns out
 --                      x₃y₁    x₂y₁    x₁y₁    x₀y₁
 --              x₃y₂    x₂y₂    x₁y₂    x₀y₂
 --      x₃y₃    x₂y₃    x₁y₃    x₀y₃
-formAllColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> M n [(Int, [RefB])]
-formAllColumns width x (Left y) = do
-  let numberOfColumns = 2 * width - 1
+formAllColumns :: (GaloisField n, Integral n) => RefU -> Either RefU U -> M n [(Int, [RefB])]
+formAllColumns x (Left y) = do
+  let width = widthOf x
+  let numberOfColumns = 2 * width
   let pairs = [(indexSum, [(RefUBit x (indexSum - i), RefUBit y i) | i <- [(indexSum - width + 1) `max` 0 .. indexSum `min` (width - 1)]]) | indexSum <- [0 .. numberOfColumns - 1]]
   forM pairs $ \(i, xs) -> do
     xs' <- mapM multiplyBits xs
     return (i, xs')
-formAllColumns width x (Right y) = do
+formAllColumns x (Right y) = do
+  let width = widthOf x
   let numberOfColumns = 2 * width - 1
   forM [0 .. numberOfColumns - 1] $ \i -> do
     -- put the bits of x into the column if `Data.Bits.testBit y j` is True

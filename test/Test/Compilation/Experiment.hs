@@ -30,25 +30,22 @@ tests = describe "Experiment" $ do
             x <- input Public :: Comp (UInt 8)
             y <- input Public
             return $ x `mulD` y
-      -- debug (Prime 257) program
 
       property $ \(x, y :: Word8) -> do
         let expected = [toInteger x * toInteger y]
-        -- check gf181 program (map toInteger [x, y]) [] expected
-        -- check (Prime 4099) program (map toInteger [x, y]) [] expected
-        -- check (Prime 257) program (map toInteger [x, y]) [] expected
-        -- check (Prime 17) program (map toInteger [x, y]) [] expected
-        check (Binary 7) program (map toInteger [x, y]) [] expected
+        forM_ [gf181, Prime 4099, Prime 257, Prime 17, Binary 7] $ \field -> 
+          check field program (map toInteger [x, y]) [] expected
 
--- it "1 constant + 1 variable / Byte" $ do
---   let program x = do
---         y <- input Public :: Comp (UInt 8)
---         return $ x `mulD` y
---   property $ \(x, y :: Word8) -> do
---     let expected = [toInteger (x * y)]
---     forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x)) [toInteger y] [] expected
+    -- it "1 constant + 1 variable / Byte" $ do
+    --   let program x = do
+    --         y <- input Public :: Comp (UInt 8)
+    --         return $ x `mulD` y
+    --   property $ \(x, y :: Word8) -> do
+    --     let expected = [toInteger (x * y)]
+    --     check gf181 (program (fromIntegral x)) [toInteger y] [] expected
+        -- check (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
+        -- check (Binary 7) (program (fromIntegral x)) [toInteger y] [] expected
 
--- it "1 variable + 1 constant / Byte" $ do
 --   let program y = do
 --         x <- input Public :: Comp (UInt 8)
 --         return $ x `mulD` y

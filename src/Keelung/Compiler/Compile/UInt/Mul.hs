@@ -11,7 +11,7 @@ import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.Addition
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
-import Keelung.Compiler.Compile.UInt.Multiplication.Binary (compileMulB)
+import Keelung.Compiler.Compile.UInt.Multiplication.Binary qualified as Binary
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
@@ -51,7 +51,7 @@ compileMul out x y = do
   let limbWidth = operandWidth `ceilDiv` limbNumber
   let maxHeight = if limbWidth > 20 then 1048576 else 2 ^ limbWidth -- HACK
   case fieldTypeData fieldInfo of
-    Binary _ -> compileMulB outWidth out x y
+    Binary _ -> Binary.compile out x y
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 5 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
