@@ -279,7 +279,7 @@ tests =
               [dividend, 0]
               []
               (InterpreterError Interpreter.DivModQuotientIsZeroError)
-              (SolverError (Solver.QuotientIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 103]))) :: Error (Prime 17))
+              (SolverError (Solver.QuotientIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 79]))) :: Error (Prime 17))
             throwErrors
               (Binary 7)
               program
@@ -311,7 +311,7 @@ tests =
               [0, quotient]
               []
               (InterpreterError Interpreter.DivModDividendIsZeroError)
-              (SolverError (Solver.DividendIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 87]))) :: Error (Prime 17))
+              (SolverError (Solver.DividendIsZeroError (Solver.Segments (Seq.fromList [Solver.SegVars 8 63]))) :: Error (Prime 17))
             throwErrors
               (Binary 7)
               program

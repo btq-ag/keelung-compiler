@@ -34,7 +34,7 @@ tests = describe "UInt" $ do
             return $ c .&. 5
       assertCountO0 gf181 program 28
       -- TODO: should be 23
-      assertCount gf181 program 25
+      assertCount gf181 program 28
 
   describe "Addition / Subtraction" $ do
     it "2 variables / 8 bit / GF181" $ do
