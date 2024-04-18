@@ -10,6 +10,7 @@
 module Test.Util
   ( -- prints the compiled constraint module and R1CS
     debug,
+    debugO0,
     debugI,
     debugO0I,
     debugWithOpts,
@@ -92,6 +93,9 @@ debugWithOpts options program = caseFieldType fieldType handlePrime handleBinary
 
 debug :: (Encode t) => FieldType -> Comp t -> IO ()
 debug = debugWithOpts . Options.new
+
+debugO0 :: (Encode t) => FieldType -> Comp t -> IO ()
+debugO0 fieldType = debugWithOpts ((Options.new fieldType) {Options.optOptimize = False})
 
 debugI :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> IO ()
 debugI = debugWithOptsI . Options.new

@@ -135,7 +135,7 @@ addLimbColumnView resultSlice (LimbColumn.OnePositiveLimbOnly slice) = do
       -- the operand is shorter than result
       -- write 0 to the higher bits of the result
       let resultSliceLO = resultSlice {Slice.sliceEnd = Slice.sliceEnd resultSlice - (resultWidth - operandWidth)}
-      let resultSliceHI = resultSlice {Slice.sliceStart = Slice.sliceStart resultSlice - (resultWidth - operandWidth)}
+      let resultSliceHI = resultSlice {Slice.sliceStart = Slice.sliceEnd resultSlice - (resultWidth - operandWidth)}
       writeSliceEq resultSliceLO slice
       writeSliceVal resultSliceHI 0
     EQ -> writeSliceEq resultSlice slice

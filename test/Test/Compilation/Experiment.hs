@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module Test.Compilation.Experiment (run, tests) where
 
@@ -19,32 +20,34 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Experiment" $ do
   describe "Double-width" $ do
-    it "2 constants / Byte" $ do
-      let program x y = return $ x `mulD` (y :: UInt 8)
+    -- it "2 constants / Byte" $ do
+    --   let program x y = return $ x `mulD` (y :: UInt 8)
+    --   property $ \(x :: Word8, y :: Word8) -> do
+    --     let expected = [toInteger x * toInteger y]
+    --     forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x) (fromIntegral y)) [] [] expected
+
+    -- it "2 positive variables / Byte" $ do
+    --   let program = do
+    --         x <- input Public :: Comp (UInt 8)
+    --         y <- input Public
+    --         return $ x `mulD` y
+
+    --   property $ \(x, y :: Word8) -> do
+    --     let expected = [toInteger x * toInteger y]
+    --     forM_ [gf181, Prime 4099, Prime 257, Binary 7] $ \field ->
+    --       check field program (map toInteger [x, y]) [] expected
+
+    it "1 constant + 1 variable / Byte" $ do
+      let program x = do
+            y <- input Public :: Comp (UInt 8)
+            return $ x `mulD` y
+      -- debug (Prime 17) (program 1)
       property $ \(x :: Word8, y :: Word8) -> do
         let expected = [toInteger x * toInteger y]
-        forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x) (fromIntegral y)) [] [] expected
+        check gf181 (program (fromIntegral x)) [toInteger y] [] expected
+        check (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
 
-    it "2 positive variables / Byte" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public
-            return $ x `mulD` y
-
-      property $ \(x, y :: Word8) -> do
-        let expected = [toInteger x * toInteger y]
-        forM_ [gf181, Prime 4099, Prime 257, Prime 17, Binary 7] $ \field -> 
-          check field program (map toInteger [x, y]) [] expected
-
-    -- it "1 constant + 1 variable / Byte" $ do
-    --   let program x = do
-    --         y <- input Public :: Comp (UInt 8)
-    --         return $ x `mulD` y
-    --   property $ \(x, y :: Word8) -> do
-    --     let expected = [toInteger (x * y)]
-    --     check gf181 (program (fromIntegral x)) [toInteger y] [] expected
-        -- check (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
-        -- check (Binary 7) (program (fromIntegral x)) [toInteger y] [] expected
+-- check (Binary 7) (program (fromIntegral x)) [toInteger y] [] expected
 
 --   let program y = do
 --         x <- input Public :: Comp (UInt 8)

@@ -5,6 +5,7 @@ import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict qualified as IntMap
+import Data.Maybe qualified as Maybe
 import Keelung (FieldType (..), HasWidth (widthOf))
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Monad
@@ -69,12 +70,9 @@ compileMul out x y = do
               writeSliceVal extraPart 0
             mulnxn maxHeight limbWidth limbNumber out x y
 
-      case y of
-        Left refY ->
-          if enableNewAlgorithm
-            then multiply maxHeight out (x, refY) limbWidth
-            else oldAlgorithm
-        Right _ -> oldAlgorithm
+      if enableNewAlgorithm
+        then multiply maxHeight out (x, y) limbWidth
+        else oldAlgorithm
   where
     -- like div, but rounds up
     ceilDiv :: Int -> Int -> Int
@@ -84,19 +82,32 @@ compileMul out x y = do
 enableNewAlgorithm :: Bool
 enableNewAlgorithm = True
 
--- | Multiply slices of two operands and return resulting slice
-multiplyLimbs :: (GaloisField n, Integral n) => (Slice, Slice) -> M n Slice
-multiplyLimbs (sliceX, sliceY) = do
+-- | Multiply slices of two operands and return the resulting slice
+multiplyLimbs :: (GaloisField n, Integral n) => (Slice, Either Slice U) -> M n (Maybe Slice)
+multiplyLimbs (sliceX, Left sliceY) = do
   let productWidth = widthOf sliceX + widthOf sliceY
   productSlice <- allocSlice productWidth
 
-  -- write constraints
+  -- write constraints: productSlice = sliceX * sliceY
   writeMulWithLC
     (LC.new 0 [] [(sliceX, 1)])
     (LC.new 0 [] [(sliceY, 1)])
     (LC.new 0 [] [(productSlice, 1)])
 
-  return productSlice
+  return (Just productSlice)
+multiplyLimbs (_, Right 0) = do
+  return Nothing
+multiplyLimbs (sliceX, Right 1) = do
+  return (Just sliceX)
+multiplyLimbs (sliceX, Right valueY) = do
+  -- range of product: 0 ... ((2 ^ widthOf sliceX) - 1) * valueY
+  let productUpperBound = ((2 ^ widthOf sliceX) - 1) * toInteger valueY
+  let productWidth = U.widthOfInteger productUpperBound
+  -- traceShowM (productUpperBound, sliceX, valueY)
+  productSlice <- allocSlice productWidth
+  -- write constraints: productSlice = valueY * sliceX
+  writeAdd 0 [] [(productSlice, -1), (sliceX, fromIntegral valueY)]
+  return (Just productSlice)
 
 --  Here's what multiplication looks like in the elementary school:
 --
@@ -131,8 +142,8 @@ multiplyLimbs (sliceX, sliceY) = do
 -- It's possible that the product of the highest two limbs may be shorter than the default limb width.
 --    * Width of the product of the highest limbs = (outputWidth % limbWidth) * 2
 --
-multiply :: (GaloisField n, Integral n) => Int -> RefU -> (RefU, RefU) -> Width -> M n ()
-multiply maxHeight refOutput (refX, refY) limbWidth = foldM_ step (mempty, mempty) [0 .. outputWidth `div` limbWidth - 1] -- the number of columns
+multiply :: (GaloisField n, Integral n) => Int -> RefU -> (RefU, Either RefU U) -> Width -> M n ()
+multiply maxHeight refOutput (refX, operandY) limbWidth = foldM_ step (mempty, mempty) [0 .. outputWidth `div` limbWidth - 1] -- the number of columns
   where
     outputWidth = widthOf refOutput
     operandWidth = widthOf refX
@@ -142,7 +153,9 @@ multiply maxHeight refOutput (refX, refY) limbWidth = foldM_ step (mempty, mempt
       let indexPairs = [(xi, columnIndex - xi) | xi <- [0 .. columnIndex]]
       let slicePairs =
             [ ( Slice refX startX ((startX + limbWidth) `min` operandWidth),
-                Slice refY startY ((startY + limbWidth) `min` operandWidth)
+                case operandY of
+                  Left refY -> Left $ Slice refY startY ((startY + limbWidth) `min` operandWidth)
+                  Right valY -> Right $ U.slice valY (startY, (startY + limbWidth) `min` operandWidth)
               )
               | (indexX, indexY) <- indexPairs,
                 let startX = limbWidth * indexX,
@@ -152,7 +165,9 @@ multiply maxHeight refOutput (refX, refY) limbWidth = foldM_ step (mempty, mempt
             ]
       -- calculate the product of the limbs
       productSlices <- mapM multiplyLimbs slicePairs
-      let (lowerLimbs, upperLimbs) = unzip $ map (Slice.split limbWidth) productSlices
+      let (lowerLimbsMaybe, upperLimbsMaybe) = unzip $ map (splitMultipliedResult limbWidth) productSlices
+      let lowerLimbs = Maybe.catMaybes lowerLimbsMaybe
+      let upperLimbs = Maybe.catMaybes upperLimbsMaybe
 
       -- add these limbs to the output:
       --  1. lower limbs of the product
@@ -174,6 +189,15 @@ multiply maxHeight refOutput (refX, refY) limbWidth = foldM_ step (mempty, mempt
       -- traceM $ "next carry    " <> show nextCarries
 
       return (upperLimbs, nextCarries)
+
+    -- split the resulting slice of multiplication into lower and upper slices
+    -- returns Nothing as the upper slice if it's shorter than the limb width
+    splitMultipliedResult :: Int -> Maybe Slice -> (Maybe Slice, Maybe Slice)
+    splitMultipliedResult _ Nothing = (Nothing, Nothing)
+    splitMultipliedResult n (Just slice) =
+      if n < widthOf slice
+        then let (a, b) = Slice.split n slice in (Just a, Just b)
+        else (Just slice, Nothing)
 
 -- | n-limb by n-limb multiplication
 --                       .. x2 x1 x0
