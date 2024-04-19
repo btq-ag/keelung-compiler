@@ -5,6 +5,7 @@ import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
+import Debug.Trace
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Monad
 import Keelung.Compiler.Compile.UInt.Addition.Binary (compileAddB)
@@ -54,8 +55,7 @@ compileAdd width out refs constant = do
         if expectedCarryWidth * 2 <= fieldWidth fieldInfo
           then expectedCarryWidth -- we can use the expected carry width
           else fieldWidth fieldInfo `div` 2 -- the actual carry width should be less than half of the field width
-
-  -- NOTE, we use the same width for all limbs on the both sides for the moment (they can be different)
+          -- NOTE, we use the same width for all limbs on the both sides for the moment (they can be different)
   let limbWidth = fieldWidth fieldInfo - carryWidth
 
   -- the maximum number of limbs that can be added up at a time
@@ -72,13 +72,20 @@ compileAdd width out refs constant = do
       let ranges =
             map
               ( \start ->
-                  let currentLimbWidth = limbWidth `min` (width - start)
+                  let end = (start + limbWidth) `min` width
+                      outputLimbWidth = end - start
                       -- positive limbs
-                      constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. currentLimbWidth - 1]]
-                      column = LimbColumn.new constantSegment [Limb.newOperand (Slice ref start (start + currentLimbWidth)) sign | (ref, sign) <- refs]
+                      constantSegment = sum [(if Data.Bits.testBit constant (start + i) then 1 else 0) * (2 ^ i) | i <- [0 .. outputLimbWidth - 1]]
+                      column =
+                        LimbColumn.new
+                          constantSegment
+                          [ Limb.newOperand (Slice ref start ((start + outputLimbWidth) `min` widthOf ref)) sign
+                            | (ref, sign) <- refs,
+                              ((start + outputLimbWidth) `min` widthOf ref) > start
+                          ]
                       -- negative limbs
-                      resultSlice = Slice out start (start + currentLimbWidth)
-                   in (column, resultSlice)
+                      outputSlice = Slice out start (start + outputLimbWidth)
+                   in (column, outputSlice)
               )
               [0, limbWidth .. width - 1] -- index of the first bit of each limb
       foldM_
