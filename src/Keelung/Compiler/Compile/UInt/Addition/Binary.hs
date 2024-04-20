@@ -9,7 +9,6 @@ import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (Slice))
 import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
-import Debug.Trace
 import qualified Keelung.Data.Slice as Slice
 
 --------------------------------------------------------------------------------
