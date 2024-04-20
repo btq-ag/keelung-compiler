@@ -157,10 +157,10 @@ writeAddWithLC xs = case xs of
 
 --------------------------------------------------------------------------------
 
-writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
+writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)], [(Slice, n)]) -> (n, [(Ref, n)], [(Slice, n)]) -> (n, [(Ref, n)], [(Slice, n)]) -> M n ()
 writeMul as bs cs = writeMulWithLC (fromRefs as) (fromRefs bs) (fromRefs cs)
   where
-    fromRefs (constant, refs) = LC.new constant refs []
+    fromRefs (constant, refs, slices) = LC.new constant refs slices
 
 writeMulWithLC :: (GaloisField n, Integral n) => LC n -> LC n -> LC n -> M n ()
 writeMulWithLC (Constant x) (Constant y) (Constant z) =

@@ -33,7 +33,7 @@ assertLTE width (Left a) bound
       -- (a - 0) * (a - 1) = 0
       -- `(a - 0) * (a - 1) = 0` on the LSB
       let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeMul (0, bits) (-1, bits) (0, [])
+      writeMul (0, bits, []) (-1, bits, []) (0, [], [])
       -- assign the rest of the bits to `0`
       forM_ [1 .. width - 1] $ \j ->
         writeRefBVal (RefUBit a j) False
@@ -64,8 +64,8 @@ assertLTE width (Left a) bound
           -- `(a - 0) * (a - 1) * (a - 2) = 0` on the smallest limb
           let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
           temp <- freshRefF
-          writeMul (0, bits) (-1, bits) (0, [(F temp, 1)])
-          writeMul (0, [(F temp, 1)]) (-2, bits) (0, [])
+          writeMul (0, bits, []) (-1, bits, []) (0, [(F temp, 1)], [])
+          writeMul (0, [(F temp, 1)], []) (-2, bits, []) (0, [], [])
           -- assign the rest of the limbs to `0`
           forM_ [limbWidth .. width - 1] $ \j ->
             writeRefBVal (RefUBit a j) False
@@ -106,14 +106,14 @@ assertLTE width (Left a) bound
               --    then acc' = acc
               --    else acc' = 0
               acc' <- freshRefF
-              writeMul (0, [(acc, 1)]) (0, [(aBit, 1)]) (0, [(F acc', 1)])
+              writeMul (0, [(acc, 1)], []) (0, [(aBit, 1)], []) (0, [(F acc', 1)], [])
               return $ Just (F acc')
             else do
               -- constraint on a[i]
               -- (1 - acc - a[i]) * a[i] = 0
               -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
               --           if acc = 1 then a[i] = 0
-              writeMul (1, [(acc, -1), (aBit, -1)]) (0, [(aBit, 1)]) (0, [])
+              writeMul (1, [(acc, -1), (aBit, -1)], []) (0, [(aBit, 1)], []) (0, [], [])
               -- pass down the accumulator
               return $ Just acc
 
@@ -165,14 +165,14 @@ assertGTE width (Left a) bound
           -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0`
           -- the LSB is either 0 or 1
           let lsb = B (RefUBit a 0)
-          writeMul (0, [(lsb, 1)]) (1, [(lsb, 1)]) (0, [])
+          writeMul (0, [(lsb, 1)], []) (1, [(lsb, 1)], []) (0, [], [])
           -- the other bits are all 1
           forM_ [1 .. width - 1] $ \i ->
             writeRefBVal (RefUBit a i) True
         else do
           -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0` on the smallest limb
           let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
-          writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
+          writeMul (1 - 2 ^ limbWidth, bits, []) (2 - 2 ^ limbWidth, bits, []) (0, [], [])
           -- assign the rest of the limbs to `1`
           forM_ [limbWidth .. width - 1] $ \j ->
             writeRefBVal (RefUBit a j) True
@@ -202,8 +202,8 @@ assertGTE width (Left a) bound
           -- writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
 
           temp <- freshRefF
-          writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [(F temp, 1)])
-          writeMul (0, [(F temp, 1)]) (3 - 2 ^ limbWidth, bits) (0, [])
+          writeMul (1 - 2 ^ limbWidth, bits, []) (2 - 2 ^ limbWidth, bits, []) (0, [(F temp, 1)], [])
+          writeMul (0, [(F temp, 1)], []) (3 - 2 ^ limbWidth, bits, []) (0, [], [])
 
           -- assign the rest of the limbs to `1`
           forM_ [limbWidth .. width - 1] $ \j ->
@@ -238,12 +238,12 @@ assertGTE width (Left a) bound
               -- (flag + bit - 1) * bit = flag
               -- such that if flag = 0 then bit = 0 or 1 (don't care)
               --           if flag = 1 then bit = 1
-              writeMul (-1, [(B aBit, 1), (flag, 1)]) (0, [(B aBit, 1)]) (0, [(flag, 1)])
+              writeMul (-1, [(B aBit, 1), (flag, 1)], []) (0, [(B aBit, 1)], []) (0, [(flag, 1)], [])
               return flag
             else do
               flag' <- freshRefF
               -- flag' := flag * (1 - bit)
-              writeMul (0, [(flag, 1)]) (1, [(B aBit, -1)]) (0, [(F flag', 1)])
+              writeMul (0, [(flag, 1)], []) (1, [(B aBit, -1)], []) (0, [(F flag', 1)], [])
               return (F flag')
 
 -- | Assert that a UInt is greater than some constant
@@ -295,7 +295,7 @@ assertNonZero width ref = do
         go :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
         go nonZero bit = do
           nonZero' <- freshRefB
-          writeMul (0, [(B nonZero, 1)]) (0, [(B bit, 1)]) (0, [(B nonZero, 1), (B bit, 1), (B nonZero', -1)])
+          writeMul (0, [(B nonZero, 1)], []) (0, [(B bit, 1)], []) (0, [(B nonZero, 1), (B bit, 1), (B nonZero', -1)], [])
           return nonZero'
 
     fasterCase :: (GaloisField n, Integral n) => Int -> [RefB] -> M n ()

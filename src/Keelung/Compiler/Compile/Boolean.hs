@@ -17,7 +17,7 @@ import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
-import Keelung.Data.LC ( LC(Constant), (@), neg )
+import Keelung.Data.LC (LC (Constant), neg, (@))
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.Reference
 import Keelung.Data.Slice qualified as Slice
@@ -131,25 +131,25 @@ compileIfB (Left p) (Right x) (Left y) = do
   out <- freshRefB
   -- (out - y) = p * (x - y)
   writeMul
-    (0, [(B p, 1)])
-    (if x then 1 else 0, [(B y, -1)])
-    (0, [(B y, -1), (B out, 1)])
+    (0, [(B p, 1)], [])
+    (if x then 1 else 0, [(B y, -1)], [])
+    (0, [(B y, -1), (B out, 1)], [])
   return $ Left out
 compileIfB (Left p) (Left x) (Right y) = do
   out <- freshRefB
   -- (out - y) = p * (x - y)
   writeMul
-    (0, [(B p, 1)])
-    (if y then -1 else 0, [(B x, 1)])
-    (if y then -1 else 0, [(B out, 1)])
+    (0, [(B p, 1)], [])
+    (if y then -1 else 0, [(B x, 1)], [])
+    (if y then -1 else 0, [(B out, 1)], [])
   return $ Left out
 compileIfB (Left p) (Left x) (Left y) = do
   out <- freshRefB
   -- (out - y) = p * (x - y)
   writeMul
-    (0, [(B p, 1)])
-    (0, [(B x, 1), (B y, -1)])
-    (0, [(B y, -1), (B out, 1)])
+    (0, [(B p, 1)], [])
+    (0, [(B x, 1), (B y, -1)], [])
+    (0, [(B y, -1), (B out, 1)], [])
   return $ Left out
 
 -- | O(lg n) OR
@@ -213,9 +213,9 @@ orBs xs = do
     orB var1 var2 = do
       out <- freshRefB
       writeMul
-        (1, [(B var1, -1)])
-        (0, [(B var2, 1)])
-        (0, [(B var1, -1), (B out, 1)])
+        (1, [(B var1, -1)], [])
+        (0, [(B var2, 1)], [])
+        (0, [(B var1, -1), (B out, 1)], [])
       return out
 
 -- | O(lg n) AND
@@ -278,9 +278,9 @@ andBs xs = do
     andB var1 var2 = do
       out <- freshRefB
       writeMul
-        (0, [(B var1, 1)])
-        (0, [(B var2, 1)])
-        (0, [(B out, 1)])
+        (0, [(B var1, 1)], [])
+        (0, [(B var2, 1)], [])
+        (0, [(B out, 1)], [])
       return out
 
 -- | XOR, O(lg n) on prime fields and O(1) on binary fields
@@ -383,9 +383,9 @@ xorBs xs = do
       -- 2 x * y = x + y - out
       out <- freshRefB
       writeMul
-        (0, [(B x, 2)])
-        (0, [(B y, 1)])
-        (0, [(B x, 1), (B y, 1), (B out, -1)])
+        (0, [(B x, 2)], [])
+        (0, [(B y, 1)], [])
+        (0, [(B x, 1), (B y, 1), (B out, -1)], [])
       return out
 
 -- | Basically specialized version of `xorBs`
@@ -418,9 +418,9 @@ eqB (Left x) (Left y) = do
       --    (1 - x) * (1 - 2y) = (out - y)
       out <- freshRefB
       writeMul
-        (1, [(B x, -1)])
-        (1, [(B y, -2)])
-        (0, [(B out, 1), (B y, -1)])
+        (1, [(B x, -1)], [])
+        (1, [(B y, -2)], [])
+        (0, [(B out, 1), (B y, -1)], [])
       return (Left out)
 
 --------------------------------------------------------------------------------
@@ -437,7 +437,7 @@ computeLTEUVarVar x y = do
       yBit = B (RefUBit y 0)
   -- x[0] * y[0] = result + x[0] - 1
   result <- freshRefB
-  writeMul (0, [(xBit, 1)]) (0, [(yBit, 1)]) (-1, [(B result, 1), (xBit, 1)])
+  writeMul (0, [(xBit, 1)], []) (0, [(yBit, 1)], []) (-1, [(B result, 1), (xBit, 1)], [])
   -- starting from the least significant bit
   Left <$> foldM (compileLTEUVarVarPrim x y) result [1 .. width - 1]
 
@@ -475,7 +475,7 @@ computeLTUVarVar x y = do
       yBit = B (RefUBit y 0)
   -- (y - lastBit) = (x)(y)
   lastBit <- freshRefB
-  writeMul (0, [(xBit, 1)]) (0, [(yBit, 1)]) (0, [(B lastBit, -1), (yBit, 1)])
+  writeMul (0, [(xBit, 1)], []) (0, [(yBit, 1)], []) (0, [(B lastBit, -1), (yBit, 1)], [])
   -- starting from the least significant bit
   Left <$> foldM (compileLTEUVarVarPrim x y) lastBit [1 .. width - 1]
 
@@ -499,19 +499,19 @@ compileLTEUVarVarPrim x y acc i = do
 
   -- yacc = y[i] * acc
   yacc <- freshRefB
-  writeMul (0, [(yBit, 1)]) (0, [(B acc, 1)]) (0, [(B yacc, 1)])
+  writeMul (0, [(yBit, 1)], []) (0, [(B acc, 1)], []) (0, [(B yacc, 1)], [])
 
   characteristic <- gets (FieldInfo.fieldChar . optFieldInfo . cmOptions)
   if characteristic == 2
     then do
       -- result + yacc + y[i] + acc = (x[i]) * (y[i] + acc)
       result <- freshRefB
-      writeMul (0, [(xBit, 1)]) (0, [(yBit, 1), (B acc, 1)]) (0, [(B result, 1), (B yacc, 1), (yBit, 1), (B acc, 1)])
+      writeMul (0, [(xBit, 1)], []) (0, [(yBit, 1), (B acc, 1)], []) (0, [(B result, 1), (B yacc, 1), (yBit, 1), (B acc, 1)], [])
       return result
     else do
       -- result - yacc = (1 - x[i]) * (y[i] + acc - 2 * yacc)
       result <- freshRefB
-      writeMul (1, [(xBit, -1)]) (0, [(yBit, 1), (B acc, 1), (B yacc, -2)]) (0, [(B result, 1), (B yacc, -1)])
+      writeMul (1, [(xBit, -1)], []) (0, [(yBit, 1), (B acc, 1), (B yacc, -2)], []) (0, [(B result, 1), (B yacc, -1)], [])
       return result
 
 computeLTUVarConst :: (GaloisField n, Integral n) => RefU -> U -> M n (Either RefB Bool)
@@ -532,12 +532,12 @@ compileLTEUVarConstPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (R
 compileLTEUVarConstPrim (Left acc) (x, True) = do
   -- acc' - acc = (1 - x[i]) * (1 - acc)
   acc' <- freshRefB
-  writeMul (1, [(B x, -1)]) (1, [(B acc, -1)]) (0, [(B acc', 1), (B acc, -1)])
+  writeMul (1, [(B x, -1)], []) (1, [(B acc, -1)], []) (0, [(B acc', 1), (B acc, -1)], [])
   return $ Left acc'
 compileLTEUVarConstPrim (Left acc) (x, False) = do
   -- acc' = (1 - x[i]) * acc
   acc' <- freshRefB
-  writeMul (1, [(B x, -1)]) (0, [(B acc, 1)]) (0, [(B acc', 1)])
+  writeMul (1, [(B x, -1)], []) (0, [(B acc, 1)], []) (0, [(B acc', 1)], [])
   return $ Left acc'
 compileLTEUVarConstPrim (Right True) (_, True) = return $ Right True
 compileLTEUVarConstPrim (Right True) (x, False) = do
@@ -554,12 +554,12 @@ compileLTEUConstVarPrim :: (GaloisField n, Integral n) => Either RefB Bool -> (B
 compileLTEUConstVarPrim (Left acc) (True, y) = do
   -- y[i] * acc = result
   result <- freshRefB
-  writeMul (0, [(B y, 1)]) (0, [(B acc, 1)]) (0, [(B result, 1)])
+  writeMul (0, [(B y, 1)], []) (0, [(B acc, 1)], []) (0, [(B result, 1)], [])
   return $ Left result
 compileLTEUConstVarPrim (Left acc) (_, y) = do
   -- - y[i] * acc = result - y[i] - acc
   result <- freshRefB
-  writeMul (0, [(B y, -1)]) (0, [(B acc, 1)]) (0, [(B result, 1), (B y, -1), (B acc, -1)])
+  writeMul (0, [(B y, -1)], []) (0, [(B acc, 1)], []) (0, [(B result, 1), (B y, -1), (B acc, -1)], [])
   return $ Left result
 compileLTEUConstVarPrim (Right True) (True, y) = return $ Left y
 compileLTEUConstVarPrim (Right True) (False, _) = return $ Right True

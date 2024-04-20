@@ -157,4 +157,4 @@ multiplyBits (x, y) = do
 
 -- | Like `multiplyBits` but write the result to an existing reference
 multiplyBits' :: (GaloisField n, Integral n) => RefB -> (RefB, RefB) -> M n ()
-multiplyBits' out (x, y) = writeMul (0, [(B x, 1)]) (0, [(B y, 1)]) (0, [(B out, 1)])
+multiplyBits' out (x, y) = writeMul (0, [(B x, 1)], []) (0, [(B y, 1)], []) (0, [(B out, 1)], [])

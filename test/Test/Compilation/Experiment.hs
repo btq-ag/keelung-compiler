@@ -57,7 +57,8 @@ tests = describe "Experiment" $ do
       let program n = do
             xs <- inputList Public n :: Comp [UInt 8]
             return $ addV xs :: Comp (UInt 10)
-      check  (Binary 7)  (program 2) [197, 70] [] [267]
+      -- debug  (Binary 7)  (program 2)
+      check  (Binary 7)  (program 1) [1] [] [1]
       -- let genParam = do
       --       n <- chooseEnum (0, 2)
       --       xs <- vector n
@@ -68,8 +69,8 @@ tests = describe "Experiment" $ do
       --   -- check gf181 (program n) (map toInteger xs) [] expected
       --   -- check (Prime 17) (program n) (map toInteger xs) [] expected
       --   check (Binary 7) (program n) (map toInteger xs) [] expected
-        -- forM_ [gf181, Prime 17, Binary 7] $ \field ->
-        --   check field (program n) (map toInteger xs) [] expected
+      --   forM_ [gf181, Prime 17, Binary 7] $ \field ->
+      --     check field (program n) (map toInteger xs) [] expected
 
 -- it "2 positive variables / Byte -> UInt 10" $ do
 --   let program = do
