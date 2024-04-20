@@ -1,36 +1,52 @@
-module Keelung.Compiler.Compile.UInt.Addition.Binary (compileAddB) where
+module Keelung.Compiler.Compile.UInt.Addition.Binary (compile) where
 
 import Control.Monad.Except
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
+import Debug.Trace
+import Keelung (widthOf)
 import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice (Slice))
 import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
 
 --------------------------------------------------------------------------------
 
 -- | Binary field addition
-compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> [(RefU, Bool)] -> U -> M n ()
-compileAddB _ out [] constant = writeRefUVal out constant
-compileAddB _ out [(var, True)] 0 = writeRefUEq out var
-compileAddB width out [(var, True)] constant = compileAddBPosConst width out var constant
-compileAddB width out [(var, False)] constant = compileAddBNegConst width out var constant
-compileAddB width out ((var1, sign1) : (var2, sign2) : vars) constant = do
+compile :: (GaloisField n, Integral n) => RefU -> [(RefU, Bool)] -> U -> M n ()
+compile out [] constant = writeRefUVal out constant
+compile out (x : xs) constant =
+  let outputWidth = widthOf out
+      operandsWidth = widthOf (fst x)
+   in if outputWidth > operandsWidth
+        then do
+          traceShowM (outputWidth, operandsWidth)
+          -- add to the LO bits
+          compileAddB operandsWidth out x xs constant
+          -- write 0 to the HI bits
+          writeSliceVal (Slice out operandsWidth outputWidth) 0
+        else compileAddB outputWidth out x xs constant
+
+compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> (RefU, Bool) -> [(RefU, Bool)] -> U -> M n ()
+compileAddB _ out (var, True) [] 0 = writeRefUEq out var
+compileAddB width out (var, True) [] constant = compileAddBPosConst width out var constant
+compileAddB width out (var, False) [] constant = compileAddBNegConst width out var constant
+compileAddB width out (var1, sign1) ((var2, sign2) : vars) constant = do
   temp <- freshRefU width
   case (sign1, sign2) of
     (True, True) -> do
       compileAddBPosPos width temp var1 var2
-      compileAddB width out ((temp, True) : vars) constant
+      compileAddB width out (temp, True) vars constant
     (True, False) -> do
       compileAddBPosNeg width temp var1 var2
-      compileAddB width out ((temp, True) : vars) constant
+      compileAddB width out (temp, True) vars constant
     (False, True) -> do
       compileAddBPosNeg width temp var2 var1
-      compileAddB width out ((temp, True) : vars) constant
+      compileAddB width out (temp, True) vars constant
     (False, False) -> do
       compileAddBPosPos width temp var1 var2
-      compileAddB width out ((temp, False) : vars) constant -- NOTE: temp is negative here
+      compileAddB width out (temp, False) vars constant -- NOTE: temp is negative here
 
 -- temp <- freshRefU width
 -- compileAddB width temp vars constant

@@ -5,10 +5,9 @@ import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
-import Debug.Trace
 import Keelung.Compiler.Compile.Error qualified as Error
 import Keelung.Compiler.Compile.Monad
-import Keelung.Compiler.Compile.UInt.Addition.Binary (compileAddB)
+import Keelung.Compiler.Compile.UInt.Addition.Binary qualified as Binary
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn (LimbColumn)
 import Keelung.Compiler.Compile.UInt.Addition.LimbColumn qualified as LimbColumn
 import Keelung.Compiler.Compile.Util
@@ -61,7 +60,7 @@ compileAdd width out refs constant = do
   -- the maximum number of limbs that can be added up at a time
   let maxHeight = if carryWidth > 21 then 1048576 else 2 ^ carryWidth -- HACK
   case fieldTypeData fieldInfo of
-    Binary _ -> compileAddB width out refs constant
+    Binary _ -> Binary.compile out refs constant
     Prime 2 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 3 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
     Prime 5 -> throwError $ Error.FieldNotSupported (fieldTypeData fieldInfo)
