@@ -7,9 +7,9 @@ import Keelung (widthOf)
 import Keelung.Compiler.Compile.Monad
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (Slice))
+import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Syntax (Width)
-import qualified Keelung.Data.Slice as Slice
 
 --------------------------------------------------------------------------------
 
@@ -28,13 +28,13 @@ compile out (x : xs) constant =
           compileAddB outputWidth out x xs constant
 
 compileAddB :: (GaloisField n, Integral n) => Width -> RefU -> (RefU, Bool) -> [(RefU, Bool)] -> U -> M n ()
-compileAddB _ out (var, True) [] 0 = 
-  case widthOf out `compare` widthOf var of 
-    LT -> do 
+compileAddB _ out (var, True) [] 0 =
+  case widthOf out `compare` widthOf var of
+    LT -> do
       let varLO = Slice var 0 (widthOf out)
       writeSliceEq varLO (Slice.fromRefU out)
     EQ -> writeRefUEq out var
-    GT -> do 
+    GT -> do
       let outLO = Slice out 0 (widthOf var)
       let outHI = Slice out (widthOf var) (widthOf out)
       writeSliceEq outLO (Slice.fromRefU var)
@@ -65,8 +65,6 @@ compileAddB width out (var1, sign1) ((var2, sign2) : vars) constant = do
 --    edge case: carry[0] = 0
 compileAddBPosPos :: (GaloisField n, Integral n) => RefU -> RefU -> RefU -> M n ()
 compileAddBPosPos out as bs = do
-  
-
   let outputWidth = widthOf out
   -- allocates `outputWidth - 1` carry bits
   carryBits <- freshRefU (outputWidth - 1)
@@ -241,37 +239,62 @@ compileAddBNegConst out as bs = do
   carryBits <- freshRefU (outputWidth - 1)
 
   forM_ [0 .. outputWidth - 1] $ \index -> do
-    let a = B (RefUBit as index)
-    let b = if Data.Bits.testBit bs index then 1 else 0
-    let c = B (RefUBit out index)
-    let prevCarry = if index == 0 then Nothing else Just (B (RefUBit carryBits (index - 1)))
-    let nextCarry = if index == outputWidth - 1 then Nothing else Just (B (RefUBit carryBits index))
+    let a =
+          if index >= widthOf as
+            then Nothing
+            else Just $ Slice as index (index + 1)
+    let b
+          | index >= widthOf bs = 0
+          | Data.Bits.testBit bs index = 1
+          | otherwise = 0
+    let c = Slice out index (index + 1)
+    let prevCarry = if index == 0 then Nothing else Just (Slice carryBits (index - 1) index)
+    let nextCarry = if index == outputWidth - 1 then Nothing else Just (Slice carryBits index (index + 1))
     -- out[index] = a + b + prevCarry + 1
     -- nextCarry = a * b + a * prevCarry + b * prevCarry + b + prevCarry
     case (prevCarry, nextCarry) of
       (Nothing, Nothing) -> do
-        -- c = a + b + prev + 1
+        -- c = a + b + 1 + 1
         --   = a + b
-        writeAdd b [(a, 1), (c, -1)] []
+        case a of
+          Nothing -> writeSliceVal c (toInteger b) -- c = b
+          Just refA -> writeAdd b [] [(refA, 1), (c, -1)] -- c = a + b
       (Nothing, Just next) -> do
-        -- c = a + b + prev + 1
-        --   = a + b
-        writeAdd b [(a, 1), (c, -1)] []
-        -- next = a * b + a * prev + b * prev + b + prev
-        --      = a * (b + 1) + 1
-        writeAdd 1 [(a, b + 1), (next, -1)] []
+        case a of
+          Nothing -> do
+            -- c = a + b + 1 + 1
+            --   = b
+            writeSliceVal c (toInteger b)
+            -- next = a * b + a * 1 + b * 1 + b + 1
+            --      = 1
+            writeSliceVal next 1
+          Just refA -> do
+            -- c = a + b + 1 + 1
+            --   = a + b
+            writeAdd b [] [(refA, 1), (c, -1)]
+            -- next = a * b + a * prev + b * prev + b + prev
+            --      = a * (b + 1) + 1
+            writeAdd 1 [] [(refA, b + 1), (next, -1)]
       (Just prev, Nothing) -> do
-        -- c = a + b + prev + 1
-        writeAdd (b + 1) [(a, 1), (prev, 1), (c, -1)] []
+        case a of
+          Nothing -> writeAdd (b + 1) [] [(prev, 1), (c, -1)] -- c = b + prev + 1
+          Just refA -> writeAdd (b + 1) [] [(refA, 1), (prev, 1), (c, -1)] -- c = a + b + prev + 1
       (Just prev, Just next) -> do
-        -- c = a + b + prev + 1
-        writeAdd (b + 1) [(a, 1), (prev, 1), (c, -1)] []
-        -- next = a * b + a * prev + (b + 1) * prev + b + prev
-        aPrev <- freshRefB
-        -- aPrev = a * prev
-        writeMul (0, [(a, 1)], []) (0, [(prev, 1)], []) (0, [(B aPrev, 1)], [])
-        -- next = ab + aPrev + bPrev + b + prev
-        writeAdd b [(a, b), (B aPrev, 1), (prev, b + 1), (next, -1)] []
+        case a of
+          Nothing -> do
+            -- c = b + prev + 1
+            writeAdd (b + 1) [] [(prev, 1), (c, -1)]
+            -- next = (b + 1) * prev + b + prev
+            writeAdd b [] [(prev, b + 1), (next, -1)]
+          Just refA -> do
+            -- c = a + b + prev + 1
+            writeAdd (b + 1) [] [(refA, 1), (prev, 1), (c, -1)]
+            -- next = a * b + a * prev + (b + 1) * prev + b + prev
+            aPrev <- freshRefB
+            -- aPrev = a * prev
+            writeMul (0, [], [(refA, 1)]) (0, [], [(prev, 1)]) (0, [(B aPrev, 1)], [])
+            -- next = ab + aPrev + bPrev + b + prev
+            writeAdd b [(B aPrev, 1)] [(refA, b), (prev, b + 1), (next, -1)]
 
 -- | Adds a positive variable with a negative variable on a binary field:
 --   Assume `as` to be the positive operand and `bs` to be the negative operand

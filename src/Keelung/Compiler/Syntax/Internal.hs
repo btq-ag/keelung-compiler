@@ -234,7 +234,7 @@ data Internal n = Internal
     internalAssertions :: ![Expr n],
     -- | Side effects
     internalSideEffects :: !(Seq (SideEffect n))
-  } 
+  }
   deriving (Eq)
 
 instance (GaloisField n, Integral n) => Show (Internal n) where
