@@ -41,7 +41,9 @@ module Test.Util
     -- operands
     Operand (..),
     Operands (..),
-    operandToInteger,
+    operandToUnsignedInteger,
+    operandToSignedInteger,
+    operandToSignedVariable,
     cassifyOperands,
   )
 where
@@ -289,10 +291,20 @@ arbitraryOperandOfWidth width =
 instance Arbitrary Operand where
   arbitrary = arbitraryOperandOfWidth 8
 
-operandToInteger :: Operand -> Integer
-operandToInteger (Constant x) = toInteger x
-operandToInteger (PosVar x) = toInteger x
-operandToInteger (NegVar x) = (-toInteger x) `mod` (2 ^ widthOf x)
+operandToUnsignedInteger :: Operand -> Integer
+operandToUnsignedInteger (Constant x) = toInteger x
+operandToUnsignedInteger (PosVar x) = toInteger x
+operandToUnsignedInteger (NegVar x) = toInteger x
+
+operandToSignedInteger :: Operand -> Integer
+operandToSignedInteger (Constant x) = toInteger x
+operandToSignedInteger (PosVar x) = toInteger x
+operandToSignedInteger (NegVar x) = (-toInteger x) `mod` (2 ^ widthOf x)
+
+operandToSignedVariable :: (KnownNat n) => Operand -> UInt n -> UInt n
+operandToSignedVariable (Constant _) _ = error "[ panic ] operandToSignedVariable: constant"
+operandToSignedVariable (PosVar _) var = var
+operandToSignedVariable (NegVar _) var = -var
 
 --------------------------------------------------------------------------------
 
