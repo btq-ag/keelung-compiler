@@ -104,7 +104,7 @@ convertExprU expr = case expr of
   T.VarUI w var -> return $ VarUI w var
   T.VarUP w var -> return $ VarUP w var
   T.AddU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure True
-  T.AddV w xs -> chainExprsOfAssocOpAddV w <$> mapM (convertExprU . overwriteWidth w) xs
+  T.AddV w xs -> chainExprsOfAssocOpAddV w <$> mapM convertExprU xs
   T.SubU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure False
   T.AESMulU _ x y -> AESMulU <$> convertExprU x <*> convertExprU y
   T.MulU w x y -> MulU w <$> convertExprU x <*> convertExprU y
@@ -121,32 +121,6 @@ convertExprU expr = case expr of
   T.BtoU w x -> BtoU w <$> convertExprB x
   T.SliceU w x i j -> SliceU w <$> convertExprU x <*> pure i <*> pure j
   T.JoinU w x y -> JoinU w <$> convertExprU x <*> convertExprU y
-
--- | overwriting the width of a UInt expression
-overwriteWidth :: Width -> T.UInt -> T.UInt
-overwriteWidth width expr = case expr of
-  T.ValU _ n -> T.ValU width n
-  T.VarU w var -> T.VarU w var -- variable width is not overwritten
-  T.VarUI w var -> T.VarUI w var -- variable width is not overwritten
-  T.VarUP w var -> T.VarUP w var -- variable width is not overwritten
-  T.AddU _ x y -> T.AddU width x y
-  T.AddV _ xs -> T.AddV width xs
-  T.SubU _ x y -> T.SubU width x y
-  T.AESMulU _ x y -> T.AESMulU width x y
-  T.MulU _ x y -> T.MulU width x y
-  T.CLMulU _ x y -> T.CLMulU width x y
-  T.MMIU _ x p -> T.MMIU width x p
-  T.AndU _ x y -> T.AndU width x y
-  T.OrU _ x y -> T.OrU width x y
-  T.XorU _ x y -> T.XorU width x y
-  T.NotU _ x -> T.NotU width x
-  T.RoLU _ i x -> T.RoLU width i x
-  T.ShLU _ i x -> T.ShLU width i x
-  T.SetU _ x i b -> T.SetU width x i b
-  T.IfU _ p x y -> T.IfU width p x y
-  T.BtoU _ x -> T.BtoU width x
-  T.SliceU _ x i j -> T.SliceU width x i j
-  T.JoinU _ x y -> T.JoinU width x y
 
 convertExprAndAllocOutputVar :: (GaloisField n, Integral n) => T.Expr -> M n [(Var, Expr n)]
 convertExprAndAllocOutputVar expr = case expr of

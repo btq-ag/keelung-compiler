@@ -9,6 +9,7 @@ import Data.Either qualified as Either
 import Data.Word (Word8)
 import Keelung hiding (MulU, VarUI)
 import Keelung.Data.U (U)
+import Keelung.Data.U qualified as U
 import Test.Arbitrary (arbitraryUOfWidth)
 import Test.Hspec
 import Test.QuickCheck
@@ -81,19 +82,18 @@ tests = describe "Experiment" $ do
         check (Prime 17) program (map operandToInteger vars) [] expected
         check (Binary 7) program (map operandToInteger vars) [] expected
 
-    it "Byte -> UInt 10" $ do
-        let operands = Operands [NegVar 3]
-      -- property $ \operands -> do
-        -- separate constants and variables
-        let (constants, vars) = cassifyOperands operands
-        let expected = [sum (map operandToInteger (unOperands operands)) `mod` 1024]
-        let arity = length vars
-        let program = do
-              xs <- inputList Public arity :: Comp [UInt 8]
-              return $ addV (xs <> map fromIntegral constants) :: Comp (UInt 10)
-        -- check gf181 program (map operandToInteger vars) [] expected
-        -- check (Prime 17) program (map operandToInteger vars) [] expected
-        check (Binary 7) program (map operandToInteger vars) [] expected
+  it "Byte -> UInt 10" $ do
+    property $ \operands -> do
+      -- separate constants and variables
+      let (constants, vars) = cassifyOperands operands
+      let expected = [sum (map operandToInteger (unOperands operands)) `mod` 1024]
+      let arity = length vars
+      let program = do
+            xs <- inputList Public arity :: Comp [UInt 8]
+            return $ addV (xs <> map fromIntegral constants) :: Comp (UInt 10)
+      check gf181 program (map operandToInteger vars) [] expected
+      check (Prime 17) program (map operandToInteger vars) [] expected
+      check (Binary 7) program (map operandToInteger vars) [] expected
 
 -- case (a, b) of
 --   (Constant valA, Constant valB) -> do
@@ -213,7 +213,7 @@ instance Arbitrary Operand where
 operandToInteger :: Operand -> Integer
 operandToInteger (Constant x) = toInteger x
 operandToInteger (PosVar x) = toInteger x
-operandToInteger (NegVar x) = -toInteger x
+operandToInteger (NegVar x) = (-toInteger x) `mod` (2 ^ widthOf x)
 
 --------------------------------------------------------------------------------
 

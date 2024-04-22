@@ -61,6 +61,7 @@ instance Num U where
   (+) = add
   (-) = sub
   (*) = mul
+  negate a = U (uWidth a) (negate (uValue a))
   abs = id
   signum = const 1
   fromInteger = U (Just 32)

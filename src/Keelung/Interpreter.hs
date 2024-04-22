@@ -459,7 +459,7 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
     VarUI w var -> pure <$> lookupUI w var
     VarUP w var -> pure <$> lookupUP w var
     AddU _ x y -> zipWith (+) <$> interpretU x <*> interpretU y
-    AddV w xs -> map (U.slice (0, w)) <$> (foldr (zipWith (+)) [U.new w 0] <$> mapM (interpretU . overwriteWidth w) xs)
+    AddV w xs -> map (U.slice (0, w)) <$> (foldr (zipWith (+)) [U.new w 0] <$> mapM interpretU xs)
     SubU _ x y -> zipWith (-) <$> interpretU x <*> interpretU y
     CLMulU _ x y -> zipWith U.clMul <$> interpretU x <*> interpretU y
     MulU w x y -> zipWith (U.mulV w) <$> interpretU x <*> interpretU y
@@ -496,32 +496,6 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
       xs <- interpretU x
       ys <- interpretU y
       return [U.join x' y' | (x', y') <- zip xs ys]
-
--- | overwriting the width of a UInt expression
-overwriteWidth :: Width -> UInt -> UInt
-overwriteWidth w expr = case expr of
-  ValU _ n -> ValU w n
-  VarU v var -> VarU v var -- variable width is not changed
-  VarUI v var -> VarUI v var -- variable width is not changed
-  VarUP v var -> VarUP v var -- variable width is not changed
-  AddU _ x y -> AddU w (overwriteWidth w x) (overwriteWidth w y)
-  AddV _ xs -> AddV w (map (overwriteWidth w) xs)
-  SubU _ x y -> SubU w (overwriteWidth w x) (overwriteWidth w y)
-  CLMulU _ x y -> CLMulU w (overwriteWidth w x) (overwriteWidth w y)
-  MulU _ x y -> MulU w (overwriteWidth w x) (overwriteWidth w y)
-  AESMulU _ x y -> AESMulU w (overwriteWidth w x) (overwriteWidth w y)
-  MMIU _ x p -> MMIU w (overwriteWidth w x) p
-  AndU _ x y -> AndU w (overwriteWidth w x) (overwriteWidth w y)
-  OrU _ x y -> OrU w (overwriteWidth w x) (overwriteWidth w y)
-  XorU _ x y -> XorU w (overwriteWidth w x) (overwriteWidth w y)
-  NotU _ x -> NotU w (overwriteWidth w x)
-  RoLU _ i x -> RoLU w i (overwriteWidth w x)
-  ShLU _ i x -> ShLU w i (overwriteWidth w x)
-  SetU _ x i y -> SetU w (overwriteWidth w x) i y
-  IfU _ p x y -> IfU w p (overwriteWidth w x) (overwriteWidth w y)
-  BtoU _ x -> BtoU w x
-  SliceU _ x i j -> SliceU w (overwriteWidth w x) i j
-  JoinU _ x y -> JoinU w (overwriteWidth w x) (overwriteWidth w y)
 
 -- instance (GaloisField n, Integral n) => Interpret Expr n where
 --   interpret expr = case expr of
