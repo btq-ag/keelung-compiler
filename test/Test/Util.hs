@@ -38,9 +38,15 @@ module Test.Util
     throwErrorsWithOpts,
     throwErrors,
     gf181Info,
+    -- operands
+    Operand (..),
+    Operands (..),
+    operandToInteger,
+    cassifyOperands,
   )
 where
 
+import Data.Either qualified as Either
 import Data.Field.Galois
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits
@@ -56,9 +62,12 @@ import Keelung.Compiler.Util (gf181Info)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Data.FieldInfo
 import Keelung.Data.FieldInfo qualified as FieldInfo
+import Keelung.Data.U (U)
 import Keelung.Solver qualified as Solver
+import Test.Arbitrary (arbitraryUOfWidth)
 import Test.HUnit (assertFailure)
 import Test.Hspec
+import Test.QuickCheck
 
 --------------------------------------------------------------------------------
 
@@ -262,3 +271,42 @@ throwErrorsWithOpts options program rawPublicInputs rawPrivateInputs stError csE
 
 throwErrors :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Error n -> Error n -> IO ()
 throwErrors = throwErrorsWithOpts . Options.new
+
+--------------------------------------------------------------------------------
+
+data Operand = Constant U | PosVar U | NegVar U
+  deriving (Show)
+
+arbitraryOperandOfWidth :: Width -> Gen Operand
+arbitraryOperandOfWidth width =
+  oneof
+    [ Constant <$> arbitraryUOfWidth width,
+      PosVar <$> arbitraryUOfWidth width,
+      NegVar <$> arbitraryUOfWidth width
+    ]
+
+-- | Default to generating Byte operands
+instance Arbitrary Operand where
+  arbitrary = arbitraryOperandOfWidth 8
+
+operandToInteger :: Operand -> Integer
+operandToInteger (Constant x) = toInteger x
+operandToInteger (PosVar x) = toInteger x
+operandToInteger (NegVar x) = (-toInteger x) `mod` (2 ^ widthOf x)
+
+--------------------------------------------------------------------------------
+
+newtype Operands = Operands {unOperands :: [Operand]}
+  deriving (Show)
+
+instance Arbitrary Operands where
+  arbitrary = do
+    n <- chooseInt (0, 10)
+    Operands <$> vector n
+
+cassifyOperands :: Operands -> ([U], [Operand])
+cassifyOperands = Either.partitionEithers . map cassifyOperand . unOperands
+  where
+    cassifyOperand :: Operand -> Either U Operand
+    cassifyOperand (Constant x) = Left x
+    cassifyOperand x = Right x
