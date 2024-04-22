@@ -3,8 +3,6 @@
 
 module Test.Compilation.UInt.Multiplication (tests, run) where
 
-import Control.Monad
-import Data.Word
 import Keelung hiding (compile)
 import Test.Hspec
 import Test.QuickCheck hiding ((.&.))
@@ -17,156 +15,162 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Multiplication" $ do
-  describe "Single-width" $ do
-    it "2 constants / Byte" $ do
-      let program x y = return $ x * (y :: UInt 8)
-      property $ \(x, y :: Word8) -> do
-        let expected = [toInteger (x * y)]
-        forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x) (fromIntegral y)) [] [] expected
+  describe "Ordinary Multiplication" $ do
+    it "Byte" $ do
+      property $ \(a, b) -> do
+        let expected = [(operandToInteger a * operandToInteger b) `mod` 256]
+        case (a, b) of
+          (Constant valA, Constant valB) -> do
+            let program = return $ fromIntegral valA * fromIntegral valB :: Comp (UInt 8)
+            check gf181 program [] [] expected
+            check (Prime 17) program [] [] expected
+            check (Binary 7) program [] [] expected
+          (Constant valA, _) -> do
+            let program = do
+                  y <- input Public :: Comp (UInt 8)
+                  return $ fromIntegral valA * y
+            check gf181 program [operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger b] [] expected
+          (_, Constant valB) -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  return $ x * fromIntegral valB
+            check gf181 program [operandToInteger a] [] expected
+            check (Prime 17) program [operandToInteger a] [] expected
+            check (Binary 7) program [operandToInteger a] [] expected
+          _ -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  y <- input Public :: Comp (UInt 8)
+                  return $ x * y
+            check gf181 program [operandToInteger a, operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger a, operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger a, operandToInteger b] [] expected
 
-    it "2 positive variables / Byte" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public
-            return $ x * y
-      property $ \(x, y :: Word8) -> do
-        let expected = [toInteger (x * y)]
-        forM_ [gf181, Prime 17, Binary 7] $ \field -> check field program (map toInteger [x, y]) [] expected
-
-    it "1 constant + 1 variable / Byte" $ do
-      let program x = do
-            y <- input Public :: Comp (UInt 8)
-            return $ x * y
-      property $ \(x, y :: Word8) -> do
-        let expected = [toInteger (x * y)]
-        forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x)) [toInteger y] [] expected
-
-    it "1 variable + 1 constant / Byte" $ do
-      let program y = do
-            x <- input Public :: Comp (UInt 8)
-            return $ x * y
-      property $ \(x, y :: Word8) -> do
-        let expected = [toInteger (x * y)]
-        forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral y)) [toInteger x] [] expected
-
-    it "with addition / Byte" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public
-            z <- input Public
-            return $ x * y + z
-      property $ \(x, y, z :: Word8) -> do
-        let expected = [toInteger (x * y + z)]
-        forM_ [gf181, Prime 257, Prime 17, Binary 7] $ \field -> check field program (map toInteger [x, y, z]) [] expected
-
-    it "with subtraction / Byte" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public
-            z <- input Public
-            return $ x * y - z
-      property $ \(x, y, z :: Word8) -> do
-        let expected = [toInteger (x * y - z)]
-        forM_ [gf181, Prime 257, Prime 17, Binary 7] $ \field -> check field program (map toInteger [x, y, z]) [] expected
-  describe "Double-width" $ do
-    it "2 constants / Byte -> UInt 16" $ do
-      let program x y = return $ x `mulD` (y :: UInt 8)
-      property $ \(x :: Word8, y :: Word8) -> do
-        let expected = [(toInteger x * toInteger y) `mod` 65536]
-        forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x) (fromIntegral y)) [] [] expected
-
-    it "2 positive variables / Byte -> UInt 16" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public
-            return $ x `mulD` y
-
-      property $ \(x, y :: Word8) -> do
-        let expected = [(toInteger x * toInteger y) `mod` 65536]
-        forM_ [gf181, Prime 4099, Binary 7] $ \field ->
-          check field program (map toInteger [x, y]) [] expected
-
-    it "1 constant + 1 variable / Byte -> UInt 16" $ do
-      let program x = do
-            y <- input Public :: Comp (UInt 8)
-            return $ x `mulD` y
-      property $ \(x :: Word8, y :: Word8) -> do
-        let expected = [(toInteger x * toInteger y) `mod` 65536]
-        check gf181 (program (fromIntegral x)) [toInteger y] [] expected
-        check (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
-        check (Binary 7) (program (fromIntegral x)) [toInteger y] [] expected
-
-    it "with addition / Byte -> UInt 16" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public
-            z <- input Public
-            return $ x `mulD` y + z
-      property $ \(x, y, z :: Word8) -> do
-        let expected = [(toInteger x * toInteger y + toInteger z) `mod` 65536]
-        forM_ [gf181, Prime 257, Prime 17, Binary 7] $ \field -> check field program (map toInteger [x, y, z]) [] expected
-
-    it "with subtraction / Byte -> UInt 16" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public
-            z <- input Public
-            return $ x `mulD` y - z
-      property $ \(x, y, z :: Word8) -> do
-        let expected = [(toInteger x * toInteger y - toInteger z) `mod` 65536]
-        forM_ [gf181, Prime 257, Prime 17, Binary 7] $ \field -> check field program (map toInteger [x, y, z]) [] expected
-
-  describe "Variable-width" $ do
-    it "2 constants / Byte -> UInt 6" $ do
-      let program x y = return $ x `mulV` (y :: UInt 8) :: Comp (UInt 6)
-      property $ \(x :: Word8, y :: Word8) -> do
-        let expected = [(toInteger x * toInteger y) `mod` 64]
-        forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x) (fromIntegral y)) [] [] expected
-
-    it "2 constants / Byte -> UInt 10" $ do
-      let program x y = return $ x `mulV` (y :: UInt 8) :: Comp (UInt 10)
-      property $ \(x :: Word8, y :: Word8) -> do
-        let expected = [(toInteger x * toInteger y) `mod` 1024]
-        forM_ [gf181, Prime 17, Binary 7] $ \field -> check field (program (fromIntegral x) (fromIntegral y)) [] [] expected
-
-    it "2 positive variables / Byte -> UInt 6" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public
-            return $ x `mulV` y :: Comp (UInt 6)
-
-      property $ \(x, y :: Word8) -> do
-        let expected = [(toInteger x * toInteger y) `mod` 64]
-        forM_ [gf181, Prime 17, Binary 7] $ \field ->
-          check field program (map toInteger [x, y]) [] expected
-
-    it "2 positive variables / Byte -> UInt 10" $ do
-      let program = do
-            x <- input Public :: Comp (UInt 8)
-            y <- input Public
-            return $ x `mulV` y :: Comp (UInt 10)
-
-      property $ \(x, y :: Word8) -> do
-        let expected = [(toInteger x * toInteger y) `mod` 1024]
-        forM_ [gf181, Prime 17, Binary 7] $ \field ->
-          check field program (map toInteger [x, y]) [] expected
-
-    it "1 constant + 1 variable / Byte -> UInt 6" $ do
-      let program x = do
-            y <- input Public :: Comp (UInt 8)
-            return $ x `mulV` y :: Comp (UInt 6)
-      property $ \(x :: Word8, y :: Word8) -> do
-        let expected = [(toInteger x * toInteger y) `mod` 64]
-        check gf181 (program (fromIntegral x)) [toInteger y] [] expected
-        check (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
-        check (Binary 7) (program (fromIntegral x)) [toInteger y] [] expected
-
-    it "1 constant + 1 variable / Byte -> UInt 10" $ do
-      let program x = do
-            y <- input Public :: Comp (UInt 8)
-            return $ x `mulV` y :: Comp (UInt 10)
-      property $ \(x :: Word8, y :: Word8) -> do
-        let expected = [(toInteger x * toInteger y) `mod` 1024]
-        check gf181 (program (fromIntegral x)) [toInteger y] [] expected
-        check (Prime 17) (program (fromIntegral x)) [toInteger y] [] expected
-        check (Binary 7) (program (fromIntegral x)) [toInteger y] [] expected
+  describe "Variable-width Multiplication" $ do
+    it "Byte -> UInt 6" $ do
+      property $ \(a, b) -> do
+        let expected = [(operandToInteger a * operandToInteger b) `mod` 64]
+        case (a, b) of
+          (Constant valA, Constant valB) -> do
+            let program = return $ (fromIntegral valA :: UInt 8) `mulV` fromIntegral valB :: Comp (UInt 6)
+            check gf181 program [] [] expected
+            check (Prime 17) program [] [] expected
+            check (Binary 7) program [] [] expected
+          (Constant valA, _) -> do
+            let program = do
+                  y <- input Public :: Comp (UInt 8)
+                  return $ fromIntegral valA `mulV` y :: Comp (UInt 6)
+            check gf181 program [operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger b] [] expected
+          (_, Constant valB) -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  return $ x `mulV` fromIntegral valB :: Comp (UInt 6)
+            check gf181 program [operandToInteger a] [] expected
+            check (Prime 17) program [operandToInteger a] [] expected
+            check (Binary 7) program [operandToInteger a] [] expected
+          _ -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  y <- input Public :: Comp (UInt 8)
+                  return $ x `mulV` y :: Comp (UInt 6)
+            check gf181 program [operandToInteger a, operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger a, operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger a, operandToInteger b] [] expected
+    it "Byte -> UInt 8" $ do
+      property $ \(a, b) -> do
+        let expected = [(operandToInteger a * operandToInteger b) `mod` 256]
+        case (a, b) of
+          (Constant valA, Constant valB) -> do
+            let program = return $ (fromIntegral valA :: UInt 8) `mulV` fromIntegral valB :: Comp (UInt 8)
+            check gf181 program [] [] expected
+            check (Prime 17) program [] [] expected
+            check (Binary 7) program [] [] expected
+          (Constant valA, _) -> do
+            let program = do
+                  y <- input Public :: Comp (UInt 8)
+                  return $ fromIntegral valA `mulV` y :: Comp (UInt 8)
+            check gf181 program [operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger b] [] expected
+          (_, Constant valB) -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  return $ x `mulV` fromIntegral valB :: Comp (UInt 8)
+            check gf181 program [operandToInteger a] [] expected
+            check (Prime 17) program [operandToInteger a] [] expected
+            check (Binary 7) program [operandToInteger a] [] expected
+          _ -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  y <- input Public :: Comp (UInt 8)
+                  return $ x `mulV` y :: Comp (UInt 8)
+            check gf181 program [operandToInteger a, operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger a, operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger a, operandToInteger b] [] expected
+    it "Byte -> UInt 10" $ do
+      property $ \(a, b) -> do
+        let expected = [(operandToInteger a * operandToInteger b) `mod` 1024]
+        case (a, b) of
+          (Constant valA, Constant valB) -> do
+            let program = return $ (fromIntegral valA :: UInt 8) `mulV` fromIntegral valB :: Comp (UInt 10)
+            check gf181 program [] [] expected
+            check (Prime 17) program [] [] expected
+            check (Binary 7) program [] [] expected
+          (Constant valA, _) -> do
+            let program = do
+                  y <- input Public :: Comp (UInt 8)
+                  return $ fromIntegral valA `mulV` y :: Comp (UInt 10)
+            check gf181 program [operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger b] [] expected
+          (_, Constant valB) -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  return $ x `mulV` fromIntegral valB :: Comp (UInt 10)
+            check gf181 program [operandToInteger a] [] expected
+            check (Prime 17) program [operandToInteger a] [] expected
+            check (Binary 7) program [operandToInteger a] [] expected
+          _ -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  y <- input Public :: Comp (UInt 8)
+                  return $ x `mulV` y :: Comp (UInt 10)
+            check gf181 program [operandToInteger a, operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger a, operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger a, operandToInteger b] [] expected
+  describe "Double-width Multiplication" $ do
+    it "UInt 8 -> UInt 16" $ do
+      property $ \(a, b) -> do
+        let expected = [(operandToInteger a * operandToInteger b) `mod` 65536]
+        case (a, b) of
+          (Constant valA, Constant valB) -> do
+            let program = return $ (fromIntegral valA :: UInt 8) `mulD` fromIntegral valB :: Comp (UInt 16)
+            check gf181 program [] [] expected
+            check (Prime 17) program [] [] expected
+            check (Binary 7) program [] [] expected
+          (Constant valA, _) -> do
+            let program = do
+                  y <- input Public :: Comp (UInt 8)
+                  return $ fromIntegral valA `mulD` y :: Comp (UInt 16)
+            check gf181 program [operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger b] [] expected
+          (_, Constant valB) -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  return $ x `mulD` fromIntegral valB :: Comp (UInt 16)
+            check gf181 program [operandToInteger a] [] expected
+            check (Prime 17) program [operandToInteger a] [] expected
+            check (Binary 7) program [operandToInteger a] [] expected
+          _ -> do
+            let program = do
+                  x <- input Public :: Comp (UInt 8)
+                  y <- input Public :: Comp (UInt 8)
+                  return $ x `mulD` y :: Comp (UInt 16)
+            check gf181 program [operandToInteger a, operandToInteger b] [] expected
+            check (Prime 17) program [operandToInteger a, operandToInteger b] [] expected
+            check (Binary 7) program [operandToInteger a, operandToInteger b] [] expected
