@@ -39,7 +39,7 @@ assertDivModU width dividend divisor quotient remainder = do
   --  =>
   --    divisor * quotient = dividend - remainder
   -- double the widths of these variables when the flag is set
-  let useAllocDoubleWidth = True
+  let useAllocDoubleWidth = False
   let applyFlag x = do
         x' <- x
         if useAllocDoubleWidth
@@ -64,7 +64,7 @@ assertDivModU width dividend divisor quotient remainder = do
         Right True -> return ()
         Right val -> throwError $ Error.ConflictingValuesB True val
     (Left xVar, Right yVal) -> do
-      Comparison.assertLT (width * 2) (Left xVar) (toInteger yVal)
+      Comparison.assertLT width (Left xVar) (toInteger yVal)
     (Right xVal, Left yVar) -> do
       Comparison.assertGT (width * 2) (Left yVar) (toInteger xVal)
     (Right xVal, Right yVal) -> do
