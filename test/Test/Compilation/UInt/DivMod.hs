@@ -35,10 +35,12 @@ tests =
 
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
-          forM_ [gf181, Prime 17] $ \field -> do
-            check field program [dividend, divisor] [] expected
-          forM_ [Binary 7] $ \field -> do
-            check field program [dividend, divisor] [] expected
+          check gf181 program [dividend, divisor] [] expected
+          assertCount gf181 program 85 -- previously 163 with double allocation
+          check (Prime 17) program [dividend, divisor] [] expected
+          assertCount (Prime 17) program 238 -- previously 372 with double allocation
+          check (Binary 7) program [dividend, divisor] [] expected 
+          assertCount (Binary 7) program 771 -- previously 901 with double allocation
 
       it "constant dividend / variable divisor" $ do
         let program dividend = do
