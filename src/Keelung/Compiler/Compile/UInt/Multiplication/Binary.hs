@@ -51,7 +51,7 @@ compile out refX operandY = do
 --                      x₃y₁    x₂y₁    x₁y₁    x₀y₁
 --              x₃y₂    x₂y₂    x₁y₂    x₀y₂
 --      x₃y₃    x₂y₃    x₁y₃    x₀y₃
-formAllColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> M n [(Int, [RefUBit])]
+formAllColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> M n [(Int, [Bit])]
 formAllColumns productWidth x (Left y) = do
   let width = widthOf x
   let pairs = [(indexSum, [((x, indexSum - i), (y, i)) | i <- [(indexSum - width + 1) `max` 0 .. indexSum `min` (width - 1)]]) | indexSum <- [0 .. productWidth - 1]]
@@ -74,7 +74,7 @@ formAllColumns productWidth x (Right y) = do
 --      x₂y₁    x₁y₁    x₀y₁
 --      x₁y₂    x₀y₂
 --      x₀y₃
-formHalfColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> M n [(Int, [RefUBit])]
+formHalfColumns :: (GaloisField n, Integral n) => Width -> RefU -> Either RefU U -> M n [(Int, [Bit])]
 formHalfColumns width x (Left y) = do
   let numberOfColumns = width
   forM [0 .. numberOfColumns - 1] $ \i -> do
@@ -89,10 +89,10 @@ formHalfColumns width x (Right y) = do
     return (i, vars)
 
 -- | Starting from the least significant column, add the bits together and propagate the carry to the next column
-foldColumns :: (GaloisField n, Integral n) => RefU -> [(Int, [RefUBit])] -> M n ()
+foldColumns :: (GaloisField n, Integral n) => RefU -> [(Int, [Bit])] -> M n ()
 foldColumns out = foldM_ step []
   where
-    step :: (GaloisField n, Integral n) => [RefUBit] -> (Int, [RefUBit]) -> M n [RefUBit]
+    step :: (GaloisField n, Integral n) => [Bit] -> (Int, [Bit]) -> M n [Bit]
     step prevCarries (columnIndex, column)
       | widthOf out <= columnIndex = return [] -- out of the range of `out`
       | otherwise = do
@@ -102,7 +102,7 @@ foldColumns out = foldM_ step []
 ----------------------------------------
 
 -- | Add up a column of bits and propagate the carry to the next column
-foldColumn :: (GaloisField n, Integral n) => RefUBit -> [RefUBit] -> M n [RefUBit]
+foldColumn :: (GaloisField n, Integral n) => Bit -> [Bit] -> M n [Bit]
 foldColumn out xs = do
   let (chunk, rest) = splitAt 3 xs
   if null rest
@@ -120,7 +120,7 @@ foldColumn out xs = do
       return $ carry <> carries
 
 -- | Add up a limited number of bits and return the carry
-combineBits :: (GaloisField n, Integral n) => RefUBit -> [RefUBit] -> M n [RefUBit]
+combineBits :: (GaloisField n, Integral n) => Bit -> [Bit] -> M n [Bit]
 combineBits (out, i) [] = do
   writeSliceVal (Slice out i (i + 1)) 0
   return [] -- no carry
@@ -146,21 +146,21 @@ combineBits out [a, b, c] = do
   return [carry]
 combineBits _ _ = error "[ panic ] combineBits: cannot handle too many bits"
 
-type RefUBit = (RefU, Int)
+type Bit = (RefU, Int)
 
 -- | Add up a list of bits
-addBitsAlloc :: (GaloisField n, Integral n) => [RefUBit] -> M n RefUBit
+addBitsAlloc :: (GaloisField n, Integral n) => [Bit] -> M n Bit
 addBitsAlloc xs = do
   out <- allocSlice 1
   writeAdd 0 [] ((out, -1) : [(Slice x i (i + 1), 1) | (x, i) <- xs])
   return (Slice.sliceRefU out, 0)
 
 -- | Like `addBitsAlloc` but write the result to an existing reference
-addBits :: (GaloisField n, Integral n) => RefUBit -> [RefUBit] -> M n ()
+addBits :: (GaloisField n, Integral n) => Bit -> [Bit] -> M n ()
 addBits (out, i) xs = writeAdd 0 [] ((Slice out i (i + 1), -1) : [(Slice x j (j + 1), 1) | (x, j) <- xs])
 
 -- | Multiply two bits
-multiplyBitsAlloc :: (GaloisField n, Integral n) => (RefUBit, RefUBit) -> M n RefUBit
+multiplyBitsAlloc :: (GaloisField n, Integral n) => (Bit, Bit) -> M n Bit
 multiplyBitsAlloc ((x, i), (y, j)) = do
   -- out <- freshRefB
   out <- allocSlice 1

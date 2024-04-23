@@ -4,6 +4,7 @@
 module Keelung.Compiler.Linker
   ( linkConstraintModule,
     reindexRef,
+    reindexSlice,
     Env (..),
     constructEnv,
     toConstraints,

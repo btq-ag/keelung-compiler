@@ -33,17 +33,26 @@ test cm = checkReport (envCounters (constructEnv cm)) $ generateReindexReport (c
 --------------------------------------------------------------------------------
 
 -- | Ref with a String tag
-data TaggedRef = TaggedRef Ref [String]
+data TaggedRef = TaggedRef Ref [String] | TaggedSliceBit RefU Int [String]
 
 instance Show TaggedRef where
   show (TaggedRef ref []) = show ref
+  show (TaggedSliceBit ref i []) = show ref ++ "[" ++ show i ++ "]"
   show (TaggedRef ref tags) = show ref <> " " <> showList' tags
+  show (TaggedSliceBit ref i tags) = show ref ++ "[" ++ show i ++ "]" <> " " <> showList' tags
 
 instance Eq TaggedRef where
   TaggedRef ref1 _ == TaggedRef ref2 _ = ref1 == ref2
+  TaggedSliceBit ref1 i _ == TaggedSliceBit ref2 j _ = ref1 == ref2 && i == j
+  _ == _ = False
 
 instance Ord TaggedRef where
   TaggedRef ref1 _ `compare` TaggedRef ref2 _ = ref1 `compare` ref2
+  TaggedSliceBit ref1 i _ `compare` TaggedSliceBit ref2 j _ = case ref1 `compare` ref2 of
+    EQ -> i `compare` j
+    x -> x
+  TaggedRef _ _ `compare` TaggedSliceBit {} = LT
+  TaggedSliceBit {} `compare` TaggedRef _ _ = GT
 
 -- | Datatype for keeping track of which Ref is mapped to which Var
 newtype ReindexReport = ReindexReport (IntMap (Set TaggedRef))
@@ -104,13 +113,24 @@ class GenerateReindexReport a where
 
 instance GenerateReindexReport Slice where
   generateReindexReport env tags slice =
+    -- ReindexReport $
+    --   IntMap.fromList
+    --     [ ( reindexRefU
+    --           env
+    --           (Slice.sliceRefU slice)
+    --           i,
+    --         Set.singleton (TaggedRef (B (RefUBit (Slice.sliceRefU slice) i)) tags)
+    --       )
+    --       | i <- [Slice.sliceStart slice .. Slice.sliceEnd slice - 1]
+    --     ]
+
     ReindexReport $
       IntMap.fromList
         [ ( reindexRefU
               env
               (Slice.sliceRefU slice)
               i,
-            Set.singleton (TaggedRef (B (RefUBit (Slice.sliceRefU slice) i)) tags)
+            Set.singleton (TaggedSliceBit (Slice.sliceRefU slice) i tags)
           )
           | i <- [Slice.sliceStart slice .. Slice.sliceEnd slice - 1]
         ]
@@ -125,7 +145,9 @@ instance GenerateReindexReport RefF where
   generateReindexReport env tags ref = ReindexReport $ IntMap.singleton (reindexRefF env ref) (Set.singleton (TaggedRef (F ref) tags))
 
 instance GenerateReindexReport RefB where
-  generateReindexReport env tags ref = ReindexReport $ IntMap.singleton (reindexRefB env ref) (Set.singleton (TaggedRef (B ref) tags))
+  generateReindexReport env tags ref = case ref of 
+    RefUBit refU i -> ReindexReport $ IntMap.singleton (reindexRefB env ref) (Set.singleton (TaggedSliceBit refU i tags))
+    _ -> ReindexReport $ IntMap.singleton (reindexRefB env ref) (Set.singleton (TaggedRef (B ref) tags))
 
 instance GenerateReindexReport Ref where
   generateReindexReport env tags (F refF) = generateReindexReport env tags refF
