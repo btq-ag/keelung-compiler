@@ -20,7 +20,6 @@ import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.LC (LC (Constant), neg, (@))
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.Reference
-import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 
 compile :: (GaloisField n, Integral n) => (ExprU n -> M n (Either RefU U)) -> ExprB n -> M n (Either RefB Bool)
@@ -361,14 +360,24 @@ xorBs xs = do
     compileChunk (var1 NonEmpty.:| [var2, var3]) = xorB var1 var2 >>= xorB var3
     compileChunk (var1 NonEmpty.:| [var2, var3, var4]) = xorB var1 var2 >>= xorB var3 >>= xorB var4
     compileChunk (var NonEmpty.:| vars') = do
+      -- to see if the sum of operands is odd, we can use the following approach:
+      --
+      --    sum of vars = result + 2x[0] + 4x[1] + ...
+      --
+      -- `result` will be the answer we want
+      --
+      -- determine the width of the unsigned integer and allocate a it
       let vars = var : vars'
-      -- devise an unsigned integer for expressing the sum of vars
       let width = widthOfInteger (toInteger (length vars))
-      slice <- allocSlice width
+      slice <- allocSlice (width - 1)
+      -- LC for the sum of vars
       let sumOfVars = mconcat (fmap (\x -> 1 @ B x) vars)
-      writeAddWithLC $ sumOfVars <> LC.new 0 [] [(slice, -1)]
-      -- check if the sum is even or odd by checking the least significant bit of the unsigned integer
-      return $ RefUBit (Slice.sliceRefU slice) 0
+      -- allocate the boolean variable for the least significant bit
+      result <- freshRefB
+      -- form the equation
+      writeAddWithLC $ sumOfVars <> LC.new 0 [(B result, -1)] [(slice, -2)]
+      -- return the least significant bit
+      return result
 
     flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
     flipResult (Right False) = return $ Right True
@@ -387,108 +396,6 @@ xorBs xs = do
         (0, [(B y, 1)], [])
         (0, [(B x, 1), (B y, 1), (B out, -1)], [])
       return out
-
--- type Bit = (RefU, Int)
-
--- xorBs2 :: (GaloisField n, Integral n) => [Either RefB Bool] -> M n (Either RefB Bool)
--- xorBs2 xs = do
---   -- separate the operands into variables and constants
---   let (vars, constants) = Either.partitionEithers xs
---   let constant = odd (length (filter id constants)) -- if number of True is odd
---   resultFromVars <- do
---     fieldType <- gets (FieldInfo.fieldTypeData . optFieldInfo . cmOptions)
---     case fieldType of
---       Binary _ -> constantFold vars
---       Prime 2 -> linearFold vars
---       Prime _ -> divideAndConquer vars
-
---   if constant
---     then flipResult resultFromVars
---     else return resultFromVars
---   where
---     -- special case for binary fields, simply sum up all operands
---     constantFold :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
---     constantFold [] = return $ Right False
---     constantFold [x] = return $ Left x
---     constantFold vars = do
---       out <- freshRefB
---       -- compose the LC for the sum
---       let sumOfVars = mconcat (fmap (\x -> 1 @ B x) vars)
---       writeAddWithLC $ sumOfVars <> neg (1 @ B out)
---       return $ Left out
-
---     -- for Prime 2 fields, we can't use the divide and conquer approach
---     linearFold :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
---     linearFold =
---       foldM
---         ( \acc var -> case acc of
---             Right True -> flipResult (Left var)
---             Right False -> return $ Left var
---             Left accVar -> Left <$> xorB accVar var
---         )
---         (Right False)
-
---     -- rewrite as even/odd relationship instead:
---     --      if the sum of all operands is even then 0 else 1
---     divideAndConquer :: (GaloisField n, Integral n) => [RefB] -> M n (Either RefB Bool)
---     divideAndConquer vars = do
---       -- split operands into chunks in case that the order of field is too small
---       -- each chunk can only has at most `(2 ^ fieldWidth) - 1` operands
---       fieldWidth <- gets (FieldInfo.fieldWidth . optFieldInfo . cmOptions)
---       let lists =
---             -- trying to avoid having to compute `2 ^ fieldWidth - 1` most of the time
---             let len = length vars
---              in if length vars <= fieldWidth || len < 256 && fieldWidth >= 8
---                   then [vars]
---                   else List.chunksOf (fromInteger (2 ^ fieldWidth - 1)) vars
---       let nonEmptyChunks = Data.Maybe.mapMaybe NonEmpty.nonEmpty lists
---       case nonEmptyChunks of
---         [] -> return $ Right False
---         [var NonEmpty.:| []] -> return $ Left var
---         _ -> mapM compileChunk nonEmptyChunks >>= divideAndConquer
-
---     compileChunk :: (GaloisField n, Integral n) => NonEmpty RefB -> M n RefB
---     compileChunk (var1 NonEmpty.:| []) = return var1
---     compileChunk (var1 NonEmpty.:| [var2]) = xorB var1 var2
---     compileChunk (var1 NonEmpty.:| [var2, var3]) = xorB var1 var2 >>= xorB var3
---     compileChunk (var1 NonEmpty.:| [var2, var3, var4]) = xorB var1 var2 >>= xorB var3 >>= xorB var4
---     compileChunk (var NonEmpty.:| vars') = do
---       -- to see if the sum of operands is odd, we can use the following approach:
---       --
---       --    sum of vars = result + 2x[0] + 4x[1] + ...
---       --
---       -- `result` will be the answer we want
---       --
---       -- determine the width of the unsigned integer and allocate a it
---       let vars = var : vars'
---       let width = widthOfInteger (toInteger (length vars))
---       slice <- allocSlice (width - 1)
---       -- LC for the sum of vars
---       let sumOfVars = mconcat (fmap (\x -> 1 @ B x) vars)
---       -- allocate the boolean variable for the least significant bit
---       result <- freshRefB
---       -- form the equation
---       writeAddWithLC $ sumOfVars <> LC.new 0 [(B result, -1)] [(slice, -2)]
---       -- return the least significant bit
---       return result
-
---     flipResult :: (GaloisField n, Integral n) => Either RefB Bool -> M n (Either RefB Bool)
---     flipResult (Right False) = return $ Right True
---     flipResult (Right True) = return $ Right False
---     flipResult (Left var) = do
---       out <- freshRefB
---       writeRefBNEq var out
---       return $ Left out
-
---     xorB :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
---     xorB x y = do
---       -- 2 x * y = x + y - out
---       out <- freshRefB
---       writeMul
---         (0, [(B x, 2)], [])
---         (0, [(B y, 1)], [])
---         (0, [(B x, 1), (B y, 1), (B out, -1)], [])
---       return out
 
 -- | Basically specialized version of `xorBs`
 eqB :: (GaloisField n, Integral n) => Either RefB Bool -> Either RefB Bool -> M n (Either RefB Bool)

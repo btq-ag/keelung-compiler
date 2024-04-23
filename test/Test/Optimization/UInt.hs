@@ -185,8 +185,8 @@ tests = describe "UInt" $ do
             y <- input Public :: Comp (UInt 8)
             return (x .*. y)
       -- print $ linkConstraintModule cs'
-      assertCountO0 gf181 program 91
-      assertCount gf181 program 87
+      assertCountO0 gf181 program 87
+      assertCount gf181 program 79
 
   describe "Constants" $ do
     -- TODO: should be just 4
