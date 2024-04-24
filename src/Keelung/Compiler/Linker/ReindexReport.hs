@@ -156,13 +156,13 @@ instance GenerateReindexReport Ref where
 instance GenerateReindexReport RefU where
   generateReindexReport env tags refU = generateReindexReport env tags (Slice.fromRefUWithDesiredWidth (envFieldWidth env) refU)
 
-instance (Num n) => GenerateReindexReport (PolyL n) where
+instance (Integral n, GaloisField n) => GenerateReindexReport (PolyL n) where
   generateReindexReport env tags poly =
     let sliceReindexReport = generateReindexReport env tags (map fst (PolyL.toSlices poly))
         refReindexReport = generateReindexReport env tags (Map.keys (PolyL.polyRefs poly))
      in sliceReindexReport <> refReindexReport
 
-instance (Num n) => GenerateReindexReport (Constraint n) where
+instance (Integral n, GaloisField n) => GenerateReindexReport (Constraint n) where
   generateReindexReport env tags (CAddL poly) = generateReindexReport env ("CAddL" : tags) poly
   generateReindexReport env tags (CRefEq x y) = generateReindexReport env ("CRefEq L" : tags) x <> generateReindexReport env ("CRefEq R" : tags) y
   generateReindexReport env tags (CRefBNEq x y) = generateReindexReport env ("CRefBNEq L" : tags) x <> generateReindexReport env ("CRefBNEq R" : tags) y

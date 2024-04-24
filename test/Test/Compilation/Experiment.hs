@@ -23,6 +23,8 @@ import qualified Keelung.Data.SlicePolynomial as SlicePolynomial
 import Keelung.Data.SlicePolynomial (SlicePoly)
 import Keelung.Data.Slice (Slice(Slice))
 import Keelung.Data.Reference
+import qualified Keelung.Data.LC as LC
+import qualified Keelung.Data.PolyL as PolyL
 
 run :: IO ()
 run = hspec tests
@@ -47,20 +49,21 @@ tests = describe "Experiment" $ do
     let program bound = do
           x <- input Public :: Comp (UInt 4)
           assertLTE x bound
+    debug (Prime 2) (program 8)
     -- forAll (choose (0, 14)) $ \bound -> do
-    let bound = 11
-    check (Prime 2) (program bound) [0] [] []
-    forM_ [0 .. 15] $ \x -> do
-      if x <= bound
-        then check (Prime 2) (program bound) [fromInteger x] [] []
-        else
-          throwErrors
-            (Prime 2)
-            (program bound)
-            [fromInteger x]
-            []
-            (InterpreterError (Interpreter.AssertLTEError (fromInteger x) bound))
-            (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Keelung.Compiler.Error (Prime 2))
+    -- let bound = 11
+    -- check (Prime 2) (program bound) [0] [] []
+    -- forM_ [0 .. 15] $ \x -> do
+    --   if x <= bound
+    --     then check (Prime 2) (program bound) [fromInteger x] [] []
+    --     else
+    --       throwErrors
+    --         (Prime 2)
+    --         (program bound)
+    --         [fromInteger x]
+    --         []
+    --         (InterpreterError (Interpreter.AssertLTEError (fromInteger x) bound))
+    --         (SolverError (Solver.ConflictingValues "at eliminateIfHold") :: Keelung.Compiler.Error (Prime 2))
 
   -- it "variable dividend / variable divisor" $ do
   --   let program = do

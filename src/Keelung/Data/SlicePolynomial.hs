@@ -70,16 +70,25 @@ fromSlices :: (Integral n, GaloisField n) => [(Slice, n)] -> SlicePoly n
 fromSlices = foldr insert new
 
 -- | Convert the polynomial to a list of Slices
-toSlices :: (Num n) => SlicePoly n -> [(Slice, n)]
+toSlices :: (Integral n, GaloisField n) => SlicePoly n -> [(Slice, n)]
 toSlices = concatMap (uncurry convert) . Map.toList . unSlicePoly
   where
-    convert :: (Num n) => RefU -> IntervalSet n -> [(Slice, n)]
+    convert :: (Integral n, GaloisField n) => RefU -> IntervalSet n -> [(Slice, n)]
     convert ref xss = case IntMap.toList (IntervalSet.unIntervalSet xss) of
       [] -> []
       ((firstStart, (firstEnd, firstCount)) : xs) ->
         -- we need to know what's the first interval, so that we can adjust the multiplier of the rest
         (Slice.Slice ref firstStart firstEnd, firstCount)
-          : map (\(start, (end, count)) -> (Slice.Slice ref start end, count * 2 ^ (start - firstStart))) xs
+          : map (\(start, (end, count)) -> (Slice.Slice ref start end, count * calculateMultiplier firstStart start)) xs
+
+    -- To merge 2 Slices, we need to know the multiplier of the second Slice
+    -- However, because the underlying field may be a binary field, we need to check if `2 == 0` first
+    calculateMultiplier :: (Integral n, GaloisField n) => Int -> Int -> n
+    calculateMultiplier prev next =
+      let two = 2
+       in if two == 0
+            then 1
+            else two ^ (next - prev)
 
 --------------------------------------------------------------------------------
 
@@ -126,7 +135,7 @@ null :: (Integral n) => SlicePoly n -> Bool
 null = all IntervalSet.null . unSlicePoly
 
 -- | Get the number of Slices in the polynomial
-size :: (Integral n) => SlicePoly n -> Int
+size :: (Integral n, GaloisField n) => SlicePoly n -> Int
 size = length . toSlices
 
 -- | Check if a PolySlice is valid

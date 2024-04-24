@@ -117,7 +117,7 @@ fromRef :: (Integral n, GaloisField n) => Ref -> PolyL n
 fromRef ref = PolyL 0 (Map.singleton ref 1) mempty
 
 -- | Convert a PolyL to a list of (Slice, coefficient) pairs
-toSlices :: (Num n) => PolyL n -> [(Slice, n)]
+toSlices :: (Integral n, GaloisField n) => PolyL n -> [(Slice, n)]
 toSlices = SlicePoly.toSlices . polySlices
 
 -- | Construct a PolyL from a constant and a single slice
@@ -168,7 +168,7 @@ data View n
   deriving (Eq, Show)
 
 -- | View a PolyL as a Monomial, Binomial, or Polynomial
-view :: (Num n) => PolyL n -> View n
+view :: (Integral n, GaloisField n) => PolyL n -> View n
 view (PolyL constant refs slicePoly) =
   let slices = SlicePoly.toSlices slicePoly
    in case (Map.toList refs, slices) of
@@ -182,7 +182,7 @@ view (PolyL constant refs slicePoly) =
         _ -> MixedPolynomial constant refs slices
 
 -- | Number of terms (including the constant)
-size :: (Integral n) => PolyL n -> Int
+size :: (Integral n, GaloisField n) => PolyL n -> Int
 size (PolyL c refs slicePoly) = (if c == 0 then 0 else 1) + Map.size refs + SlicePoly.size slicePoly
 
 --------------------------------------------------------------------------------

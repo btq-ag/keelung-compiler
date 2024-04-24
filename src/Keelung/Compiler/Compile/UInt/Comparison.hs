@@ -87,18 +87,17 @@ assertLTE width (Left a) bound
     -- starts from the MSB
     step :: (GaloisField n, Integral n) => RefU -> Maybe Ref -> Int -> M n (Maybe Ref)
     step ref Nothing i =
-      let aBit = RefUBit ref i
-          bit = Slice ref i (i + 1)
+      let bit = RefUBit ref i
        in -- have not found the first bit in 'c' that is 1 yet
           if Data.Bits.testBit bound i
             then do
-              return $ Just (B aBit) -- when found, return a[i]
+              return $ Just (B bit) -- when found, return a[i]
             else do
               -- a[i] = 0
-              writeSliceVal bit 0
+              writeRefVal (B bit) 0
               return Nothing -- otherwise, continue searching
     step ref (Just acc) i =
-      let bit = Slice ref i (i + 1)
+      let bit = RefUBit ref i
        in if Data.Bits.testBit bound i
             then do
               -- constraint for the next accumulator
@@ -107,16 +106,68 @@ assertLTE width (Left a) bound
               --    then acc' = acc
               --    else acc' = 0
               acc' <- freshRefF
-              writeMul (0, [(acc, 1)], []) (0, [], [(bit, 1)]) (0, [(F acc', 1)], [])
+              writeMul (0, [(acc, 1)], []) (0, [(B bit, 1)], []) (0, [(F acc', 1)], [])
               return $ Just (F acc')
             else do
               -- constraint on a[i]
               -- (1 - acc - a[i]) * a[i] = 0
               -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
               --           if acc = 1 then a[i] = 0
-              writeMul (1, [(acc, -1)], [(bit, -1)]) (0, [], [(bit, 1)]) (0, [], [])
+              writeMul (1, [(acc, -1), (B bit, -1)], []) (0, [(B bit, 1)], []) (0, [], [])
               -- pass down the accumulator
               return $ Just acc
+
+    -- step2 :: (GaloisField n, Integral n) => RefU -> Maybe (Either Slice Ref) -> Int -> M n (Maybe (Either Slice Ref))
+    -- step2 ref Nothing i =
+    --   let bit = Slice ref i (i + 1)
+    --    in -- have not found the first bit in 'c' that is 1 yet
+    --       if Data.Bits.testBit bound i
+    --         then do
+    --           return $ Just (Left bit) -- when found, return a[i]
+    --         else do
+    --           -- a[i] = 0
+    --           writeSliceVal bit 0
+    --           return Nothing -- otherwise, continue searching
+    -- step2 ref (Just (Left acc)) i =
+    --   let bit = Slice ref i (i + 1)
+    --    in if Data.Bits.testBit bound i
+    --         then do
+    --           -- constraint for the next accumulator
+    --           -- acc * a[i] = acc'
+    --           -- such that if a[i] = 1
+    --           --    then acc' = acc
+    --           --    else acc' = 0
+    --           acc' <- freshRefF
+    --           writeMul (0, [], [(acc, 1)]) (0, [], [(bit, 1)]) (0, [(F acc', 1)], [])
+    --           return $ Just (Right (F acc'))
+    --         else do
+    --           -- constraint on a[i]
+    --           -- (1 - acc - a[i]) * a[i] = 0
+    --           -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
+    --           --           if acc = 1 then a[i] = 0
+    --           writeMul (1, [], [(acc, -1), (bit, -1)]) (0, [], [(bit, 1)]) (0, [], [])
+    --           -- pass down the accumulator
+    --           return $ Just (Left acc)
+    -- step2 ref (Just (Right acc)) i =
+    --   let bit = Slice ref i (i + 1)
+    --    in if Data.Bits.testBit bound i
+    --         then do
+    --           -- constraint for the next accumulator
+    --           -- acc * a[i] = acc'
+    --           -- such that if a[i] = 1
+    --           --    then acc' = acc
+    --           --    else acc' = 0
+    --           acc' <- freshRefF
+    --           writeMul (0, [(acc, 1)], []) (0, [], [(bit, 1)]) (0, [(F acc', 1)], [])
+    --           return $ Just (Right (F acc'))
+    --         else do
+    --           -- constraint on a[i]
+    --           -- (1 - acc - a[i]) * a[i] = 0
+    --           -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
+    --           --           if acc = 1 then a[i] = 0
+    --           writeMul (1, [(acc, -1)], [(bit, -1)]) (0, [], [(bit, 1)]) (0, [], [])
+    --           -- pass down the accumulator
+    --           return $ Just (Right acc)
 
 -- | Assert that a UInt is less than some constant
 assertLT :: (GaloisField n, Integral n) => Width -> Either RefU U -> Integer -> M n ()
