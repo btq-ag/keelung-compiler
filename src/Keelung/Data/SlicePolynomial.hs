@@ -95,16 +95,21 @@ insertMany slices xs = foldr insert xs slices
 
 -- | Merge two IntervalSets while maintaining the correct multiplier
 mergeEntry :: (Integral n, GaloisField n) => IntervalSet n -> IntervalSet n -> IntervalSet n
-mergeEntry a b =
-  let result = case (IntervalSet.getStartOffset a, IntervalSet.getStartOffset b) of
-        (Nothing, Nothing) -> mempty
-        (Just _, Nothing) -> a
-        (Nothing, Just _) -> b
-        (Just x, Just y) -> case x `compare` y of
-          LT -> a <> IntervalSet.multiplyBy (recip (2 ^ (y - x))) b
-          EQ -> a <> b
-          GT -> b <> IntervalSet.multiplyBy (recip (2 ^ (x - y))) a
-   in result
+mergeEntry a b = case (IntervalSet.getStartOffset a, IntervalSet.getStartOffset b) of
+  (Nothing, Nothing) -> mempty
+  (Just _, Nothing) -> a
+  (Nothing, Just _) -> b
+  (Just x, Just y) -> case notOnBinaryExtentionFields 2 of
+    Nothing -> a <> b
+    Just two -> case x `compare` y of
+      LT -> a <> IntervalSet.multiplyBy (recip (two ^ (y - x))) b
+      EQ -> a <> b
+      GT -> b <> IntervalSet.multiplyBy (recip (two ^ (x - y))) a
+  where
+    -- on `Prime 2` and binary fields, `2 == 0` and `recip (2 ^ n)` would lead to `ArithException: divide by zero`
+    -- to prevent this from happening, we first check if `2 == 0` is true
+    -- the following function is for enforcing the type of `2` to be the same as the underlying field
+    notOnBinaryExtentionFields x = if x == 0 then Nothing else Just x
 
 -- | Multiply all Slices in the polynomial by a number
 multiplyBy :: (Integral n, GaloisField n) => n -> SlicePoly n -> SlicePoly n

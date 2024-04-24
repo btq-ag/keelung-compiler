@@ -13,5 +13,10 @@ prof:
 repl test: 
 	stack repl keelung-compiler:test:keelung-test
 
+
+# repl trace: 
+# 	stack repl keelung-compiler:test:keelung-test --ghci-options="-fexternal-interpreter" --ghci-options="-prof" --ghci-options="-fprof-auto-calls"
+# repl build: 
+# 	stack build keelung-compiler:test:keelung-test --library-profiling
 # repl: 
 # 	stack ghci keelung-compiler:exe:keelungc
