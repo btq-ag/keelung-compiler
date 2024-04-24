@@ -79,3 +79,14 @@ traceShowWhen False _ = id
 traceShowWhenM :: (Monad m, Show s) => Bool -> s -> m ()
 traceShowWhenM True msg = Trace.traceShowM msg
 traceShowWhenM False _ = return ()
+
+
+-- If the underlying field is binary, that is, `2 == 0`
+--  then return `1`
+--  else return `2 ^ power`
+powerOf2 :: (Integral n, GaloisField n) => Int -> n
+powerOf2 power =
+  let two = 2
+    in if two == 0
+        then 1
+        else two ^ power

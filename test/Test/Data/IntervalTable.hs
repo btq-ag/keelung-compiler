@@ -16,6 +16,7 @@ import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice (Slice))
 import Test.Hspec
 import Test.Util
+import Keelung.Compiler.Util (powerOf2)
 
 run :: IO ()
 run = hspec tests
@@ -182,5 +183,5 @@ tests =
         reindexSlice env (Slice inputVar1 0 4) (1 :: GF181) `shouldBe` buildIntMap 4 9
         reindexRef env (F (RefFX 0)) `shouldBe` 13
 
-buildIntMap :: Num n => Width -> Int -> IntMap n
-buildIntMap w i = IntMap.fromList [(j, 2 ^ (j - i)) | j <- [i .. i + w - 1]]
+buildIntMap :: (Integral n, GaloisField n) => Width -> Int -> IntMap n
+buildIntMap w i = IntMap.fromList [(j, powerOf2 (j - i)) | j <- [i .. i + w - 1]]

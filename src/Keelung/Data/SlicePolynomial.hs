@@ -31,6 +31,7 @@ import Data.IntMap qualified as IntMap
 import Data.Map (Map)
 import Data.Map qualified as Map
 import GHC.Generics (Generic)
+import Keelung.Compiler.Util (powerOf2)
 import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.Reference (RefU)
@@ -79,16 +80,7 @@ toSlices = concatMap (uncurry convert) . Map.toList . unSlicePoly
       ((firstStart, (firstEnd, firstCount)) : xs) ->
         -- we need to know what's the first interval, so that we can adjust the multiplier of the rest
         (Slice.Slice ref firstStart firstEnd, firstCount)
-          : map (\(start, (end, count)) -> (Slice.Slice ref start end, count * calculateMultiplier firstStart start)) xs
-
-    -- To merge 2 Slices, we need to know the multiplier of the second Slice
-    -- However, because the underlying field may be a binary field, we need to check if `2 == 0` first
-    calculateMultiplier :: (Integral n, GaloisField n) => Int -> Int -> n
-    calculateMultiplier prev next =
-      let two = 2
-       in if two == 0
-            then 1
-            else two ^ (next - prev)
+          : map (\(start, (end, count)) -> (Slice.Slice ref start end, count * powerOf2 (start - firstStart))) xs
 
 --------------------------------------------------------------------------------
 
@@ -108,17 +100,10 @@ mergeEntry a b = case (IntervalSet.getStartOffset a, IntervalSet.getStartOffset 
   (Nothing, Nothing) -> mempty
   (Just _, Nothing) -> a
   (Nothing, Just _) -> b
-  (Just x, Just y) -> case notOnBinaryExtentionFields 2 of
-    Nothing -> a <> b
-    Just two -> case x `compare` y of
-      LT -> a <> IntervalSet.multiplyBy (recip (two ^ (y - x))) b
-      EQ -> a <> b
-      GT -> b <> IntervalSet.multiplyBy (recip (two ^ (x - y))) a
-  where
-    -- on `Prime 2` and binary fields, `2 == 0` and `recip (2 ^ n)` would lead to `ArithException: divide by zero`
-    -- to prevent this from happening, we first check if `2 == 0` is true
-    -- the following function is for enforcing the type of `2` to be the same as the underlying field
-    notOnBinaryExtentionFields x = if x == 0 then Nothing else Just x
+  (Just x, Just y) -> case x `compare` y of
+    LT -> a <> IntervalSet.multiplyBy (recip (powerOf2 (y - x))) b
+    EQ -> a <> b
+    GT -> b <> IntervalSet.multiplyBy (recip (powerOf2 (x - y))) a
 
 -- | Multiply all Slices in the polynomial by a number
 multiplyBy :: (Integral n, GaloisField n) => n -> SlicePoly n -> SlicePoly n
