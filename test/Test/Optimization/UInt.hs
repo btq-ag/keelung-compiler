@@ -379,7 +379,7 @@ tests = describe "UInt" $ do
             assert $ x `lte` (bound :: UInt 4)
       forM_
         [ (0, 5), -- special case: only 1 possible value
-          (1, 8), -- special case: only 2 possible value
+          (1, 6), -- special case: only 2 possible value
           (2, 6), -- special case: only 3 possible value
           (3, 6), -- trailing one: 1
           (4, 7),

@@ -12,6 +12,7 @@ import Keelung.Compiler.Options
 import Keelung.Data.FieldInfo
 import Keelung.Data.LC ((@))
 import Keelung.Data.Reference
+import Keelung.Data.Slice (Slice (Slice))
 import Keelung.Data.U (U)
 import Keelung.Field
 
@@ -32,11 +33,10 @@ assertLTE width (Left a) bound
       -- we can use these 2 values as the only roots of the following multiplicative polynomial
       -- (a - 0) * (a - 1) = 0
       -- `(a - 0) * (a - 1) = 0` on the LSB
-      let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. width - 1]]
-      writeMul (0, bits, []) (-1, bits, []) (0, [], [])
+      let slice = Slice a 0 width
+      writeMul (0, [], [(slice, 1)]) (-1, [], [(slice, 1)]) (0, [], [])
       -- assign the rest of the bits to `0`
-      forM_ [1 .. width - 1] $ \j ->
-        writeRefBVal (RefUBit a j) False
+      writeSliceVal (Slice a 1 width) 0
   | bound == 2 = do
       -- there are 3 possible values for `a`, which are `0`, `1` and `2`
       -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
@@ -57,22 +57,21 @@ assertLTE width (Left a) bound
             Prime _ -> False
 
       if isSmallField
-        then -- because we don't have to execute the `go` function for trailing ones of `c`
+        then -- because we don't have to execute the `step` function for trailing ones of `c`
         -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
-          foldM_ (go a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
+          foldM_ (step a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
         else do
           -- `(a - 0) * (a - 1) * (a - 2) = 0` on the smallest limb
-          let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
+          let slice = Slice a 0 limbWidth
           temp <- freshRefF
-          writeMul (0, bits, []) (-1, bits, []) (0, [(F temp, 1)], [])
-          writeMul (0, [(F temp, 1)], []) (-2, bits, []) (0, [], [])
+          writeMul (0, [], [(slice, 1)]) (-1, [], [(slice, 1)]) (0, [(F temp, 1)], [])
+          writeMul (0, [(F temp, 1)], []) (-2, [], [(slice, 1)]) (0, [], [])
           -- assign the rest of the limbs to `0`
-          forM_ [limbWidth .. width - 1] $ \j ->
-            writeRefBVal (RefUBit a j) False
+          writeSliceVal (Slice a limbWidth width) 0
   | otherwise = do
-      -- because we don't have to execute the `go` function for trailing ones of `c`
+      -- because we don't have to execute the `step` function for trailing ones of `c`
       -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
-      foldM_ (go a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
+      foldM_ (step a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
   where
     -- for counting the number of trailing ones of `c`
     countTrailingOnes :: Int
@@ -85,19 +84,21 @@ assertLTE width (Left a) bound
           (0, True)
           [0 .. width - 1]
 
-    go :: (GaloisField n, Integral n) => RefU -> Maybe Ref -> Int -> M n (Maybe Ref)
-    go ref Nothing i =
+    -- starts from the MSB
+    step :: (GaloisField n, Integral n) => RefU -> Maybe Ref -> Int -> M n (Maybe Ref)
+    step ref Nothing i =
       let aBit = RefUBit ref i
+          bit = Slice ref i (i + 1)
        in -- have not found the first bit in 'c' that is 1 yet
           if Data.Bits.testBit bound i
             then do
               return $ Just (B aBit) -- when found, return a[i]
             else do
               -- a[i] = 0
-              writeRefBVal aBit False
+              writeSliceVal bit 0
               return Nothing -- otherwise, continue searching
-    go ref (Just acc) i =
-      let aBit = B (RefUBit ref i)
+    step ref (Just acc) i =
+      let bit = Slice ref i (i + 1)
        in if Data.Bits.testBit bound i
             then do
               -- constraint for the next accumulator
@@ -106,14 +107,14 @@ assertLTE width (Left a) bound
               --    then acc' = acc
               --    else acc' = 0
               acc' <- freshRefF
-              writeMul (0, [(acc, 1)], []) (0, [(aBit, 1)], []) (0, [(F acc', 1)], [])
+              writeMul (0, [(acc, 1)], []) (0, [], [(bit, 1)]) (0, [(F acc', 1)], [])
               return $ Just (F acc')
             else do
               -- constraint on a[i]
               -- (1 - acc - a[i]) * a[i] = 0
               -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
               --           if acc = 1 then a[i] = 0
-              writeMul (1, [(acc, -1), (aBit, -1)], []) (0, [(aBit, 1)], []) (0, [], [])
+              writeMul (1, [(acc, -1)], [(bit, -1)]) (0, [], [(bit, 1)]) (0, [], [])
               -- pass down the accumulator
               return $ Just acc
 
@@ -213,9 +214,9 @@ assertGTE width (Left a) bound
     runDefault = do
       flag <- freshRefF
       writeRefFVal flag 1
-      -- because we don't have to execute the `go` function for trailing zeros of `bound`
+      -- because we don't have to execute the `step` function for trailing zeros of `bound`
       -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingZeros]`
-      foldM_ (go a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
+      foldM_ (step a) (F flag) [width - 1, width - 2 .. (width - 2) `min` countTrailingZeros]
 
     -- for counting the number of trailing zeros of `bound`
     countTrailingZeros :: Int
@@ -228,8 +229,8 @@ assertGTE width (Left a) bound
           (0, True)
           [0 .. width - 1]
 
-    go :: (GaloisField n, Integral n) => RefU -> Ref -> Int -> M n Ref
-    go ref flag i =
+    step :: (GaloisField n, Integral n) => RefU -> Ref -> Int -> M n Ref
+    step ref flag i =
       let aBit = RefUBit ref i
           bBit = Data.Bits.testBit bound i
        in if bBit
@@ -281,7 +282,7 @@ assertNonZero width ref = do
     linearCase bits = do
       nonZero <- freshRefB
       writeRefBVal nonZero False
-      final <- foldM go nonZero bits
+      final <- foldM step nonZero bits
       -- assert that the final `nonZero` is 1
       writeRefBVal final True
       where
@@ -292,8 +293,8 @@ assertNonZero width ref = do
         --    if `nonZero = 0` then `nonZero' = bit`
         --    if `nonZero = 1` then `nonZero' = 1`
         -- and assert the final `nonZero' = 1`
-        go :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
-        go nonZero bit = do
+        step :: (GaloisField n, Integral n) => RefB -> RefB -> M n RefB
+        step nonZero bit = do
           nonZero' <- freshRefB
           writeMul (0, [(B nonZero, 1)], []) (0, [(B bit, 1)], []) (0, [(B nonZero, 1), (B bit, 1), (B nonZero', -1)], [])
           return nonZero'
