@@ -239,7 +239,10 @@ writeRefUVal x c = execRelations $ Relations.assignS (Slice.fromRefU x) (toInteg
 
 -- | Assign an Integer to a Slice
 writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
-writeSliceVal x c = execRelations $ Relations.assignS x (toInteger c)
+writeSliceVal x c =
+  if widthOf x == 0
+    then return () -- no need to add a constraint for slices of width 0
+    else execRelations $ Relations.assignS x (toInteger c)
 
 -- | Assert that two RefUs are equal
 writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()

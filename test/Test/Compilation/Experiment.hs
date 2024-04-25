@@ -48,8 +48,8 @@ tests = describe "Experiment" $ do
   it "Prime 2" $ do
     let program bound = do
           x <- input Public :: Comp (UInt 4)
-          assertLTE x bound
-    debug (Prime 2) (program 8)
+          assertGTE x bound
+    debug (Binary 7) (program 14)
     -- forAll (choose (0, 14)) $ \bound -> do
     -- let bound = 11
     -- check (Prime 2) (program bound) [0] [] []

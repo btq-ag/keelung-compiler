@@ -59,7 +59,7 @@ assertLTE width (Left a) bound
       if isSmallField
         then -- because we don't have to execute the `step` function for trailing ones of `c`
         -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
-          foldM_ (step a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
+          foldM_ (step a) (Left 0) [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
         else do
           -- `(a - 0) * (a - 1) * (a - 2) = 0` on the smallest limb
           let slice = Slice a 0 limbWidth
@@ -71,7 +71,7 @@ assertLTE width (Left a) bound
   | otherwise = do
       -- because we don't have to execute the `step` function for trailing ones of `c`
       -- we can limit the range of bits of c from `[width-1, width-2 .. 0]` to `[width-1, width-2 .. countTrailingOnes]`
-      foldM_ (step a) Nothing [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
+      foldM_ (step a) (Left 0) [width - 1, width - 2 .. (width - 2) `min` countTrailingOnes]
   where
     -- for counting the number of trailing ones of `c`
     countTrailingOnes :: Int
@@ -85,18 +85,16 @@ assertLTE width (Left a) bound
           [0 .. width - 1]
 
     -- starts from the MSB
-    step :: (GaloisField n, Integral n) => RefU -> Maybe (Either Slice Ref) -> Int -> M n (Maybe (Either Slice Ref))
-    step ref Nothing i =
+    step :: (GaloisField n, Integral n) => RefU -> Either Int (Either Slice Ref) -> Int -> M n (Either Int (Either Slice Ref))
+    step ref (Left leadingZeros) i =
+      -- have not found the first bit in 'c' that is 1 yet
       let bit = Slice ref i (i + 1)
-       in -- have not found the first bit in 'c' that is 1 yet
-          if Data.Bits.testBit bound i
-            then do
-              return $ Just (Left bit) -- when found, return a[i]
+       in if Data.Bits.testBit bound i
+            then return $ Right (Left bit) -- when found, return a[i]
             else do
-              -- a[i] = 0
               writeSliceVal bit 0
-              return Nothing -- otherwise, continue searching
-    step ref (Just (Left acc)) i =
+              return (Left (leadingZeros + 1)) -- otherwise, continue searching
+    step ref (Right acc) i =
       let bit = Slice ref i (i + 1)
        in if Data.Bits.testBit bound i
             then do
@@ -106,36 +104,20 @@ assertLTE width (Left a) bound
               --    then acc' = acc
               --    else acc' = 0
               acc' <- freshRefF
-              writeMul (0, [], [(acc, 1)]) (0, [], [(bit, 1)]) (0, [(F acc', 1)], [])
-              return $ Just (Right (F acc'))
+              case acc of
+                Left accSlice -> writeMul (0, [], [(accSlice, 1)]) (0, [], [(bit, 1)]) (0, [(F acc', 1)], [])
+                Right accRef -> writeMul (0, [(accRef, 1)], []) (0, [], [(bit, 1)]) (0, [(F acc', 1)], [])
+              return $ Right (Right (F acc'))
             else do
               -- constraint on a[i]
               -- (1 - acc - a[i]) * a[i] = 0
               -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
               --           if acc = 1 then a[i] = 0
-              writeMul (1, [], [(acc, -1), (bit, -1)]) (0, [], [(bit, 1)]) (0, [], [])
+              case acc of
+                Left accSlice -> writeMul (1, [], [(accSlice, -1), (bit, -1)]) (0, [], [(bit, 1)]) (0, [], [])
+                Right accRef -> writeMul (1, [(accRef, -1)], [(bit, -1)]) (0, [], [(bit, 1)]) (0, [], [])
               -- pass down the accumulator
-              return $ Just (Left acc)
-    step ref (Just (Right acc)) i =
-      let bit = Slice ref i (i + 1)
-       in if Data.Bits.testBit bound i
-            then do
-              -- constraint for the next accumulator
-              -- acc * a[i] = acc'
-              -- such that if a[i] = 1
-              --    then acc' = acc
-              --    else acc' = 0
-              acc' <- freshRefF
-              writeMul (0, [(acc, 1)], []) (0, [], [(bit, 1)]) (0, [(F acc', 1)], [])
-              return $ Just (Right (F acc'))
-            else do
-              -- constraint on a[i]
-              -- (1 - acc - a[i]) * a[i] = 0
-              -- such that if acc = 0 then a[i] = 0 or 1 (don't care)
-              --           if acc = 1 then a[i] = 0
-              writeMul (1, [(acc, -1)], [(bit, -1)]) (0, [], [(bit, 1)]) (0, [], [])
-              -- pass down the accumulator
-              return $ Just (Right acc)
+              return $ Right acc
 
 -- | Assert that a UInt is less than some constant
 assertLT :: (GaloisField n, Integral n) => Width -> Either RefU U -> Integer -> M n ()
@@ -184,18 +166,18 @@ assertGTE width (Left a) bound
         then do
           -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0`
           -- the LSB is either 0 or 1
-          let lsb = B (RefUBit a 0)
-          writeMul (0, [(lsb, 1)], []) (1, [(lsb, 1)], []) (0, [], [])
+          let lsb = Slice a 0 1
+          writeMul (0, [], [(lsb, 1)]) (1, [], [(lsb, 1)]) (0, [], [])
           -- the other bits are all 1
-          forM_ [1 .. width - 1] $ \i ->
-            writeRefBVal (RefUBit a i) True
+          forM_ [1 .. width - 1] $ \j ->
+            writeSliceVal (Slice a j (j + 1)) 1
         else do
           -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) = 0` on the smallest limb
-          let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
-          writeMul (1 - 2 ^ limbWidth, bits, []) (2 - 2 ^ limbWidth, bits, []) (0, [], [])
+          let slice = Slice a 0 limbWidth
+          writeMul (1 - 2 ^ limbWidth, [], [(slice, 1)]) (2 - 2 ^ limbWidth, [], [(slice, 1)]) (0, [], [])
           -- assign the rest of the limbs to `1`
           forM_ [limbWidth .. width - 1] $ \j ->
-            writeRefBVal (RefUBit a j) True
+            writeSliceVal (Slice a j (j + 1)) 1
   | bound == 2 ^ width - 3 = do
       -- there's only 3 possible value for `a`, which is `2^width - 1`, `2^width - 2` or `2^width - 3`
       -- we can use these 3 values as the only roots of the following 2 multiplicative polynomial
@@ -218,16 +200,15 @@ assertGTE width (Left a) bound
         then runDefault
         else do
           -- `(a - 2^limbWidth + 1) * (a - 2^limbWidth + 2) * (a - 2^limbWidth + 3) = 0` on the smallest limb
-          let bits = [(B (RefUBit a i), 2 ^ i) | i <- [0 .. limbWidth - 1]]
-          -- writeMul (1 - 2 ^ limbWidth, bits) (2 - 2 ^ limbWidth, bits) (0, [])
+          let slice = Slice a 0 limbWidth
 
           temp <- freshRefF
-          writeMul (1 - 2 ^ limbWidth, bits, []) (2 - 2 ^ limbWidth, bits, []) (0, [(F temp, 1)], [])
-          writeMul (0, [(F temp, 1)], []) (3 - 2 ^ limbWidth, bits, []) (0, [], [])
+          writeMul (1 - 2 ^ limbWidth, [], [(slice, 1)]) (2 - 2 ^ limbWidth, [], [(slice, 1)]) (0, [(F temp, 1)], [])
+          writeMul (0, [(F temp, 1)], []) (3 - 2 ^ limbWidth, [], [(slice, 1)]) (0, [], [])
 
           -- assign the rest of the limbs to `1`
           forM_ [limbWidth .. width - 1] $ \j ->
-            writeRefBVal (RefUBit a j) True
+            writeSliceVal (Slice a j (j + 1)) 1
   | otherwise = runDefault
   where
     runDefault = do
