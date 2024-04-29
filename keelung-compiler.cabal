@@ -255,7 +255,6 @@ test-suite keelung-test
       Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
-      Test.Optimization.Experiment
       Test.Optimization.Field
       Test.Optimization.UInt
       Test.Optimization.UInt.AESMul

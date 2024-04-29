@@ -150,21 +150,21 @@ tests = describe "Multiplication" $ do
         let expected = [(operandToSignedInteger a * operandToSignedInteger b) `mod` 65536]
         case (a, b) of
           (Constant valA, Constant valB) -> do
-            let program = return $ (fromIntegral valA :: UInt 8) `mulD` fromIntegral valB :: Comp (UInt 16)
+            let program = return $ (fromIntegral valA :: UInt 8) `mul` fromIntegral valB :: Comp (UInt 16)
             check gf181 program [] [] expected
             check (Prime 17) program [] [] expected
             check (Binary 7) program [] [] expected
           (Constant valA, _) -> do
             let program = do
                   y <- input Public :: Comp (UInt 8)
-                  return $ fromIntegral valA `mulD` operandToSignedVariable b y :: Comp (UInt 16)
+                  return $ fromIntegral valA `mul` operandToSignedVariable b y :: Comp (UInt 16)
             check gf181 program [operandToUnsignedInteger b] [] expected
             check (Prime 17) program [operandToUnsignedInteger b] [] expected
             check (Binary 7) program [operandToUnsignedInteger b] [] expected
           (_, Constant valB) -> do
             let program = do
                   x <- input Public :: Comp (UInt 8)
-                  return $ operandToSignedVariable a x `mulD` fromIntegral valB :: Comp (UInt 16)
+                  return $ operandToSignedVariable a x `mul` fromIntegral valB :: Comp (UInt 16)
             check gf181 program [operandToUnsignedInteger a] [] expected
             check (Prime 17) program [operandToUnsignedInteger a] [] expected
             check (Binary 7) program [operandToUnsignedInteger a] [] expected
@@ -172,7 +172,7 @@ tests = describe "Multiplication" $ do
             let program = do
                   x <- input Public :: Comp (UInt 8)
                   y <- input Public :: Comp (UInt 8)
-                  return $ operandToSignedVariable a x `mulD` operandToSignedVariable b y :: Comp (UInt 16)
+                  return $ operandToSignedVariable a x `mul` operandToSignedVariable b y :: Comp (UInt 16)
             check gf181 program [operandToUnsignedInteger a, operandToUnsignedInteger b] [] expected
             check (Prime 17) program [operandToUnsignedInteger a, operandToUnsignedInteger b] [] expected
             check (Binary 7) program [operandToUnsignedInteger a, operandToUnsignedInteger b] [] expected

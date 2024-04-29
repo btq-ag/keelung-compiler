@@ -169,7 +169,6 @@ tests = describe "UInt" $ do
     it "constant / constant" $ do
       let program = do
             return $ 2 * (4 :: UInt 4)
-      -- print $ linkConstraintModule cs'
       assertCountO0 gf181 program 5
       assertCount gf181 program 5
 
@@ -184,7 +183,6 @@ tests = describe "UInt" $ do
             x <- input Public :: Comp (UInt 8)
             y <- input Public :: Comp (UInt 8)
             return (x .*. y)
-      -- print $ linkConstraintModule cs'
       assertCountO0 gf181 program 87
       assertCount gf181 program 79
 
@@ -193,7 +191,6 @@ tests = describe "UInt" $ do
     it "`return 0`" $ do
       let program = do
             return (0 :: UInt 4)
-      -- print $ linkConstraintModule cs'
       assertCountO0 gf181 program 5
       assertCount gf181 program 5
 
