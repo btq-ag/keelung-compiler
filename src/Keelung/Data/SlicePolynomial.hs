@@ -111,7 +111,7 @@ multiplyBy n = SlicePoly . fmap (IntervalSet.multiplyBy n) . unSlicePoly
 
 -- | Add two polynomials together
 add :: (Integral n, GaloisField n) => SlicePoly n -> SlicePoly n -> SlicePoly n
-add (SlicePoly xs) (SlicePoly ys) = SlicePoly (Map.unionWith mergeEntry xs ys)
+add (SlicePoly xs) (SlicePoly ys) = SlicePoly (Map.filter (not . IntervalSet.null) $ Map.unionWith mergeEntry xs ys)
 
 --------------------------------------------------------------------------------
 

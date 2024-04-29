@@ -222,7 +222,6 @@ test-suite keelung-test
       Test.Compilation.Boolean.Equality
       Test.Compilation.Boolean.Inequality
       Test.Compilation.Boolean.Logical
-      Test.Compilation.Experiment
       Test.Compilation.Field
       Test.Compilation.Field.Arithmetics
       Test.Compilation.Field.Conditional
@@ -252,6 +251,7 @@ test-suite keelung-test
       Test.Data.LC
       Test.Data.PolyRS
       Test.Data.RefUSegments
+      Test.Experiment
       Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
