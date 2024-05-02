@@ -198,7 +198,24 @@ shrinkMul as bs (Left c) = do
       -- (a + coeff var) * b = c
       bindVar "mul 2" var ((c - a * b) / (coeff * b))
       return Eliminated
-    (Uninomial av as' _ _, Uninomial bv bs' _ _) -> return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
+    (Uninomial av as' constA (varA, coeffA), Uninomial bv bs' constB (varB, coeffB)) ->
+      if c == 1
+        then do
+          avIsBoolean <- isBooleanVar varA
+          bvIsBoolean <- isBooleanVar varB
+          if avIsBoolean && bvIsBoolean
+            then do
+              -- as = 1
+              --    =>
+              -- constA + coeffA * varA = 1
+              bindVar "mul a*b=1" varA ((1 - constA) / coeffA)
+              -- bs = 1
+              --    =>
+              -- constB + coeffB * varB = 1
+              bindVar "mul a*b=1" varB ((1 - constB) / coeffB)
+              return Eliminated
+            else return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
+        else return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
     (Uninomial av as' _ _, Polynomial bv bs') -> return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
     (Polynomial _ as', Constant b) -> case Poly.multiplyBy b as' of
       Left constant -> eliminateIfHold constant c

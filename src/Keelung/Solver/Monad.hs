@@ -74,6 +74,14 @@ bindSegments msg (Segments xs) val = foldM_ bindSegment 0 xs
         bindVar msg (var + i) (if Data.Bits.testBit val (offset + i) then 1 else 0)
       return (offset + w)
 
+-- | See if a variable is a Boolean variable
+isBooleanVar :: Var -> M n Bool
+isBooleanVar var = do
+  boolVarRanges <- asks envBoolVars
+  return $ case IntMap.lookupLE var boolVarRanges of
+    Nothing -> False
+    Just (index, len) -> var < index + len
+
 --------------------------------------------------------------------------------
 
 data Constraint n
