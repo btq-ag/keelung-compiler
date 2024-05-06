@@ -152,6 +152,7 @@ data ExprU n
   | CLMulU Width (ExprU n) (ExprU n)
   | CLModU Width (ExprU n) (ExprU n)
   | MMIU Width (ExprU n) U -- modular multiplicative inverse
+  | DivModU Width (ExprU n) (ExprU n)
   | -- logical operators
     AndU Width (Seq (ExprU n))
   | OrU Width (Seq (ExprU n))
@@ -183,6 +184,7 @@ instance (Show n, Integral n) => Show (ExprU n) where
     CLMulU _ x y -> chain prec " .*. " 7 $ x :<| y :<| Empty
     CLModU _ x y -> chain prec " .%. " 8 $ x :<| y :<| Empty
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
+    DivModU _ x y -> chain prec " `divMod` " 7 $ x :<| y :<| Empty
     AndU _ xs -> chain prec " ∧ " 3 xs
     OrU _ xs -> chain prec " ∨ " 2 xs
     XorU _ xs -> chain prec " ⊕ " 4 xs
@@ -208,6 +210,7 @@ instance HasWidth (ExprU n) where
     CLMulU w _ _ -> w
     CLModU w _ _ -> w
     MMIU w _ _ -> w
+    DivModU w _ _ -> w
     AndU w _ -> w
     OrU w _ -> w
     XorU w _ -> w

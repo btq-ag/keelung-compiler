@@ -5,8 +5,8 @@ module Keelung.Compiler.Compile.UInt
     assertLT,
     assertGTE,
     assertGT,
-    DivMod.assertDivModU,
-    DivMod.assertCLDivModU,
+    DivMod.assert,
+    DivMod.assertCL,
   )
 where
 
@@ -68,6 +68,12 @@ compile out expr = case expr of
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
     a' <- wireU a
     compileModInv w out a' p
+  DivModU w x y -> do 
+    dividend <- wireU x
+    divisor <- wireU y
+    quotient <- freshRefU w
+    remainder <- freshRefU w
+    DivMod.assert w dividend divisor (Left quotient) (Left remainder)
   AndU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (AndB (fmap (`BitU` i) xs))
