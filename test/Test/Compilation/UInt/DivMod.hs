@@ -54,10 +54,9 @@ tests =
 
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
-          forM_ [gf181, Prime 17] $ \field -> do
-            check field (program (fromIntegral dividend)) [divisor] [] expected
-          forM_ [Binary 7] $ \field -> do
-            check field (program (fromIntegral dividend)) [divisor] [] expected
+          check gf181 (program (fromIntegral dividend)) [divisor] [] expected
+          check (Prime 17) (program (fromIntegral dividend)) [divisor] [] expected
+          check (Binary 7) (program (fromIntegral dividend)) [divisor] [] expected
 
       it "variable dividend / constant divisor" $ do
         let program divisor = do
@@ -70,8 +69,9 @@ tests =
 
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
-          forM_ [gf181, Prime 17, Binary 7] $ \field -> do
-            check field (program (fromIntegral divisor)) [dividend] [] expected
+          check gf181 (program (fromIntegral divisor)) [dividend] [] expected
+          check (Prime 17) (program (fromIntegral divisor)) [dividend] [] expected
+          check (Binary 7) (program (fromIntegral divisor)) [dividend] [] expected
 
       it "variable dividend / constant divisor = 1" $ do
         let program divisor = do

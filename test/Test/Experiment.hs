@@ -16,35 +16,66 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Experiment" $ do
-  describe "DivMod" $ do
-    it "variable dividend / variable divisor" $ do
-      let program = do
-            dividend <- input Public :: Comp (UInt 8)
-            divisor <- input Public
-            performDivMod dividend divisor
+  describe "divU & modU" $ do
+      it "variable dividend / variable divisor" $ do
+        let program = do
+              dividend <- input Public :: Comp (UInt 8)
+              divisor <- input Public
+              return (dividend `divU` divisor, dividend `modU` divisor)
 
-      let (dividend, divisor) = (10, 2)
-      -- let expected = [dividend `div` divisor, dividend `mod` divisor]
-      -- debug gf181 program
-      -- check gf181 program [dividend, divisor] [] expected
-      debugSolver gf181 program [dividend, divisor] []
+        let genPair = do
+              dividend <- choose (0, 255)
+              divisor <- choose (1, 255)
+              return (dividend, divisor)
 
-    -- it "variable dividend / variable divisor" $ do
-    --     let program = do
-    --           dividend <- input Public :: Comp (UInt 8)
-    --           divisor <- input Public
-    --           performDivMod dividend divisor
+        forAll genPair $ \(dividend, divisor) -> do
+          let expected = [dividend `div` divisor, dividend `mod` divisor]
+          check gf181 program [dividend, divisor] [] expected
+          -- assertCount gf181 program 67 -- previously 163 with double allocation
+          check (Prime 17) program [dividend, divisor] [] expected
+          -- assertCount (Prime 17) program 218 -- previously 372 with double allocation
+          check (Binary 7) program [dividend, divisor] [] expected 
+          -- assertCount (Binary 7) program 747 -- previously 901 with double allocation
 
-    --     let genPair = do
-    --           dividend <- choose (0, 255)
-    --           divisor <- choose (1, 255)
-    --           return (dividend, divisor)
+      it "constant dividend / variable divisor" $ do
+        let program dividend = do
+              divisor <- input Public :: Comp (UInt 8)
+              return (dividend `divU` divisor, dividend `modU` divisor)
 
-    --     forAll genPair $ \(dividend, divisor) -> do
-    --       let expected = [dividend `div` divisor, dividend `mod` divisor]
-    --       check gf181 program [dividend, divisor] [] expected
-    --       assertCount gf181 program 85 -- previously 163 with double allocation
-    --       check (Prime 17) program [dividend, divisor] [] expected
-    --       assertCount (Prime 17) program 238 -- previously 372 with double allocation
-    --       check (Binary 7) program [dividend, divisor] [] expected 
-    --       assertCount (Binary 7) program 771 -- previously 901 with double allocation
+        let genPair = do
+              dividend <- choose (0, 255)
+              divisor <- choose (1, 255)
+              return (dividend, divisor)
+
+        forAll genPair $ \(dividend, divisor) -> do
+          let expected = [dividend `div` divisor, dividend `mod` divisor]
+          check gf181 (program (fromIntegral dividend)) [divisor] [] expected
+          check (Prime 17) (program (fromIntegral dividend)) [divisor] [] expected
+          check (Binary 7) (program (fromIntegral dividend)) [divisor] [] expected
+
+      it "variable dividend / constant divisor" $ do
+        let program divisor = do
+              dividend <- input Public :: Comp (UInt 8)
+              return (dividend `divU` divisor, dividend `modU` divisor)
+        let genPair = do
+              dividend <- choose (0, 255)
+              divisor <- choose (1, 255)
+              return (dividend, divisor)
+
+        forAll genPair $ \(dividend, divisor) -> do
+          let expected = [dividend `div` divisor, dividend `mod` divisor]
+          check gf181 (program (fromIntegral divisor)) [dividend] [] expected
+          check (Prime 17) (program (fromIntegral divisor)) [dividend] [] expected
+          check (Binary 7) (program (fromIntegral divisor)) [dividend] [] expected
+
+      it "constant dividend / constant divisor" $ do
+        let program dividend divisor = return (fromInteger dividend `divU` fromInteger divisor :: UInt 8, fromInteger dividend `modU` fromInteger divisor :: UInt 8)
+        let genPair = do
+              dividend <- choose (0, 255)
+              divisor <- choose (1, 255)
+              return (dividend, divisor)
+        forAll genPair $ \(dividend, divisor) -> do
+          let expected = [dividend `div` divisor, dividend `mod` divisor]
+          check gf181 (program dividend divisor) [] [] expected
+          check (Prime 17) (program dividend divisor) [] [] expected
+          check (Binary 7) (program dividend divisor) [] [] expected
