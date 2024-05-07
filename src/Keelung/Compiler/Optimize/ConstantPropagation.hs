@@ -116,7 +116,8 @@ propagateExprU e = do
     CLMulU w x y -> CLMulU w <$> propagateExprU x <*> propagateExprU y
     CLModU w x y -> CLModU w <$> propagateExprU x <*> propagateExprU y
     MMIU w x p -> MMIU w <$> propagateExprU x <*> pure p
-    DivModU w x y -> DivModU w <$> propagateExprU x <*> propagateExprU y
+    DivU w x y -> DivU w <$> propagateExprU x <*> propagateExprU y
+    ModU w x y -> ModU w <$> propagateExprU x <*> propagateExprU y
     AndU w xs -> AndU w <$> mapM propagateExprU xs
     OrU w xs -> OrU w <$> mapM propagateExprU xs
     XorU w xs -> XorU w <$> mapM propagateExprU xs

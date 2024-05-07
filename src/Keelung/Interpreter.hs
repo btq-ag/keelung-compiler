@@ -472,6 +472,8 @@ instance (GaloisField n, Integral n) => InterpretU UInt n where
             return [U.new w v]
           _ -> throwError $ ModInvError x'' p
         _ -> throwError $ ResultSizeError 1 (length x')
+    DivU _ x y -> zipWith div <$> interpretU x <*> interpretU y
+    ModU _ x y -> zipWith mod <$> interpretU x <*> interpretU y
     AndU _ x y -> zipWith (.&.) <$> interpretU x <*> interpretU y
     OrU _ x y -> zipWith (.|.) <$> interpretU x <*> interpretU y
     XorU _ x y -> zipWith xor <$> interpretU x <*> interpretU y
@@ -604,6 +606,8 @@ instance FreeVar UInt where
     AESMulU _ x y -> freeVars x <> freeVars y
     CLMulU _ x y -> freeVars x <> freeVars y
     MMIU _ x _ -> freeVars x
+    DivU _ x y -> freeVars x <> freeVars y
+    ModU _ x y -> freeVars x <> freeVars y
     AndU _ x y -> freeVars x <> freeVars y
     OrU _ x y -> freeVars x <> freeVars y
     XorU _ x y -> freeVars x <> freeVars y
