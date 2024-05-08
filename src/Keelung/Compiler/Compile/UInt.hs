@@ -71,13 +71,27 @@ compile out expr = case expr of
   DivU w x y -> do
     dividend <- wireU x
     divisor <- wireU y
-    remainder <- freshRefU w
-    DivMod.assert w dividend divisor (Left out) (Left remainder)
+    -- before actually compiling the division, we see if the same div/mod was memoized before
+    result <- memoDivModLookup dividend divisor
+    case result of
+      Just (quotient, _) -> do
+        writeRefUEq out quotient
+      Nothing -> do
+        remainder <- freshRefU w
+        DivMod.assert w dividend divisor (Left out) (Left remainder)
+        memoDivMod dividend divisor out remainder
   ModU w x y -> do
     dividend <- wireU x
     divisor <- wireU y
-    quotient <- freshRefU w
-    DivMod.assert w dividend divisor (Left quotient) (Left out)
+    -- before actually compiling the division, we see if the same div/mod was memoized before
+    result <- memoDivModLookup dividend divisor
+    case result of
+      Just (_, remainder) -> do
+        writeRefUEq out remainder
+      Nothing -> do
+        quotient <- freshRefU w
+        DivMod.assert w dividend divisor (Left quotient) (Left out)
+        memoDivMod dividend divisor quotient out
   AndU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (AndB (fmap (`BitU` i) xs))

@@ -5,6 +5,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
+import Data.Map qualified as Map
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Keelung (widthOf)
@@ -52,6 +53,7 @@ runM options compilers counters program =
             mempty
             mempty
             mempty
+            mempty
         )
     )
 
@@ -91,6 +93,15 @@ execRelations f = do
 addOccurrenceOnRefUBit :: (GaloisField n, Integral n) => Ref -> M n ()
 addOccurrenceOnRefUBit (B (RefUBit (RefUX width var) i)) = modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (i, i + 1) (cmOccurrenceU cs)})
 addOccurrenceOnRefUBit _ = return ()
+
+memoDivMod :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> RefU -> RefU -> M n ()
+memoDivMod dividend divisor quotient remainder = do
+  modify' $ \cs -> cs {cmMemoDivMod = Map.insert (dividend, divisor) (quotient, remainder) (cmMemoDivMod cs)}
+
+memoDivModLookup :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> M n (Maybe (RefU, RefU))
+memoDivModLookup dividend divisor = do
+  memo <- gets cmMemoDivMod
+  return $ Map.lookup (dividend, divisor) memo
 
 --------------------------------------------------------------------------------
 

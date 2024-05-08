@@ -31,11 +31,11 @@ tests = describe "Experiment" $ do
         forAll genPair $ \(dividend, divisor) -> do
           let expected = [dividend `div` divisor, dividend `mod` divisor]
           check gf181 program [dividend, divisor] [] expected
-          -- assertCount gf181 program 67 -- previously 163 with double allocation
+          assertCount gf181 program 76 -- previously 163 with double allocation
           check (Prime 17) program [dividend, divisor] [] expected
-          -- assertCount (Prime 17) program 218 -- previously 372 with double allocation
+          assertCount (Prime 17) program 228 -- previously 372 with double allocation
           check (Binary 7) program [dividend, divisor] [] expected 
-          -- assertCount (Binary 7) program 747 -- previously 901 with double allocation
+          assertCount (Binary 7) program 759 -- previously 901 with double allocation
 
       it "constant dividend / variable divisor" $ do
         let program dividend = do
