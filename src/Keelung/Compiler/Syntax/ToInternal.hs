@@ -16,11 +16,12 @@ import Keelung.Syntax.Encode.Syntax qualified as T
 
 run :: (GaloisField n, Integral n) => FieldInfo -> T.Elaborated -> Internal n
 run fieldInfo (T.Elaborated expr comp) =
-  let T.Computation counters assertions sideEffects = comp
+  let T.Computation counters assertions hints sideEffects = comp
       proxy = 0
    in runM counters (fieldWidth fieldInfo) $ do
         exprs <- sameType proxy <$> convertExprAndAllocOutputVar expr
         assertions' <- concat <$> mapM convertExpr assertions
+        hints' <- convertHints hints
         counters' <- get
         sideEffects' <- mapM convertSideEffect sideEffects
         return $
@@ -29,6 +30,7 @@ run fieldInfo (T.Elaborated expr comp) =
               internalFieldBitWidth = fieldWidth fieldInfo,
               internalCounters = counters',
               internalAssertions = assertions',
+              internalHints = hints',
               internalSideEffects = sideEffects'
             }
   where
@@ -43,6 +45,15 @@ type M n = StateT Counters (Reader Width)
 
 runM :: Counters -> Width -> M n a -> a
 runM counters width f = runReader (evalStateT f counters) width
+
+--------------------------------------------------------------------------------
+
+convertHints :: (GaloisField n, Integral n) => T.Hints -> M n (Hints n)
+convertHints (T.Hints fs bs uss) =
+  Hints
+    <$> mapM (\(target, hints) -> (,) <$> convertExprF target <*> mapM convertExprB hints) fs
+    <*> mapM (\(target, hints) -> (,) <$> convertExprB target <*> mapM convertExprB hints) bs
+    <*> mapM (mapM (\(target, hints) -> (,) <$> convertExprU target <*> mapM convertExprB hints)) uss
 
 --------------------------------------------------------------------------------
 

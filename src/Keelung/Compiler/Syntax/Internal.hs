@@ -9,11 +9,13 @@ module Keelung.Compiler.Syntax.Internal
     ExprF (..),
     ExprU (..),
     Internal (..),
+    Hints (..),
     SideEffect (..),
   )
 where
 
 import Data.Field.Galois (GaloisField)
+import Data.IntMap.Strict (IntMap)
 import Data.Sequence (Seq (..))
 import Keelung.Data.U (U)
 import Keelung.Field (N (..))
@@ -238,13 +240,15 @@ data Internal n = Internal
     internalCounters :: !Counters,
     -- | Assertions after type erasure
     internalAssertions :: ![Expr n],
+    -- | Hints for the constraint solver
+    internalHints :: !(Hints n),
     -- | Side effects
     internalSideEffects :: !(Seq (SideEffect n))
   }
   deriving (Eq)
 
 instance (GaloisField n, Integral n) => Show (Internal n) where
-  show (Internal expr _ counters assertions _sideEffects) =
+  show (Internal expr _ counters assertions _hints _sideEffects) =
     "Internal {\n"
       -- expressions
       <> "  Expression: "
@@ -258,6 +262,16 @@ instance (GaloisField n, Integral n) => Show (Internal n) where
       <> Counters.prettyVariables counters
       <> "\n\
          \}"
+
+--------------------------------------------------------------------------------
+
+-- | Data structure for storing hints
+data Hints n = Hints
+  { hintsF :: IntMap (ExprF n, [ExprB n]),
+    hintsB :: IntMap (ExprB n, [ExprB n]),
+    hintsU :: IntMap (IntMap (ExprU n, [ExprB n]))
+  }
+  deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 
