@@ -31,8 +31,9 @@ import Keelung.Syntax (widthOf)
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => Options -> Internal n -> Either (Error n) (ConstraintModule n)
-run options (Internal untypedExprs _ counters assertions _hints sideEffects) = left CompilerError $ runM options bootstrapCompilers counters $ do
-  forM_ untypedExprs $ \(var, expr) -> do
+run options (Internal outputExprs _ counters assertions _hints sideEffects) = left CompilerError $ runM options bootstrapCompilers counters $ do
+  -- compile output expressions
+  forM_ outputExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
         let out = RefBO var

@@ -19,13 +19,43 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Experiment" $ do
-  it "Field 4" $ do
-    let program = do
-          let x = 4
-          y <- reuse x
-          return (x + y :: Field)
+  -- it "Homemade div/mod" $ do
+  --   let program = do
+  --         dividend <- input Public :: Comp (UInt 8)
+  --         divisor <- input Public :: Comp (UInt 8)
+  --         let p = dividend `mul` divisor
+  --         remainder <- freshVarUInt :: Comp (UInt 16)
+  --         quotient <- freshVarUInt :: Comp (UInt 16)
+  --         -- dividend = divisor * quotient + remainder
+  --         assert $ (dividend `join` 0) `eq` (p + remainder)
+  --         -- 0 ≤ remainder < divisor
+  --         assertGT divisor 0
+  --         assert $ remainder `lt` (divisor `join` 0)
 
-    assertCountO0 gf181 program 1
-    assertCount gf181 program 1
-    cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
-    Relations.lookup (F $ RefFO 0) (cmRelations cm) `shouldBe` Relations.Constant 8
+  --         solve dividend $ \dividendVal -> do 
+  --           assertHint $ dividendVal 
+
+  --         return $ slice quotient (0, 8) :: Comp (UInt 8)
+
+    -- debug gf181 program
+
+    -- check gf181 program [10, 3] [] [3]
+    it "PK inverse" $ do
+      testInversePK 0x00 0x00
+
+testInversePK :: Integer -> Integer -> IO ()
+testInversePK inputs expected = do
+  actual <- solveOutput pkField (input Public >>= inversePK) [inputs] []
+  actual `shouldBe` [expected]
+
+pkField :: FieldType
+pkField = Binary 340282366920938463463374607431768211457
+
+inversePK :: Field -> Comp Field
+inversePK x = do
+  out <- freshVarField
+  h <- (freshVarUInt :: Comp (UInt 8)) >>= toField
+  m <- (freshVarUInt :: Comp (UInt 1)) >>= toField
+  assert $ 1 `eq` (x * out + 283 * h + m)
+  assert $ 0 `eq` ((out + 256 * x + 65536 * h + 16777216 * (1 + m)) * m)
+  return out

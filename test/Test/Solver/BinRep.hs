@@ -40,7 +40,7 @@ instance Arbitrary TestDetection where
   arbitrary = elements [DetectionSuccess, DetectionDuplicatedCoefficients, DetectionTooManyCoefficients]
 
 instance Arbitrary TestAssignment where
-  arbitrary = elements [AssignmentSatisfiable]
+  arbitrary = return AssignmentSatisfiable
 
 -- | Given the number of desired coefficients, generate a BinRep
 genBinRep :: (GaloisField n, Integral n) => Int -> Gen (BinRep n)
