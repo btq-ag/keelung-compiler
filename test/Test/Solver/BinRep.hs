@@ -3,16 +3,16 @@
 
 module Test.Solver.BinRep (tests, run) where
 
-import Data.Field.Galois (GaloisField, Prime, Binary)
+import Data.Field.Galois (Binary, GaloisField, Prime)
 import Data.IntMap qualified as IntMap
 import Data.IntMap.Strict (IntMap)
+import Keelung.Compiler.Util (powerOf2)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field (GF181)
-import Keelung.Solver (BinRep (..), assignBinRep, detectBinRep, rangeOfBinRep)
+import Keelung.Solver.BinRep qualified as BinRep
 import Test.Hspec
 import Test.QuickCheck
-import Keelung.Compiler.Util (powerOf2)
 
 -- import Test.QuickCheck
 
@@ -44,7 +44,7 @@ instance Arbitrary TestAssignment where
   arbitrary = return AssignmentSatisfiable
 
 -- | Given the number of desired coefficients, generate a BinRep
-genBinRep :: (GaloisField n, Integral n) => Int -> Gen (BinRep n)
+genBinRep :: (GaloisField n, Integral n) => Int -> Gen (BinRep.BinRep n)
 genBinRep n = do
   -- generate excess coefficients (so that we can remove some of them later)
   signs <- vectorOf (n * 2) arbitrary -- Bool
@@ -55,13 +55,13 @@ genBinRep n = do
   tuples <- take n <$> shuffle (zip signs vars)
   let zipped = zip [0 ..] tuples -- zip with powers
   let coeffs = IntMap.fromList zipped
-  let (lowerBound, upperBound) = rangeOfBinRep coeffs
-  return $ BinRep coeffs lowerBound upperBound
+  let (lowerBound, upperBound) = BinRep.range coeffs
+  return $ BinRep.BinRep coeffs lowerBound upperBound
 
 -- | Given a BinRep, generate some assignments and a valid polynomial
-genPoly :: (GaloisField n, Integral n) => BinRep n -> Gen (Poly n, (IntMap Bool, (n, n)))
+genPoly :: (GaloisField n, Integral n) => BinRep.BinRep n -> Gen (Poly n, (IntMap Bool, (n, n)))
 genPoly binPolys = do
-  xs <- shuffle $ IntMap.toList $ binPolyCoeffs binPolys
+  xs <- shuffle $ IntMap.toList $ BinRep.binPolyCoeffs binPolys
   multiplier <- suchThat arbitrary (> 0)
   values <- vectorOf (length xs) arbitrary
   let (coeffs, lowerBound, constant, upperBound) =
@@ -84,7 +84,7 @@ genPoly binPolys = do
     Left _ -> error "Poly.buildEither"
     Right poly -> return (poly, (assignments, (lowerBound, upperBound)))
 
-genTestDetection :: (Integral n, GaloisField n) => Int -> Gen (Poly n, Maybe (BinRep n))
+genTestDetection :: (Integral n, GaloisField n) => Int -> Gen (Poly n, Maybe (BinRep.BinRep n))
 genTestDetection fieldBitWidth = do
   -- decide if we want this BinRep to be detected or not
   scenario <- arbitrary
@@ -126,48 +126,48 @@ genTestAssignment fieldBitWidth = do
 
 tests :: SpecWith ()
 tests = describe "BinRep Detection" $ do
-  describe "`detectBinRep`" $ do
+  describe "`isSatisfiable`" $ do
     it "Prime 17" $ do
       forAll (genTestDetection 4) $ \(polynomial :: Poly (Prime 17), expected) -> do
-        let actual = fst <$> detectBinRep 4 (const True) (Poly.coeffs polynomial)
+        let actual = fst <$> BinRep.isSatisfiable 4 (const True) (Poly.coeffs polynomial)
         actual `shouldBe` expected
 
     it "GF181" $ do
       forAll (genTestDetection 180) $ \(polynomial :: Poly GF181, expected) -> do
-        let actual = fst <$> detectBinRep 180 (const True) (Poly.coeffs polynomial)
+        let actual = fst <$> BinRep.isSatisfiable 180 (const True) (Poly.coeffs polynomial)
         actual `shouldBe` expected
 
     it "Binary 7" $ do
       forAll (genTestDetection 2) $ \(polynomial :: Poly (Binary 7), expected) -> do
-        let actual = fst <$> detectBinRep 2 (const True) (Poly.coeffs polynomial)
+        let actual = fst <$> BinRep.isSatisfiable 2 (const True) (Poly.coeffs polynomial)
         actual `shouldBe` expected
 
-  describe "`assignBinRep`" $ do
+  describe "`findModel`" $ do
     it "Prime 17" $ do
       forAll (genTestAssignment 4) $ \(polynomial :: Poly (Prime 17), expected) -> do
-        let actual = assignBinRep 4 (const True) polynomial
+        let actual = BinRep.findModel 4 (const True) polynomial
         actual `shouldBe` expected
 
     it "Prime 37" $ do
       forAll (genTestAssignment 5) $ \(polynomial :: Poly (Prime 37), expected) -> do
-        let actual = assignBinRep 5 (const True) polynomial
+        let actual = BinRep.findModel 5 (const True) polynomial
         actual `shouldBe` expected
 
     it "GF181" $ do
       forAll (genTestAssignment 180) $ \(polynomial :: Poly GF181, expected) -> do
-        let actual = assignBinRep 180 (const True) polynomial
+        let actual = BinRep.findModel 180 (const True) polynomial
         actual `shouldBe` expected
 
     it "Binary 7" $ do
       forAll (genTestAssignment 2) $ \(polynomial :: Poly (Binary 7), expected) -> do
-        let actual = assignBinRep 2 (const True) polynomial
+        let actual = BinRep.findModel 2 (const True) polynomial
         actual `shouldBe` expected
 
     it "4$2 + 2$3 = 6 (mod 17)" $ do
       let polynomial = case Poly.buildEither 11 [(2, 4), (3, 2)] of
             Left _ -> error "Poly.buildEither"
             Right p -> p :: Poly (Prime 17)
-      let actual = assignBinRep 4 (const True) polynomial
+      let actual = BinRep.findModel 4 (const True) polynomial
       let expected = Just (IntMap.fromList [(2, True), (3, True)])
       actual `shouldBe` expected
 
@@ -175,7 +175,7 @@ tests = describe "BinRep Detection" $ do
       let polynomial = case Poly.buildEither 0 [(0, 6)] of
             Left _ -> error "Poly.buildEither"
             Right p -> p :: Poly (Prime 17)
-      let actual = assignBinRep 4 (const True) polynomial
+      let actual = BinRep.findModel 4 (const True) polynomial
       let expected = Just (IntMap.fromList [(0, False)])
       actual `shouldBe` expected
 
@@ -183,7 +183,7 @@ tests = describe "BinRep Detection" $ do
       let polynomial = case Poly.buildEither 11 [(1, 6)] of
             Left _ -> error "Poly.buildEither"
             Right p -> p :: Poly (Prime 17)
-      let actual = assignBinRep 4 (const True) polynomial
+      let actual = BinRep.findModel 4 (const True) polynomial
       let expected = Just (IntMap.fromList [(1, True)])
       actual `shouldBe` expected
 
@@ -191,7 +191,7 @@ tests = describe "BinRep Detection" $ do
       let polynomial = case Poly.buildEither 16 [(1, 2), (3, 1)] of
             Left _ -> error "Poly.buildEither"
             Right p -> p :: Poly (Prime 17)
-      let actual = assignBinRep 4 (const True) polynomial
+      let actual = BinRep.findModel 4 (const True) polynomial
       let expected = Just (IntMap.fromList [(1, False), (3, True)])
       actual `shouldBe` expected
 
@@ -199,7 +199,7 @@ tests = describe "BinRep Detection" $ do
       let polynomial = case Poly.buildEither 12 [(1, 25), (3, 6)] of
             Left _ -> error "Poly.buildEither"
             Right p -> p :: Poly (Prime 37)
-      let actual = assignBinRep 5 (const True) polynomial
+      let actual = BinRep.findModel 5 (const True) polynomial
       let expected = Just (IntMap.fromList [(1, True), (3, False)])
       actual `shouldBe` expected
 
@@ -207,7 +207,7 @@ tests = describe "BinRep Detection" $ do
       let polynomial = case Poly.buildEither 33 [(1, 8), (3, 4)] of
             Left _ -> error "Poly.buildEither"
             Right p -> p :: Poly (Prime 37)
-      let actual = assignBinRep 5 (const True) polynomial
+      let actual = BinRep.findModel 5 (const True) polynomial
       let expected = Just (IntMap.fromList [(1, False), (3, True)])
       actual `shouldBe` expected
 
@@ -215,7 +215,7 @@ tests = describe "BinRep Detection" $ do
       let polynomial = case Poly.buildEither 2 [(2, 11), (3, 22), (4, 13)] of
             Left _ -> error "Poly.buildEither"
             Right p -> p :: Poly (Prime 37)
-      let actual = assignBinRep 5 (const True) polynomial
+      let actual = BinRep.findModel 5 (const True) polynomial
       let expected = Just (IntMap.fromList [(2, False), (3, True), (4, True)])
       actual `shouldBe` expected
 
@@ -223,7 +223,7 @@ tests = describe "BinRep Detection" $ do
       let polynomial = case Poly.buildEither 19 [(1, 1), (3, 2), (5, 18)] of
             Left _ -> error "Poly.buildEither"
             Right p -> p :: Poly (Prime 37)
-      let actual = assignBinRep 5 (const True) polynomial
+      let actual = BinRep.findModel 5 (const True) polynomial
       let expected = Just (IntMap.fromList [(1, False), (3, False), (5, True)])
       actual `shouldBe` expected
 
@@ -231,6 +231,6 @@ tests = describe "BinRep Detection" $ do
       let polynomial = case Poly.buildEither 1 [(2, 2), (3, 1)] of
             Left _ -> error "Poly.buildEither"
             Right p -> p :: Poly (Binary 7)
-      let actual = assignBinRep 2 (const True) polynomial
+      let actual = BinRep.findModel 2 (const True) polynomial
       let expected = Just (IntMap.fromList [(2, False), (3, True)])
       actual `shouldBe` expected

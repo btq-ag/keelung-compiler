@@ -5,7 +5,6 @@ module Keelung.Solver
     Error (..),
     Log (..),
     LogReport (..),
-    module Keelung.Solver.BinRep,
   )
 where
 
@@ -148,7 +147,7 @@ lookupSegments (Segments segments) = do
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
-  xs <- shrinkMul as bs cs >>= shrinkBinRep
+  xs <- shrinkMul as bs cs >>= shrinkConstraint
   case xs of
     Shrinked xs' -> tryLog $ LogShrinkConstraint (MulConstraint as bs cs) xs'
     Stuck _ -> return ()
@@ -156,7 +155,7 @@ shrink (MulConstraint as bs cs) = do
     NothingToDo -> return ()
   return $ fmap Seq.singleton xs
 shrink (AddConstraint as) = do
-  as' <- shrinkAdd as >>= shrinkBinRep
+  as' <- shrinkAdd as >>= shrinkConstraint
   return $ fmap Seq.singleton as'
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod False divModTuple
