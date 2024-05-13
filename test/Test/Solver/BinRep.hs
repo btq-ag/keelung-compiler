@@ -9,9 +9,10 @@ import Data.IntMap.Strict (IntMap)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Field (GF181)
-import Keelung.Solver (BinRep (..), assignBinRep, detectBinRep, powerOf2, rangeOfBinRep)
+import Keelung.Solver (BinRep (..), assignBinRep, detectBinRep, rangeOfBinRep)
 import Test.Hspec
 import Test.QuickCheck
+import Keelung.Compiler.Util (powerOf2)
 
 -- import Test.QuickCheck
 

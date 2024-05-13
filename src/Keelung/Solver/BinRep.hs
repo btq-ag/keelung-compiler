@@ -3,7 +3,7 @@
 
 {-# HLINT ignore "Redundant if" #-}
 
-module Keelung.Solver.BinRep (BinRep (..), shrinkBinRep, detectBinRep, powerOf2, assignBinRep, rangeOfBinRep) where
+module Keelung.Solver.BinRep (BinRep (..), shrinkBinRep, detectBinRep, assignBinRep, rangeOfBinRep) where
 
 import Control.Monad.RWS
 import Data.Bits (xor)
@@ -15,6 +15,7 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Solver.Monad
 import Keelung.Syntax (Var, Width)
+import Keelung.Compiler.Util (powerOf2)
 
 -- | Trying to reduce a BinRep constraint
 data FoldState n = Start | Failed | Continue n [Candidate n] deriving (Eq, Show)
@@ -125,10 +126,10 @@ instance (GaloisField n, Integral n) => Eq (BinRep n) where
       normalize (True, power) = powerOf2 power
       normalize (False, power) = -(powerOf2 power)
 
-powerOf2 :: (GaloisField n, Integral n) => Int -> n
-powerOf2 n
-  | n < 0 = recip (2 ^ (-n))
-  | otherwise = 2 ^ n
+-- powerOf2 :: (GaloisField n, Integral n) => Int -> n
+-- powerOf2 n
+--   | n < 0 = recip (2 ^ (-n))
+--   | otherwise = 2 ^ n
 
 rangeOfBinRep :: (GaloisField n, Integral n) => IntMap (Bool, Var) -> (n, n)
 rangeOfBinRep = IntMap.foldlWithKey' go (0, 0)
