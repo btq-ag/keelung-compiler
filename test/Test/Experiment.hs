@@ -4,10 +4,15 @@
 
 module Test.Experiment (run, tests) where
 
+import Data.Field.Galois
+import Data.IntMap qualified as IntMap
 import Keelung hiding (MulU, VarUI)
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Relations qualified as Relations
+import Keelung.Data.Polynomial (Poly)
+import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.Reference
+import Keelung.Solver.BinRep qualified as BinRep
 import Test.Hspec
 import Test.QuickCheck
 import Test.Util
@@ -32,16 +37,24 @@ tests = describe "Experiment" $ do
   --         assertGT divisor 0
   --         assert $ remainder `lt` (divisor `join` 0)
 
-  --         solve dividend $ \dividendVal -> do 
-  --           assertHint $ dividendVal 
+  --         solve dividend $ \dividendVal -> do
+  --           assertHint $ dividendVal
 
   --         return $ slice quotient (0, 8) :: Comp (UInt 8)
 
-    -- debug gf181 program
+  -- debug gf181 program
 
-    -- check gf181 program [10, 3] [] [3]
-    it "PK inverse" $ do
-      testInversePK 0x00 0x00
+  -- check gf181 program [10, 3] [] [3]
+  -- it "PK inverse" $ do
+  --   testInversePK 0x00 0x00
+
+  it "283$2 + $3 = 1 (Bianry 340282366920938463463374607431768211457)" $ do
+    let polynomial = case Poly.buildEither 1 [(2, 283), (3, 1)] of
+          Left _ -> error "Poly.buildEither"
+          Right p -> p :: Poly (Prime 340282366920938463463374607431768211457)
+    let actual = BinRep.findAssignment 128 (const True) polynomial
+    let expected = Just (IntMap.fromList [(2, False), (3, True)])
+    actual `shouldBe` expected
 
 testInversePK :: Integer -> Integer -> IO ()
 testInversePK inputs expected = do

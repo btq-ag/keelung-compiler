@@ -4,7 +4,7 @@
 {-# HLINT ignore "Redundant if" #-}
 
 -- | Intended to be qualified as `BinRep`
-module Keelung.Solver.BinRep (BinRep (..), shrinkConstraint, isSatisfiable, findModel, range) where
+module Keelung.Solver.BinRep (BinRep (..), shrinkConstraint, isSatisfiable, findAssignment, range) where
 
 import Control.Monad.RWS
 import Data.Bits (xor)
@@ -31,7 +31,7 @@ shrinkConstraint (Stuck (AddConstraint polynomial)) = do
   let isBoolean var = case IntMap.lookupLE var boolVarRanges of
         Nothing -> False
         Just (index, len) -> var < index + len
-  case findModel fieldBitWidth isBoolean polynomial of
+  case findAssignment fieldBitWidth isBoolean polynomial of
     Nothing -> return (Stuck (AddConstraint polynomial))
     Just boolAssignments -> do
       tryLog $ LogBinRepDetection polynomial (IntMap.toList boolAssignments)
@@ -68,8 +68,8 @@ deriveAssignments (lowerBound, upperBound) rawConstant polynomial =
 --    1. There can be at most `k` coefficients that are multiples of powers of 2 if the polynomial is a binary representation.
 --    2. These coefficients cannot be too far apart, i.e., the quotient of any 2 coefficients cannot be greater than `2^(k-1)`.
 --    3. For any 2 coefficients `a` and `b`, either `a / b` or `b / a` must be a power of 2 smaller than `2^k`.
-findModel :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe (IntMap Bool)
-findModel fieldBitWidth isBoolean polynomial =
+findAssignment :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe (IntMap Bool)
+findAssignment fieldBitWidth isBoolean polynomial =
   if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
     then Nothing
     else case isSatisfiable fieldBitWidth isBoolean (Poly.coeffs polynomial) of
@@ -91,9 +91,11 @@ findModel fieldBitWidth isBoolean polynomial =
                       constant
                       (binPolyCoeffs binPoly)
 
+--------------------------------------------------------------------------------
+
 -- | Polynomial with coefficients that are multiples of powers of 2
 data BinRep n = BinRep
-  { binPolyCoeffs :: IntMap (Bool, Var),
+  { binPolyCoeffs :: IntMap (Bool, Var), -- keys are powers (of 2), values are (sign, variable)
     binPolyLowerBound :: n,
     binPolyUpperBound :: n
   }
@@ -135,7 +137,7 @@ range = IntMap.foldlWithKey' go (0, 0)
 
 type Candidate n = (IntMap (Bool, Var), n, n, n)
 
--- | Computes a BinRep and a multiplier: BinRep * multiplier = input polynomial
+-- | If a polynomial is satisfiable, then we can represent it as the multiple of a BinRep
 isSatisfiable :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> IntMap n -> Maybe (BinRep n, n)
 isSatisfiable fieldBitWidth isBoolean xs =
   case IntMap.foldlWithKey' go Start xs of

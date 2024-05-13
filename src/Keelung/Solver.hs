@@ -27,7 +27,7 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
-import Keelung.Solver.BinRep
+import Keelung.Solver.BinRep qualified as BinRep
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
 
@@ -147,7 +147,7 @@ lookupSegments (Segments segments) = do
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
-  xs <- shrinkMul as bs cs >>= shrinkConstraint
+  xs <- shrinkMul as bs cs >>= BinRep.shrinkConstraint
   case xs of
     Shrinked xs' -> tryLog $ LogShrinkConstraint (MulConstraint as bs cs) xs'
     Stuck _ -> return ()
@@ -155,7 +155,7 @@ shrink (MulConstraint as bs cs) = do
     NothingToDo -> return ()
   return $ fmap Seq.singleton xs
 shrink (AddConstraint as) = do
-  as' <- shrinkAdd as >>= shrinkConstraint
+  as' <- shrinkAdd as >>= BinRep.shrinkConstraint
   return $ fmap Seq.singleton as'
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod False divModTuple
