@@ -4,7 +4,7 @@
 {-# HLINT ignore "Redundant if" #-}
 
 -- | Intended to be qualified as `BinRep`
-module Keelung.Solver.BinRep (BinRep (..), shrinkConstraint, isSatisfiable, findAssignment, range) where
+module Keelung.Solver.BinRep (BinRep (..), isSatisfiable, findAssignment, range) where
 
 import Control.Monad.RWS
 import Data.Bits (xor)
@@ -15,32 +15,10 @@ import Data.IntMap.Strict qualified as IntMap
 import Keelung.Compiler.Util (powerOf2)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Solver.Monad
 import Keelung.Syntax (Var, Width)
 
 -- | Trying to reduce a BinRep constraint
 data FoldState n = Start | Failed | Continue n [Candidate n] deriving (Eq, Show)
-
--- | Reduce binary representations
-shrinkConstraint :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
-shrinkConstraint NothingToDo = return NothingToDo
-shrinkConstraint Eliminated = return Eliminated
-shrinkConstraint (Shrinked polynomial) = return (Shrinked polynomial)
-shrinkConstraint (Stuck (AddConstraint polynomial)) = do
-  Env _ boolVarRanges fieldBitWidth <- ask
-  let isBoolean var = case IntMap.lookupLE var boolVarRanges of
-        Nothing -> False
-        Just (index, len) -> var < index + len
-  case findAssignment fieldBitWidth isBoolean polynomial of
-    Nothing -> return (Stuck (AddConstraint polynomial))
-    Just boolAssignments -> do
-      tryLog $ LogBinRepDetection polynomial (IntMap.toList boolAssignments)
-      -- we have a binary representation
-      -- we can now assign the variables
-      forM_ (IntMap.toList boolAssignments) $ \(var, val) -> do
-        bindVar "bin rep bool" var (if val then 1 else 0)
-      return Eliminated
-shrinkConstraint (Stuck polynomial) = return (Stuck polynomial)
 
 -- | Given a mapping of (Int, (Bool, Var)) pairs, where the Int indicates the power of 2, and the Bool indicates whether the coefficient is positive or negative
 --   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer

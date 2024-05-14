@@ -44,7 +44,7 @@ runM :: (GaloisField n, Integral n) => Bool -> Ranges -> FieldInfo -> Inputs n -
 runM debug boolVarRanges fieldInfo inputs p =
   let counters = Inputs.inputCounters inputs
       initState = Inputs.toIntMap inputs
-      (result, bindings, logs) = runRWS (runExceptT p) (Env debug boolVarRanges (fieldWidth fieldInfo)) initState
+      (result, bindings, logs) = runRWS (runExceptT p) (Env debug boolVarRanges fieldInfo) initState
    in case result of
         Left err -> (Left (err, bindings), LogReport initState logs bindings)
         Right _ -> case toEither $ toTotal' (getCount counters PublicInput + getCount counters PrivateInput, bindings) of
@@ -234,7 +234,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
 data Env = Env
   { envDebugMode :: Bool, -- enable logging when True
     envBoolVars :: Ranges, -- ranges of boolean variables
-    envFieldWidth :: Width -- width of the field
+    envFieldInfo :: FieldInfo -- information about the field
   }
 
 --------------------------------------------------------------------------------

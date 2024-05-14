@@ -45,21 +45,12 @@ tests = describe "Experiment" $ do
   -- debug gf181 program
 
   -- check gf181 program [10, 3] [] [3]
-  -- it "PK inverse" $ do
-  --   testInversePK 0x00 0x00
-
-  it "283$2 + $3 = 1 (Bianry 340282366920938463463374607431768211457)" $ do
-    let polynomial = case Poly.buildEither 1 [(2, 283), (3, 1)] of
-          Left _ -> error "Poly.buildEither"
-          Right p -> p :: Poly (Prime 340282366920938463463374607431768211457)
-    let actual = BinRep.findAssignment 128 (const True) polynomial
-    let expected = Just (IntMap.fromList [(2, False), (3, True)])
-    actual `shouldBe` expected
+  it "PK inverse" $ do
+    testInversePK 0x00 0x00
 
 testInversePK :: Integer -> Integer -> IO ()
 testInversePK inputs expected = do
-  actual <- solveOutput pkField (input Public >>= inversePK) [inputs] []
-  actual `shouldBe` [expected]
+  testSolver pkField (input Public >>= inversePK) [inputs] [] [expected]
 
 pkField :: FieldType
 pkField = Binary 340282366920938463463374607431768211457

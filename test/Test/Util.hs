@@ -31,6 +31,9 @@ module Test.Util
     assertCountIO0,
     assertCountWithOpts,
     assertCountWithOptsI,
+    -- R1CS solving 
+    testSolver,
+    testSolverWithOpts,
     -- helper functions
     compileAsConstraintModule,
     compileAsConstraintSystem,
@@ -226,6 +229,28 @@ assertCount = assertCountWithOpts . Options.new
 
 assertCountI :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> Int -> IO ()
 assertCountI fieldType = assertCountWithOptsI (Options.new fieldType)
+
+
+--------------------------------------------------------------------------
+
+-- | Solve R1CS with inputs and see if it's the same as the expected output (takes Keelung program)
+testSolverWithOpts :: Encode t => Options -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
+testSolverWithOpts options program rawPublicInputs rawPrivateInputs expected = caseFieldType (FieldInfo.fieldTypeData (Options.optFieldInfo options)) handlePrime handleBinary
+  where
+    handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime (_ :: Proxy (Prime n)) _ = do
+      case Compiler.solveWithOpts options program rawPublicInputs rawPrivateInputs of
+        Left err -> assertFailure (show (err :: Error (Prime n)))
+        Right actual -> actual `shouldBe` expected
+
+    handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary (_ :: Proxy (Binary n)) _ = do
+      case Compiler.solveWithOpts options program rawPublicInputs rawPrivateInputs of
+        Left err -> assertFailure (show (err :: Error (Binary n)))
+        Right actual -> actual `shouldBe` expected
+
+testSolver :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
+testSolver = testSolverWithOpts . Options.new
 
 --------------------------------------------------------------------------
 
