@@ -268,6 +268,7 @@ test-suite keelung-test
       Test.Relations.Reference
       Test.Relations.Slice
       Test.Solver
+      Test.Solver.Binary
       Test.Solver.BinRep
       Test.Util
       Keelung.Compiler

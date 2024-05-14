@@ -14,6 +14,7 @@ import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
+import Data.IntSet qualified as IntSet
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
@@ -29,6 +30,7 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Solver.BinRep qualified as BinRep
+import Keelung.Solver.Binary qualified as Binary
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
 
@@ -196,10 +198,28 @@ shrinkAdd (Stuck (AddConstraint polynomial)) = do
 
     trySolveAddativeConstraintOnBinaryFields :: (GaloisField n, Integral n) => Poly n -> M n (Result (Poly n))
     trySolveAddativeConstraintOnBinaryFields poly = do
-      fieldInfo <- asks envFieldInfo
-      case FieldInfo.fieldTypeData fieldInfo of
-        Prime _ -> return . Stuck $ poly
-        Binary _ -> return . Stuck $ poly
+      Env _ boolVarRanges fieldInfo <- ask
+      let isBoolean var = case IntMap.lookupLE var boolVarRanges of
+            Nothing -> False
+            Just (index, len) -> var < index + len
+
+      let onBinaryField = case FieldInfo.fieldTypeData fieldInfo of
+            Prime _ -> False
+            Binary _ -> True
+      let allBoolean = all isBoolean (IntSet.toList (Poly.vars poly))
+      if onBinaryField && allBoolean
+        then case Binary.run poly of
+          Nothing -> return (Stuck poly)
+          Just (assignments, []) -> do
+            mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
+            return Eliminated
+          Just (assignments, [polynomial']) -> do
+            mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
+            return (Shrinked polynomial')
+          Just (_, _) -> do
+            -- TODO: handle this case
+            return (Stuck poly)
+        else return (Stuck poly)
 shrinkAdd (Stuck polynomial) = return (Stuck polynomial)
 
 -- | Shrinking an Polynomial by substitution

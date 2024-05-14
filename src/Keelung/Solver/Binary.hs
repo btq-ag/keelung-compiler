@@ -6,12 +6,12 @@ module Keelung.Solver.Binary (run) where
 
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
+import Data.Foldable (Foldable (toList))
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Maybe qualified as Maybe
-import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
@@ -49,7 +49,9 @@ import Keelung.Data.Polynomial qualified as Poly
 --              A + B + C = 0
 --              C = 0
 --          4. learned facts: A = B, C = 0
-run :: (GaloisField n, Integral n) => Poly n -> Maybe (IntMap Bool, Seq (Poly n))
+--
+--   TODO: return equivelent classes of variables instead of just polynomials
+run :: (GaloisField n, Integral n) => Poly n -> Maybe (IntMap Bool, [Poly n])
 run polynomial =
   let initState =
         Solving
@@ -68,7 +70,7 @@ run polynomial =
                 Right poly -> Just poly
               polynomials0 = Seq.fromList $ Maybe.mapMaybe (toPoly 0) equations0
               polynomials1 = Seq.fromList $ Maybe.mapMaybe (toPoly 1) equations1
-           in Just (assignments, polynomials0 <> polynomials1)
+           in Just (assignments, toList (polynomials0 <> polynomials1))
 
 -- | Coefficients are represented as a map from variable to Integer coefficient.
 type Coefficients = IntMap Integer
@@ -111,15 +113,21 @@ solve Failed = Failed
 solve (Solved assignments equations0 equations1) = Solved assignments equations0 equations1
 solve (Solving _ _ assignments equations0 equations1 0) = Solved assignments equations0 equations1
 solve (Solving constant coeffs assignments equations0 equations1 remaining) =
-  let (constant', remainder) = shiftConstant constant
-      (coeffs', vars) = shiftCoeffs coeffs
-   in case IntSet.toList vars of
-        [] ->
-          if remainder
-            then Failed -- 1 = 0
-            else solve $ Solving constant' coeffs' assignments equations0 equations1 remaining
-        [var] -> solve $ Solving constant' coeffs' (IntMap.insert var remainder assignments) equations0 equations1 (remaining - 1) -- x == remainder
-        _ ->
-          if remainder
-            then solve $ Solving constant' coeffs' assignments equations0 (vars : equations1) remaining
-            else solve $ Solving constant' coeffs' assignments (vars : equations0) equations1 remaining
+  if IntMap.null coeffs
+    then
+      if constant == 0
+        then Solved assignments equations0 equations1
+        else Failed
+    else
+      let (constant', remainder) = shiftConstant constant
+          (coeffs', vars) = shiftCoeffs coeffs
+       in case IntSet.toList vars of
+            [] ->
+              if remainder
+                then Failed -- 1 = 0
+                else solve $ Solving constant' coeffs' assignments equations0 equations1 remaining
+            [var] -> solve $ Solving constant' coeffs' (IntMap.insert var remainder assignments) equations0 equations1 (remaining - 1) -- x == remainder
+            _ ->
+              if remainder
+                then solve $ Solving constant' coeffs' assignments equations0 (vars : equations1) remaining
+                else solve $ Solving constant' coeffs' assignments (vars : equations0) equations1 remaining
