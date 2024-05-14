@@ -83,6 +83,7 @@ library
       Keelung.Interpreter
       Keelung.Interpreter.Monad
       Keelung.Solver
+      Keelung.Solver.Binary
       Keelung.Solver.BinRep
       Keelung.Solver.Monad
   other-modules:
@@ -175,6 +176,7 @@ executable keelungc
       Keelung.Interpreter
       Keelung.Interpreter.Monad
       Keelung.Solver
+      Keelung.Solver.Binary
       Keelung.Solver.BinRep
       Keelung.Solver.Monad
       Basic
@@ -326,6 +328,7 @@ test-suite keelung-test
       Keelung.Interpreter
       Keelung.Interpreter.Monad
       Keelung.Solver
+      Keelung.Solver.Binary
       Keelung.Solver.BinRep
       Keelung.Solver.Monad
       Basic
