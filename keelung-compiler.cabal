@@ -79,6 +79,7 @@ library
       Keelung.Data.Slice
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
+      Keelung.Data.UnionFind.Boolean
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
@@ -172,6 +173,7 @@ executable keelungc
       Keelung.Data.Slice
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
+      Keelung.Data.UnionFind.Boolean
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
@@ -253,6 +255,7 @@ test-suite keelung-test
       Test.Data.LC
       Test.Data.PolyRS
       Test.Data.RefUSegments
+      Test.Data.UnionFind.Boolean
       Test.Experiment
       Test.Intergration
       Test.Optimization
@@ -325,6 +328,7 @@ test-suite keelung-test
       Keelung.Data.Slice
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
+      Keelung.Data.UnionFind.Boolean
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
