@@ -1,4 +1,7 @@
-module Keelung.Data.UnionFind.Boolean (lookup, assign, relate) where
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use list comprehension" #-}
+module Keelung.Data.UnionFind.Boolean (UnionFind, empty, lookup, assign, relate, Error (..), isValid, validate) where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -20,9 +23,16 @@ data VarStatus
       Bool -- the same sign as the root
   deriving (Show, Eq)
 
-newtype UnionFind = UnionFind (IntMap VarStatus)
+newtype UnionFind = UnionFind (IntMap VarStatus) deriving (Show, Eq)
+
+-- | Create an empty UnionFind data structure.
+empty :: UnionFind
+empty = UnionFind mempty
+
+--------------------------------------------------------------------------------
 
 data Lookup = Constant Bool | Root | ChildOf Var Bool
+  deriving (Show, Eq)
 
 -- | Status lookup
 lookup :: UnionFind -> Var -> Lookup
@@ -96,3 +106,71 @@ compose (UnionFind xs) (root, status1) (child, status2) sign = case (status1, st
     if anotherRoot1 < anotherRoot2
       then compose (UnionFind xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (sign1 == sign2)
       else compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (sign1 == sign2)
+
+--------------------------------------------------------------------------------
+
+data Error
+  = InconsistentRelation
+      Var -- root
+      Lookup -- of root
+      Var -- child
+      Lookup -- of child
+  | MissingRoot
+      Var -- child
+  | MissingChild
+      Var -- root
+      Var -- child
+  | IsNotRoot
+      Var -- root
+  | ChildrenMixedTogether
+      Var -- root
+      IntSet -- children
+  deriving (Eq)
+
+instance Show Error where
+  show (InconsistentRelation root rootLookup child childLookup) = "Inconsistent relation: root $" <> show root <> " = " <> show rootLookup <> " and child $" <> show child <> " = " <> show childLookup
+  show (MissingRoot child) = "Missing root: root of child $" <> show child <> " does not exist"
+  show (MissingChild root child) = "Missing child: child $" <> show child <> " of root " <> show root <> " does not exist"
+  show (IsNotRoot root) = "Not a root: $" <> show root <> " is not a root"
+  show (ChildrenMixedTogether root children) = "Children mixed together: root $" <> show root <> " has children with both signs: " <> show children
+
+isValid :: UnionFind -> Bool
+isValid = null . validate
+
+validate :: UnionFind -> [Error]
+validate (UnionFind xs) = go xs
+  where
+    go xs' =
+      let (xs'', errors) = destructUnionFind xs'
+       in if xs' == xs'' then errors else go xs''
+
+-- | Try to remove a variable from the UnionFind data structure
+destructUnionFind :: IntMap VarStatus -> (IntMap VarStatus, [Error])
+destructUnionFind xs = case IntMap.maxViewWithKey xs of
+  Nothing -> (mempty, [])
+  Just ((var, status), xs') -> case status of
+    IsConstant _ -> (xs', [])
+    IsRoot same opposite ->
+      let validateChild expectedSign (child, childStatus) = case childStatus of
+            IsConstant value -> [InconsistentRelation var Root child (Constant value)]
+            IsRoot _ _ -> [InconsistentRelation var Root child Root]
+            IsChildOf root sign -> if root == var && sign == expectedSign then [] else [InconsistentRelation var Root child (ChildOf root sign)]
+          errorsFromChildrenOfTheSameSign = IntMap.toList (IntMap.restrictKeys xs same) >>= validateChild True
+          errorsFromChildrenOfTheOppositeSign = IntMap.toList (IntMap.restrictKeys xs opposite) >>= validateChild False
+       in if IntSet.null (same `IntSet.intersection` opposite)
+            then (IntMap.withoutKeys xs' (same <> opposite), errorsFromChildrenOfTheSameSign <> errorsFromChildrenOfTheOppositeSign)
+            else (xs', [ChildrenMixedTogether var (same `IntSet.intersection` opposite)])
+    IsChildOf root sign -> case IntMap.lookup root xs' of
+      Nothing -> (xs', [MissingRoot var])
+      Just (IsConstant value) -> (xs', [InconsistentRelation root Root var (Constant value)])
+      Just (IsRoot same opposite) ->
+        if sign
+          then
+            if IntSet.member var same
+              then (IntMap.insert root (IsRoot (IntSet.delete var same) opposite) xs', [])
+              else (xs', [MissingChild root var])
+          else
+            if IntSet.member var opposite
+              then (IntMap.insert root (IsRoot same (IntSet.delete var opposite)) xs', [])
+              else (xs', [MissingChild root var])
+      Just (IsChildOf _ _) -> (xs', [IsNotRoot root])
