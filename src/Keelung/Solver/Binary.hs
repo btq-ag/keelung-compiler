@@ -1,20 +1,19 @@
-{-# LANGUAGE TupleSections #-}
-
 -- | Specialized solver for addative constraints on binary fields.
 --   Intended to be qualified as `Binary`
 module Keelung.Solver.Binary (run) where
 
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
-import Data.Foldable (Foldable (toList))
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Data.Maybe qualified as Maybe
-import Data.Sequence qualified as Seq
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
+import Keelung.Data.UnionFind.Boolean (UnionFind)
+import Keelung.Data.UnionFind.Boolean qualified as UnionFind
 
 -- | What this solver does:
 --      Assume that all variables are Boolean:
@@ -51,26 +50,19 @@ import Keelung.Data.Polynomial qualified as Poly
 --          4. learned facts: A = B, C = 0
 --
 --   TODO: return equivelent classes of variables instead of just polynomials
-run :: (GaloisField n, Integral n) => Poly n -> Maybe (IntMap Bool, [Poly n])
+run :: (GaloisField n, Integral n) => Poly n -> Maybe (IntMap Bool, IntMap (IntSet, IntSet), Set IntSet)
 run polynomial =
   let initState =
         Solving
           (toInteger (Poly.constant polynomial))
           (fmap toInteger (Poly.coeffs polynomial))
-          mempty
-          mempty
+          UnionFind.empty
           mempty
           (Poly.varSize polynomial)
    in case solve initState of
         Solving {} -> error "[ panic ] Solver: Impossible"
         Failed -> Nothing
-        Solved assignments equations0 equations1 ->
-          let toPoly c vars = case Poly.buildEither c (map (,1) (IntSet.toList vars)) of
-                Left _ -> Nothing
-                Right poly -> Just poly
-              polynomials0 = Seq.fromList $ Maybe.mapMaybe (toPoly 0) equations0
-              polynomials1 = Seq.fromList $ Maybe.mapMaybe (toPoly 1) equations1
-           in Just (assignments, toList (polynomials0 <> polynomials1))
+        Solved equations assignments eqClasses -> Just (assignments, eqClasses, equations)
 
 -- | Coefficients are represented as a map from variable to Integer coefficient.
 type Coefficients = IntMap Integer
@@ -98,25 +90,24 @@ data State
   = Solving
       Integer -- constant part of the polynomial
       Coefficients -- coefficients of the polynomial
-      (IntMap Bool) -- assignments of variables
-      [IntSet] -- equations summed to 0
-      [IntSet] -- equations summed to 1
+      UnionFind
+      (Set IntSet) -- equations with more than 2 variable
       Int -- count of unsolved  variables
   | Failed
   | Solved
+      (Set IntSet) -- equations with more than 2 variable
       (IntMap Bool) -- assignments of variables
-      [IntSet] -- equations summed to 0
-      [IntSet] -- equations summed to 1
+      (IntMap (IntSet, IntSet)) -- equivelent classes of variables
 
 solve :: State -> State
 solve Failed = Failed
-solve (Solved assignments equations0 equations1) = Solved assignments equations0 equations1
-solve (Solving _ _ assignments equations0 equations1 0) = Solved assignments equations0 equations1
-solve (Solving constant coeffs assignments equations0 equations1 remaining) =
+solve (Solved equations assignments eqClasses) = Solved equations assignments eqClasses
+solve (Solving _ _ state equations 0) = uncurry (Solved equations) (UnionFind.export state)
+solve (Solving constant coeffs state equations remaining) =
   if IntMap.null coeffs
     then
       if constant == 0
-        then Solved assignments equations0 equations1
+        then uncurry (Solved equations) (UnionFind.export state)
         else Failed
     else
       let (constant', remainder) = shiftConstant constant
@@ -125,9 +116,7 @@ solve (Solving constant coeffs assignments equations0 equations1 remaining) =
             [] ->
               if remainder
                 then Failed -- 1 = 0
-                else solve $ Solving constant' coeffs' assignments equations0 equations1 remaining
-            [var] -> solve $ Solving constant' coeffs' (IntMap.insert var remainder assignments) equations0 equations1 (remaining - 1) -- x == remainder
-            _ ->
-              if remainder
-                then solve $ Solving constant' coeffs' assignments equations0 (vars : equations1) remaining
-                else solve $ Solving constant' coeffs' assignments (vars : equations0) equations1 remaining
+                else solve $ Solving constant' coeffs' state equations remaining
+            [var] -> solve $ Solving constant' coeffs' (UnionFind.assign state var remainder) equations (remaining - 1) -- var == remainder
+            [var1, var2] -> solve $ Solving constant' coeffs' (UnionFind.relate state var1 var2 (not remainder)) equations (remaining - 1) -- var1 + var2 == remainder
+            _ -> solve $ Solving constant' coeffs' state (Set.insert vars equations) remaining

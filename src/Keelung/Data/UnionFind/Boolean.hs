@@ -1,7 +1,24 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use list comprehension" #-}
-module Keelung.Data.UnionFind.Boolean (UnionFind, empty, lookup, assign, relate, Error (..), isValid, validate) where
+module Keelung.Data.UnionFind.Boolean
+  ( UnionFind,
+    empty,
+
+    -- * Operations
+    assign,
+    relate,
+
+    -- * Lookup
+    lookup,
+    export,
+
+    -- * Testing
+    Error (..),
+    isValid,
+    validate,
+  )
+where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
@@ -41,6 +58,15 @@ lookup (UnionFind xs) var = case IntMap.lookup var xs of
   Just (IsConstant b) -> Constant b
   Just (IsRoot _ _) -> Root
   Just (IsChildOf root sign) -> ChildOf root sign
+
+-- | Export the UnionFind data structure to assignements and relations.
+export :: UnionFind -> (IntMap Bool, IntMap (IntSet, IntSet))
+export (UnionFind xs) = (IntMap.mapMaybe f xs, IntMap.mapMaybe g xs)
+  where
+    f (IsConstant b) = Just b
+    f _ = Nothing
+    g (IsRoot same opposite) = Just (same, opposite)
+    g _ = Nothing
 
 -- | Assign a value to a variable.
 assign :: UnionFind -> Var -> Bool -> UnionFind

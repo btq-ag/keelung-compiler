@@ -210,13 +210,13 @@ shrinkAdd (Stuck (AddConstraint polynomial)) = do
       if onBinaryField && allBoolean
         then case Binary.run poly of
           Nothing -> return (Stuck poly)
-          Just (assignments, []) -> do
-            mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
-            return Eliminated
-          Just (assignments, [polynomial']) -> do
-            mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
-            return (Shrinked polynomial')
-          Just (_, _) -> do
+          -- Just (assignments, eqClasses) -> do
+          --   mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
+          --   return Eliminated
+          -- Just (assignments, eqClasses) -> do
+          --   mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
+          --   return (Shrinked polynomial')
+          Just (_, _, _) -> do
             -- TODO: handle this case
             return (Stuck poly)
         else return (Stuck poly)
