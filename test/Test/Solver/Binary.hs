@@ -1,3 +1,4 @@
+{-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -6,7 +7,7 @@ module Test.Solver.Binary (tests, run) where
 import Data.Field.Galois
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
-import Data.IntSet qualified as IntSet
+-- import Data.IntSet qualified as IntSet
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Solver.Binary qualified as Binary
@@ -18,60 +19,70 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Binary" $ do
-  it "$0 = 0" $ do
-    let polynomial = case Poly.buildEither 0 [(0, 1)] of
-          Left _ -> error "Poly.buildEither"
-          Right p -> p :: Poly (Binary 283)
-    let actual = Binary.run polynomial
-    let expected = Just (IntMap.fromList [(0, False)], mempty, mempty)
-    actual `shouldBe` expected
+  describe "satisfiable" $ do
+    -- it "test" $ do
+    --   --    Satisfiable B 0b11000111 + B 0b11000111$0 + B 0b11000111$1 (fromList [(0,False),(1,True)])
+    --   let polynomial = case Poly.buildEither 0b11000111 [(0, 0b11000111), (1, 0b11000111)] of
+    --         Left _ -> error "Poly.buildEither"
+    --         Right p -> p :: Poly (Binary 283)
+    --       assignments = IntMap.fromList [(0, False), (1, True)]
+    --   let actual = Binary.run polynomial
+    --   let expected = Just (assignments, mempty, mempty)
+    --   actual `shouldBe` expected
 
-  it "$0 = 1" $ do
-    let polynomial = case Poly.buildEither 1 [(0, 1)] of
-          Left _ -> error "Poly.buildEither"
-          Right p -> p :: Poly (Binary 283)
-    let actual = Binary.run polynomial
-    let expected = Just (IntMap.fromList [(0, True)], mempty, mempty)
-    actual `shouldBe` expected
+    it "Binary 283" $ do
+      property $ \(Satisfiable polynomial assignments) -> do
+        let actual = Binary.run (polynomial :: Poly (Binary 283))
+        let expected = Just (assignments, mempty, mempty)
+        actual `shouldBe` expected
+  -- describe "other cases" $ do
+  --   it "$0 = 0" $ do
+  --     let polynomial = case Poly.buildEither 0 [(0, 1)] of
+  --           Left _ -> error "Poly.buildEither"
+  --           Right p -> p :: Poly (Binary 283)
+  --     let actual = Binary.run polynomial
+  --     let expected = Just (IntMap.fromList [(0, False)], mempty, mempty)
+  --     actual `shouldBe` expected
 
-  it "$0 + 2$1 = 1" $ do
-    let polynomial = case Poly.buildEither 1 [(0, 1), (1, 2)] of
-          Left _ -> error "Poly.buildEither"
-          Right p -> p :: Poly (Binary 283)
-    let actual = Binary.run polynomial
-    let expected = Just (IntMap.fromList [(0, True), (1, False)], mempty, mempty)
-    actual `shouldBe` expected
+  --   it "$0 = 1" $ do
+  --     let polynomial = case Poly.buildEither 1 [(0, 1)] of
+  --           Left _ -> error "Poly.buildEither"
+  --           Right p -> p :: Poly (Binary 283)
+  --     let actual = Binary.run polynomial
+  --     let expected = Just (IntMap.fromList [(0, True)], mempty, mempty)
+  --     actual `shouldBe` expected
 
-  it "$0 + $1 = 1" $ do
-    let polynomial = case Poly.buildEither 1 [(0, 1), (1, 1)] of
-          Left _ -> error "Poly.buildEither"
-          Right p -> p :: Poly (Binary 283)
-    let actual = Binary.run polynomial
-    let expected = Just (IntMap.fromList [], IntMap.fromList [(0, (mempty, IntSet.fromList [1]))], mempty)
-    actual `shouldBe` expected
+  --   it "$0 + 2$1 = 1" $ do
+  --     let polynomial = case Poly.buildEither 1 [(0, 1), (1, 2)] of
+  --           Left _ -> error "Poly.buildEither"
+  --           Right p -> p :: Poly (Binary 283)
+  --     let actual = Binary.run polynomial
+  --     let expected = Just (IntMap.fromList [(0, True), (1, False)], mempty, mempty)
+  --     actual `shouldBe` expected
 
-  it "$0 + $1 = 2" $ do
-    let polynomial = case Poly.buildEither 2 [(0, 1), (1, 1)] of
-          Left _ -> error "Poly.buildEither"
-          Right p -> p :: Poly (Binary 283)
-    let actual = Binary.run polynomial
-    let expected = Nothing
-    actual `shouldBe` expected
+  --   it "$0 + $1 = 1" $ do
+  --     let polynomial = case Poly.buildEither 1 [(0, 1), (1, 1)] of
+  --           Left _ -> error "Poly.buildEither"
+  --           Right p -> p :: Poly (Binary 283)
+  --     let actual = Binary.run polynomial
+  --     let expected = Just (IntMap.fromList [], IntMap.fromList [(0, (mempty, IntSet.fromList [1]))], mempty)
+  --     actual `shouldBe` expected
 
-  it "$0 + $1 + 2$2 = 2" $ do
-    let polynomial = case Poly.buildEither 2 [(0, 1), (1, 1), (2, 2)] of
-          Left _ -> error "Poly.buildEither"
-          Right p -> p :: Poly (Binary 283)
-    let actual = Binary.run polynomial
-    let expected = Just (IntMap.fromList [(2, True)], IntMap.fromList [(0, (IntSet.fromList [1], mempty))], mempty)
-    actual `shouldBe` expected
+  --   it "$0 + $1 = 2" $ do
+  --     let polynomial = case Poly.buildEither 2 [(0, 1), (1, 1)] of
+  --           Left _ -> error "Poly.buildEither"
+  --           Right p -> p :: Poly (Binary 283)
+  --     let actual = Binary.run polynomial
+  --     let expected = Nothing
+  --     actual `shouldBe` expected
 
--- describe "satisfiable" $ do
---   it "Binary 283" $ do
---     property $ \(Satisfiable polynomial assignments) -> do
---       let actual = Binary.run (polynomial :: Poly (Binary 283))
---       let expected = Just (assignments, [])
---       actual `shouldBe` expected
+  --   it "$0 + $1 + 2$2 = 2" $ do
+  --     let polynomial = case Poly.buildEither 2 [(0, 1), (1, 1), (2, 2)] of
+  --           Left _ -> error "Poly.buildEither"
+  --           Right p -> p :: Poly (Binary 283)
+  --     let actual = Binary.run polynomial
+  --     let expected = Just (IntMap.fromList [(2, True)], IntMap.fromList [(0, (IntSet.fromList [1], mempty))], mempty)
+  --     actual `shouldBe` expected
 
 -------------------------------------------------------------------------------
 

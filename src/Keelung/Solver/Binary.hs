@@ -58,7 +58,6 @@ run polynomial =
           (fmap toInteger (Poly.coeffs polynomial))
           UnionFind.empty
           mempty
-          (Poly.varSize polynomial)
    in case solve initState of
         Solving {} -> error "[ panic ] Solver: Impossible"
         Failed -> Nothing
@@ -92,7 +91,6 @@ data State
       Coefficients -- coefficients of the polynomial
       UnionFind
       (Set IntSet) -- equations with more than 2 variable
-      Int -- count of unsolved  variables
   | Failed
   | Solved
       (Set IntSet) -- equations with more than 2 variable
@@ -102,8 +100,7 @@ data State
 solve :: State -> State
 solve Failed = Failed
 solve (Solved equations assignments eqClasses) = Solved equations assignments eqClasses
-solve (Solving _ _ state equations 0) = uncurry (Solved equations) (UnionFind.export state)
-solve (Solving constant coeffs state equations remaining) =
+solve (Solving constant coeffs state equations) =
   if IntMap.null coeffs
     then
       if constant == 0
@@ -116,7 +113,7 @@ solve (Solving constant coeffs state equations remaining) =
             [] ->
               if remainder
                 then Failed -- 1 = 0
-                else solve $ Solving constant' coeffs' state equations remaining
-            [var] -> solve $ Solving constant' coeffs' (UnionFind.assign state var remainder) equations (remaining - 1) -- var == remainder
-            [var1, var2] -> solve $ Solving constant' coeffs' (UnionFind.relate state var1 var2 (not remainder)) equations (remaining - 1) -- var1 + var2 == remainder
-            _ -> solve $ Solving constant' coeffs' state (Set.insert vars equations) remaining
+                else solve $ Solving constant' coeffs' state equations
+            [var] -> solve $ Solving constant' coeffs' (UnionFind.assign state var remainder) equations -- var == remainder
+            [var1, var2] -> solve $ Solving constant' coeffs' (UnionFind.relate state var1 var2 (not remainder)) equations -- var1 + var2 == remainder
+            _ -> solve $ solve $ Solving constant' coeffs' state (Set.insert vars equations)

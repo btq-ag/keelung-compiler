@@ -14,6 +14,7 @@ module Keelung.Data.UnionFind.Boolean
     export,
 
     -- * Testing
+    VarStatus (..),
     Error (..),
     isValid,
     validate,
@@ -77,8 +78,9 @@ assign' (UnionFind xs) var value varStatus = case varStatus of
   Nothing -> UnionFind $ IntMap.insert var (IsConstant value) xs
   Just (IsConstant v) -> if value == v then UnionFind xs else error "[ panic ] Solver: already assigned with different value"
   Just (IsRoot same opposite) ->
-    let others = IntMap.withoutKeys (IntMap.withoutKeys xs same) opposite
-     in UnionFind $ others <> IntMap.fromSet (const (IsConstant value)) same <> IntMap.fromSet (const (IsConstant (not value))) opposite
+    let withoutChildren = IntMap.withoutKeys (IntMap.withoutKeys xs same) opposite
+        rootAssignedValue = IntMap.insert var (IsConstant value) withoutChildren
+     in UnionFind $ rootAssignedValue <> IntMap.fromSet (const (IsConstant value)) same <> IntMap.fromSet (const (IsConstant (not value))) opposite
   Just (IsChildOf root sign) -> assign (UnionFind xs) root (sign == value)
 
 -- | Relate two variables.
@@ -121,9 +123,10 @@ compose (UnionFind xs) (root, status1) (child, status2) sign = case (status1, st
             )
           $ IntMap.insert child (IsChildOf root sign) childrenOfChildUpdated
   (Just (IsRoot same1 opposite1), Just (IsChildOf anotherRoot2 sign2)) ->
-    if root < anotherRoot2
-      then compose (UnionFind xs) (root, Just (IsRoot same1 opposite1)) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (sign == sign2)
-      else compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (root, Just (IsRoot same1 opposite1)) (sign == sign2)
+    case root `compare` anotherRoot2 of
+      LT -> compose (UnionFind xs) (root, Just (IsRoot same1 opposite1)) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (sign == sign2)
+      EQ -> UnionFind xs
+      GT -> compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (root, Just (IsRoot same1 opposite1)) (sign == sign2)
   (Just (IsChildOf anotherRoot1 sign1), Just (IsRoot same2 opposite2)) ->
     if root < anotherRoot1
       then compose (UnionFind xs) (root, Just (IsRoot same2 opposite2)) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (sign == sign1)
@@ -151,6 +154,8 @@ data Error
   | ChildrenMixedTogether
       Var -- root
       IntSet -- children
+  | RootAsItsOwnChild
+      Var -- root
   deriving (Eq)
 
 instance Show Error where
@@ -159,6 +164,7 @@ instance Show Error where
   show (MissingChild root child) = "Missing child: child $" <> show child <> " of root " <> show root <> " does not exist"
   show (IsNotRoot root) = "Not a root: $" <> show root <> " is not a root"
   show (ChildrenMixedTogether root children) = "Children mixed together: root $" <> show root <> " has children with both signs: " <> show children
+  show (RootAsItsOwnChild root) = "Root as its own child: root $" <> show root <> " is its own child"
 
 isValid :: UnionFind -> Bool
 isValid = null . validate
@@ -184,7 +190,10 @@ destructUnionFind xs = case IntMap.maxViewWithKey xs of
           errorsFromChildrenOfTheSameSign = IntMap.toList (IntMap.restrictKeys xs same) >>= validateChild True
           errorsFromChildrenOfTheOppositeSign = IntMap.toList (IntMap.restrictKeys xs opposite) >>= validateChild False
        in if IntSet.null (same `IntSet.intersection` opposite)
-            then (IntMap.withoutKeys xs' (same <> opposite), errorsFromChildrenOfTheSameSign <> errorsFromChildrenOfTheOppositeSign)
+            then
+              if var `IntSet.member` (same <> opposite)
+                then (xs', [RootAsItsOwnChild var])
+                else (IntMap.withoutKeys xs' (same <> opposite), errorsFromChildrenOfTheSameSign <> errorsFromChildrenOfTheOppositeSign)
             else (xs', [ChildrenMixedTogether var (same `IntSet.intersection` opposite)])
     IsChildOf root sign -> case IntMap.lookup root xs' of
       Nothing -> (xs', [MissingRoot var])
