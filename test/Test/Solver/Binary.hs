@@ -88,7 +88,7 @@ tests = describe "Binary" $ do
 
 instance (GaloisField n, Arbitrary n) => Arbitrary (TestCase n) where
   arbitrary = do
-    numberOfTerms <- choose (1, 2)
+    numberOfTerms <- choose (1, 3)
     coefficients <- vectorOf numberOfTerms (arbitrary `suchThat` (> 0)) :: Gen [n]
 
     assignments <- vectorOf numberOfTerms arbitrary

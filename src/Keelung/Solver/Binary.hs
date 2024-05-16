@@ -10,6 +10,7 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Keelung (Var)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.UnionFind.Boolean (UnionFind)
@@ -26,7 +27,6 @@ import Keelung.Data.UnionFind.Boolean qualified as UnionFind
 --      Given:  1 + 5A + B = 0
 --          1. break it into: 1 + 4A + A + B = 0
 --          2. align coefficients:
---              power   0   1   2
 --              const   1   0   0
 --                  A   1   0   1
 --                  B   1   0   0
@@ -50,18 +50,17 @@ import Keelung.Data.UnionFind.Boolean qualified as UnionFind
 --          4. learned facts: A = B, C = 0
 --
 --   TODO: return equivelent classes of variables instead of just polynomials
-run :: (GaloisField n, Integral n) => Poly n -> Maybe (IntMap Bool, IntMap (IntSet, IntSet), Set IntSet)
+run :: (GaloisField n, Integral n) => Poly n -> Maybe (IntMap Bool, IntMap (IntSet, IntSet), Set (Bool, IntSet))
 run polynomial =
-  let initState =
+  let initStage =
         Solving
           (toInteger (Poly.constant polynomial))
           (fmap toInteger (Poly.coeffs polynomial))
-          UnionFind.empty
-          mempty
-   in case solve initState of
+          empty
+   in case solve initStage of
         Solving {} -> error "[ panic ] Solver: Impossible"
         Failed -> Nothing
-        Solved equations assignments eqClasses -> Just (assignments, eqClasses, equations)
+        Solved result -> Just result
 
 -- | Coefficients are represented as a map from variable to Integer coefficient.
 type Coefficients = IntMap Integer
@@ -85,26 +84,26 @@ shiftConstant constant =
   let (quotient, remainder) = constant `divMod` 2
    in (quotient, remainder == 1)
 
-data State
+data Stage
   = Solving
       Integer -- constant part of the polynomial
       Coefficients -- coefficients of the polynomial
-      UnionFind
-      (Set IntSet) -- equations with more than 2 variable
+      State
   | Failed
   | Solved
-      (Set IntSet) -- equations with more than 2 variable
-      (IntMap Bool) -- assignments of variables
-      (IntMap (IntSet, IntSet)) -- equivelent classes of variables
+      ( IntMap Bool, -- assignments of variables
+        IntMap (IntSet, IntSet), -- equivelent classes of variables
+        Set (Bool, IntSet) -- equations with more than 2 variable (summed to 0 or 1)
+      )
 
-solve :: State -> State
+solve :: Stage -> Stage
 solve Failed = Failed
-solve (Solved equations assignments eqClasses) = Solved equations assignments eqClasses
-solve (Solving constant coeffs state equations) =
+solve (Solved result) = Solved result
+solve (Solving constant coeffs state) =
   if IntMap.null coeffs
     then
       if constant == 0
-        then uncurry (Solved equations) (UnionFind.export state)
+        then Solved (export state)
         else Failed
     else
       let (constant', remainder) = shiftConstant constant
@@ -113,7 +112,75 @@ solve (Solving constant coeffs state equations) =
             [] ->
               if remainder
                 then Failed -- 1 = 0
-                else solve $ Solving constant' coeffs' state equations
-            [var] -> solve $ Solving constant' coeffs' (UnionFind.assign state var remainder) equations -- var == remainder
-            [var1, var2] -> solve $ Solving constant' coeffs' (UnionFind.relate state var1 var2 (not remainder)) equations -- var1 + var2 == remainder
-            _ -> solve $ solve $ Solving constant' coeffs' state (Set.insert vars equations)
+                else solve $ Solving constant' coeffs' state -- no-op
+            [var] ->
+              -- var == remainder
+              solve $ Solving constant' coeffs' (assign var remainder state)
+            [var1, var2] ->
+              -- var1 + var2 == remainder
+              solve $ Solving constant' coeffs' (relate var1 var2 (not remainder) state)
+            _ -> solve $ solve $ Solving constant' coeffs' (addEquation remainder vars state)
+
+--------------------------------------------------------------------------------
+
+data State
+  = State
+      UnionFind -- UnionFind: for unary relation (variable assignment) and binary relation (variable equivalence)
+      (Set (Bool, IntSet)) -- equation pool: for relations with more than 2 variables, summed to 0 or 1
+  deriving (Eq, Show)
+
+empty :: State
+empty = State UnionFind.empty mempty
+
+-- | Assign a variable to a value in the state
+assign :: Var -> Bool -> State -> State
+assign var val (State uf eqs) = State (UnionFind.assign uf var val) (assignOnEquations var val eqs)
+
+-- | Assign a variable to a value in the equation pool
+assignOnEquations :: Var -> Bool -> Set (Bool, IntSet) -> Set (Bool, IntSet)
+assignOnEquations var val = Set.map $ \(summedToOne, equation) ->
+  if var `IntSet.member` equation
+    then (if val then not summedToOne else summedToOne, IntSet.delete var equation)
+    else (summedToOne, equation)
+
+-- | Relate two variables in the state
+relate :: Var -> Var -> Bool -> State -> State
+relate var1 var2 sign (State uf eqs) = State (UnionFind.relate uf var1 var2 sign) (relateOnEquations var1 var2 sign eqs)
+
+-- | Relate two variables in the equation pool
+relateOnEquations :: Var -> Var -> Bool -> Set (Bool, IntSet) -> Set (Bool, IntSet)
+relateOnEquations var1 var2 sign =
+  if var1 == var2
+    then id -- no-op
+    else
+      let (root, child) = (var1 `min` var2, var1 `max` var2)
+       in Set.map $ \(summedToOne, equation) ->
+            if child `IntSet.member` equation
+              then
+                if root `IntSet.member` equation
+                  then
+                    if sign
+                      then -- child + root = 1
+                        (not summedToOne, IntSet.delete child $ IntSet.delete root equation)
+                      else -- child + root = 0
+                        (summedToOne, IntSet.delete child $ IntSet.delete root equation)
+                  else
+                    if sign
+                      then -- child = root + 1
+                        (not summedToOne, IntSet.insert root $ IntSet.delete child equation)
+                      else -- child = root
+                        (summedToOne, IntSet.insert root $ IntSet.delete child equation)
+              else (summedToOne, equation) -- no-op
+
+addEquation :: Bool -> IntSet -> State -> State
+addEquation summedToOne equation (State uf eqs) = State uf (Set.insert (summedToOne, equation) eqs)
+
+export ::
+  State ->
+  ( IntMap Bool, -- assignments of variables
+    IntMap (IntSet, IntSet), -- equivelent classes of variables
+    Set (Bool, IntSet) -- equations with more than 2 variable (summed to 0 or 1)
+  )
+export (State uf eqs) =
+  let (assignments, eqClasses) = UnionFind.export uf
+   in (assignments, eqClasses, Set.filter (not . IntSet.null . snd) eqs)
