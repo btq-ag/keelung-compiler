@@ -10,7 +10,6 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Set (Set)
 import Data.Set qualified as Set
-import Debug.Trace
 import Keelung (Var)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
@@ -28,6 +27,7 @@ import Keelung.Data.UnionFind.Boolean qualified as UnionFind
 --      Given:  1 + 5A + B = 0
 --          1. break it into: 1 + 4A + A + B = 0
 --          2. align coefficients:
+--              power   0   1   2
 --              const   1   0   0
 --                  A   1   0   1
 --                  B   1   0   0
@@ -115,17 +115,13 @@ solve (Solving constant coeffs state) =
                 then Failed -- 1 = 0
                 else solve $ Solving constant' coeffs' state -- no-op
             [var] ->
-              traceShow
-                ("assign", var, remainder, state)
-                -- var == remainder
-                solve
-                $ Solving constant' coeffs' (assign var remainder state)
+              -- var == remainder
+              solve $
+                Solving constant' coeffs' (assign var remainder state)
             [var1, var2] ->
-              traceShow
-                ("relate", var1, var2, not remainder, state)
-                -- var1 + var2 == remainder
-                solve
-                $ Solving constant' coeffs' (relate var1 var2 (not remainder) state)
+              -- var1 + var2 == remainder
+              solve $
+                Solving constant' coeffs' (relate var1 var2 (not remainder) state)
             _ -> solve $ solve $ Solving constant' coeffs' (addEquation remainder vars state)
 
 --------------------------------------------------------------------------------
@@ -185,7 +181,7 @@ addEquation summedToOne equation (State uf eqs) =
    in case IntSet.toList equation' of
         [] -> State uf eqs
         [var] -> assign var summedToOne' (State uf eqs)
-        [var1, var2] -> relate var1 var2 summedToOne' (State uf eqs)
+        [var1, var2] -> relate var1 var2 (not summedToOne') (State uf eqs)
         _ -> State uf $ Set.insert (summedToOne', equation') eqs
 
 substEquation :: UnionFind -> (Bool, IntSet) -> (Bool, IntSet)
@@ -195,8 +191,14 @@ substEquation uf (b, e) = IntSet.fold step (b, mempty) e
       case UnionFind.lookup uf var of
         Nothing -> (summedToOne, IntSet.insert var equation)
         Just (UnionFind.Constant val) -> (if val then not summedToOne else summedToOne, equation)
-        Just UnionFind.Root -> (summedToOne, IntSet.insert var equation)
-        Just (UnionFind.ChildOf root sameSign) -> (if sameSign then summedToOne else not summedToOne, IntSet.insert root equation)
+        Just UnionFind.Root ->
+          if var `IntSet.member` equation
+            then (summedToOne, IntSet.delete var equation)
+            else (summedToOne, IntSet.insert var equation)
+        Just (UnionFind.ChildOf root sameSign) ->
+          if root `IntSet.member` equation
+            then (if sameSign then summedToOne else not summedToOne, IntSet.delete root equation)
+            else (if sameSign then summedToOne else not summedToOne, IntSet.insert root equation)
 
 -- Nothing -> IntSet.insert var equation
 

@@ -20,21 +20,21 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Binary" $ do
   describe "satisfiable" $ do
-    -- it "test" $ do
-    --   -- Satisfiable B 0b1000 + B 0b1000000$0 + B 0b11100101$1 + B 0b11101101$2 (fromList [(0,False),(1,True),(2,True)])
-    --   let polynomial = case Poly.buildEither 0b1000 [(0, 0b1000000), (1, 0b11100101), (2, 0b11101101)] of
-    --         Left _ -> error "Poly.buildEither"
-    --         Right p -> p :: Poly (Binary 283)
-    --       assignments = IntMap.fromList [(0, False), (1, True), (2, True)]
-    --   let actual = Binary.run polynomial
-    --   let expected = Just (assignments, mempty, mempty)
-    --   actual `shouldBe` expected
+    it "test" $ do
+      --  Satisfiable B 0b10011 + B 0b10011$0 + B 0b10110011$1 + B 0b11$2 (fromList [(0,True),(1,False),(2,False)])
+      let polynomial = case Poly.buildEither 0b10011 [(0, 0b10011), (1, 0b10110011), (2, 0b11)] of
+            Left _ -> error "Poly.buildEither"
+            Right p -> p :: Poly (Binary 283)
+          assignments = IntMap.fromList [(0, True), (1, False), (2, False)]
+      let actual = Binary.run polynomial
+      let expected = Just (assignments, mempty, mempty)
+      actual `shouldBe` expected
 
-    it "Binary 283" $ do
-      property $ \(Satisfiable polynomial assignments) -> do
-        let actual = Binary.run (polynomial :: Poly (Binary 283))
-        let expected = Just (assignments, mempty, mempty)
-        actual `shouldBe` expected
+    -- it "Binary 283" $ do
+    --   property $ \(Satisfiable polynomial assignments) -> do
+    --     let actual = Binary.run (polynomial :: Poly (Binary 283))
+    --     let expected = Just (assignments, mempty, mempty)
+    --     actual `shouldBe` expected
   -- describe "other cases" $ do
   --   it "$0 = 0" $ do
   --     let polynomial = case Poly.buildEither 0 [(0, 1)] of
