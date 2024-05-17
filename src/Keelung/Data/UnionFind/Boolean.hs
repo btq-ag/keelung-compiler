@@ -10,6 +10,7 @@ module Keelung.Data.UnionFind.Boolean
     relate,
 
     -- * Lookup
+    Lookup(..),
     lookup,
     export,
 
@@ -25,7 +26,6 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Debug.Trace
 import Keelung (Var)
 import Prelude hiding (lookup)
 
@@ -54,12 +54,12 @@ data Lookup = Constant Bool | Root | ChildOf Var Bool
   deriving (Show, Eq)
 
 -- | Status lookup
-lookup :: UnionFind -> Var -> Lookup
+lookup :: UnionFind -> Var -> Maybe Lookup
 lookup (UnionFind xs) var = case IntMap.lookup var xs of
-  Nothing -> error "[ panic ] Solver: not in UnionFind"
-  Just (IsConstant b) -> Constant b
-  Just (IsRoot _ _) -> Root
-  Just (IsChildOf root sign) -> ChildOf root sign
+  Nothing -> Nothing
+  Just (IsConstant b) -> Just (Constant b)
+  Just (IsRoot _ _) -> Just Root
+  Just (IsChildOf root sign) -> Just (ChildOf root sign)
 
 -- | Export the UnionFind data structure to assignements and relations.
 export :: UnionFind -> (IntMap Bool, IntMap (IntSet, IntSet))

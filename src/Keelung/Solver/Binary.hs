@@ -180,7 +180,25 @@ relateOnEquations var1 var2 sameSign =
               else (summedToOne, equation) -- no-op
 
 addEquation :: Bool -> IntSet -> State -> State
-addEquation summedToOne equation (State uf eqs) = State uf (Set.insert (summedToOne, equation) eqs)
+addEquation summedToOne equation (State uf eqs) =
+  let (summedToOne', equation') = substEquation uf (summedToOne, equation)
+   in case IntSet.toList equation' of
+        [] -> State uf eqs
+        [var] -> assign var summedToOne' (State uf eqs)
+        [var1, var2] -> relate var1 var2 summedToOne' (State uf eqs)
+        _ -> State uf $ Set.insert (summedToOne', equation') eqs
+
+substEquation :: UnionFind -> (Bool, IntSet) -> (Bool, IntSet)
+substEquation uf (b, e) = IntSet.fold step (b, mempty) e
+  where
+    step var (summedToOne, equation) =
+      case UnionFind.lookup uf var of
+        Nothing -> (summedToOne, IntSet.insert var equation)
+        Just (UnionFind.Constant val) -> (if val then not summedToOne else summedToOne, equation)
+        Just UnionFind.Root -> (summedToOne, IntSet.insert var equation)
+        Just (UnionFind.ChildOf root sameSign) -> (if sameSign then summedToOne else not summedToOne, IntSet.insert root equation)
+
+-- Nothing -> IntSet.insert var equation
 
 export ::
   State ->
