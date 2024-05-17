@@ -10,6 +10,7 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Set (Set)
 import Data.Set qualified as Set
+import Debug.Trace
 import Keelung (Var)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
@@ -114,11 +115,17 @@ solve (Solving constant coeffs state) =
                 then Failed -- 1 = 0
                 else solve $ Solving constant' coeffs' state -- no-op
             [var] ->
-              -- var == remainder
-              solve $ Solving constant' coeffs' (assign var remainder state)
+              traceShow
+                ("assign", var, remainder, state)
+                -- var == remainder
+                solve
+                $ Solving constant' coeffs' (assign var remainder state)
             [var1, var2] ->
-              -- var1 + var2 == remainder
-              solve $ Solving constant' coeffs' (relate var1 var2 (not remainder) state)
+              traceShow
+                ("relate", var1, var2, not remainder, state)
+                -- var1 + var2 == remainder
+                solve
+                $ Solving constant' coeffs' (relate var1 var2 (not remainder) state)
             _ -> solve $ solve $ Solving constant' coeffs' (addEquation remainder vars state)
 
 --------------------------------------------------------------------------------
@@ -145,11 +152,11 @@ assignOnEquations var val = Set.map $ \(summedToOne, equation) ->
 
 -- | Relate two variables in the state
 relate :: Var -> Var -> Bool -> State -> State
-relate var1 var2 sign (State uf eqs) = State (UnionFind.relate uf var1 var2 sign) (relateOnEquations var1 var2 sign eqs)
+relate var1 var2 sameSign (State uf eqs) = State (UnionFind.relate uf var1 var2 sameSign) (relateOnEquations var1 var2 sameSign eqs)
 
 -- | Relate two variables in the equation pool
 relateOnEquations :: Var -> Var -> Bool -> Set (Bool, IntSet) -> Set (Bool, IntSet)
-relateOnEquations var1 var2 sign =
+relateOnEquations var1 var2 sameSign =
   if var1 == var2
     then id -- no-op
     else
@@ -159,17 +166,17 @@ relateOnEquations var1 var2 sign =
               then
                 if root `IntSet.member` equation
                   then
-                    if sign
-                      then -- child + root = 1
-                        (not summedToOne, IntSet.delete child $ IntSet.delete root equation)
-                      else -- child + root = 0
+                    if sameSign
+                      then -- child + root = 0
                         (summedToOne, IntSet.delete child $ IntSet.delete root equation)
+                      else -- child + root = 1
+                        (not summedToOne, IntSet.delete child $ IntSet.delete root equation)
                   else
-                    if sign
-                      then -- child = root + 1
-                        (not summedToOne, IntSet.insert root $ IntSet.delete child equation)
-                      else -- child = root
+                    if sameSign
+                      then -- child = root
                         (summedToOne, IntSet.insert root $ IntSet.delete child equation)
+                      else -- child = root + 1
+                        (not summedToOne, IntSet.insert root $ IntSet.delete child equation)
               else (summedToOne, equation) -- no-op
 
 addEquation :: Bool -> IntSet -> State -> State
@@ -183,4 +190,4 @@ export ::
   )
 export (State uf eqs) =
   let (assignments, eqClasses) = UnionFind.export uf
-   in (assignments, eqClasses, Set.filter (not . IntSet.null . snd) eqs)
+   in (assignments, eqClasses, Set.filter ((> 2) . IntSet.size . snd) eqs)
