@@ -3,6 +3,7 @@
 module Keelung.Solver.Binary (run) where
 
 import Data.Bits qualified
+import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
 import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
@@ -115,14 +116,25 @@ solve (Solving constant coeffs state) =
                 then Failed -- 1 = 0
                 else solve $ Solving constant' coeffs' state -- no-op
             [var] ->
-              -- var == remainder
-              solve $
-                Solving constant' coeffs' (assign var remainder state)
+              -- trace ("\n$" <> show var <> " := " <> show remainder) $
+              --   traceShow state $
+              --     traceShow (assign var remainder state) $
+                    -- var == remainder
+                    solve $
+                      Solving constant' coeffs' (assign var remainder state)
             [var1, var2] ->
-              -- var1 + var2 == remainder
-              solve $
-                Solving constant' coeffs' (relate var1 var2 (not remainder) state)
-            _ -> solve $ solve $ Solving constant' coeffs' (addPolyB (PolyB vars remainder) state)
+              -- trace ("\n$" <> show var1 <> " == " <> (if not remainder then "" else "-") <> "$" <> show var2) $
+              --   traceShow state $
+              --     traceShow (relate var1 var2 (not remainder) state) $
+                    -- var1 + var2 == remainder
+                    solve $
+                      Solving constant' coeffs' (relate var1 var2 (not remainder) state)
+            _ ->
+              -- trace ("\n+ " <> show (PolyB vars remainder)) $
+              --   traceShow state $
+              --   traceShow (insert (PolyB vars remainder) state) $
+                  solve $
+                    Solving constant' coeffs' (insert (PolyB vars remainder) state)
 
 --------------------------------------------------------------------------------
 
@@ -135,57 +147,6 @@ data State
 empty :: State
 empty = State UnionFind.empty mempty
 
--- | Assign a variable to a value in the state
-assign :: Var -> Bool -> State -> State
-assign var val (State uf rels) = State (UnionFind.assign uf var val) (assignOnRelations var val rels)
-
--- | Assign a variable to a value in the relation pool
-assignOnRelations :: Var -> Bool -> Set PolyB -> Set PolyB
-assignOnRelations var val = Set.map $ \(PolyB vars parity) ->
-  if var `IntSet.member` vars
-    then PolyB (IntSet.delete var vars) (if val then not parity else parity)
-    else PolyB vars parity
-
--- | Relate two variables in the state
-relate :: Var -> Var -> Bool -> State -> State
-relate var1 var2 sameSign (State uf rels) = State (UnionFind.relate uf var1 var2 sameSign) (relateOnRelations var1 var2 sameSign rels)
-
--- | Relate two variables in the relation pool
-relateOnRelations :: Var -> Var -> Bool -> Set PolyB -> Set PolyB
-relateOnRelations var1 var2 sameSign =
-  if var1 == var2
-    then id -- no-op
-    else
-      let (root, child) = (var1 `min` var2, var1 `max` var2)
-       in Set.map $ \(PolyB vars parity) ->
-            if child `IntSet.member` vars
-              then
-                if root `IntSet.member` vars
-                  then
-                    if sameSign
-                      then -- child + root = 0
-                        PolyB (IntSet.delete child $ IntSet.delete root vars) parity
-                      else -- child + root = 1
-                        PolyB (IntSet.delete child $ IntSet.delete root vars) (not parity)
-                  else
-                    if sameSign
-                      then -- child = root
-                        PolyB (IntSet.insert root $ IntSet.delete child vars) parity
-                      else -- child = root + 1
-                        PolyB (IntSet.insert root $ IntSet.delete child vars) (not parity)
-              else PolyB vars parity -- no-op
-
-addPolyB :: PolyB -> State -> State
-addPolyB poly (State uf rels) =
-  let PolyB vars parity = substPolyB uf poly
-   in case IntSet.toList vars of
-        [] -> State uf rels
-        [var] -> assign var parity (State uf rels)
-        [var1, var2] -> relate var1 var2 (not parity) (State uf rels)
-        _ -> State uf $ Set.insert (PolyB vars parity) rels
-
--- Nothing -> IntSet.insert var equation
-
 export ::
   State ->
   ( IntMap Bool, -- assignments of variables
@@ -194,7 +155,7 @@ export ::
   )
 export (State uf rels) =
   let (assignments, eqClasses) = UnionFind.export uf
-   in (assignments, eqClasses, Set.map fromPolyB $ Set.filter ((> 2) . polyBSize) rels)
+   in (assignments, eqClasses, Set.map fromPolyB $ Set.filter ((> 0) . polyBSize) rels)
 
 --------------------------------------------------------------------------------
 
@@ -208,8 +169,12 @@ fromPolyB (PolyB vars parity) = (parity, vars)
 polyBSize :: PolyB -> Int
 polyBSize (PolyB vars _) = IntSet.size vars
 
+nullPoly :: PolyB -> Bool
+nullPoly (PolyB vars _) = IntSet.null vars
+
 substPolyB :: UnionFind -> PolyB -> PolyB
-substPolyB uf (PolyB e b) = IntSet.fold step (PolyB mempty b) e
+substPolyB uf (PolyB e b) =
+  IntSet.fold step (PolyB mempty b) e
   where
     step var (PolyB vars parity) =
       case UnionFind.lookup uf var of
@@ -223,3 +188,115 @@ substPolyB uf (PolyB e b) = IntSet.fold step (PolyB mempty b) e
           if root `IntSet.member` vars
             then PolyB (IntSet.delete root vars) (if sameSign then not parity else parity)
             else PolyB (IntSet.insert root vars) (if sameSign then parity else not parity)
+
+--------------------------------------------------------------------------------
+
+data Action
+  = Assign Var Bool -- variable assignment
+  | Relate Var Var Bool -- variable equivalence
+  deriving (Eq, Ord, Show)
+
+-- | If a PolyB has only 1 variable, convert it to an assignment.
+--   If a PolyB has 2 variables, convert it to a relation.
+--   Otherwise, remain as is.
+toAction :: PolyB -> Either PolyB Action
+toAction (PolyB vars parity) =
+  case IntSet.toList vars of
+    [] -> error "[ panic ] Solver: Impossible"
+    [var] -> Right (Assign var parity)
+    [var1, var2] -> Right (Relate var1 var2 (not parity))
+    _ -> Left (PolyB vars parity)
+
+-- | Given a list of actions, update the UnionFind
+updateUnionFind :: UnionFind -> [Action] -> UnionFind
+updateUnionFind = foldr step
+  where
+    step (Assign var val) xs = UnionFind.assign xs var val
+    step (Relate var1 var2 sameSign) xs = UnionFind.relate xs var1 var2 sameSign
+
+-- | Given a pool of relations, derive actions from them.
+updatePool :: UnionFind -> [PolyB] -> ([PolyB], [Action])
+updatePool uf = foldr step (mempty, [])
+  where
+    step poly (pool, actions) =
+      case toAction (substPolyB uf poly) of
+        Left poly' -> (poly' : pool, actions)
+        Right action -> (pool, action : actions)
+
+-- | Apply actions on the relation pool until there is no more actions to apply.
+--   Finds the fixed point of `updatePool . updateUnionFind`
+applyActionsUntilThereIsNone :: UnionFind -> ([PolyB], [Action]) -> State
+applyActionsUntilThereIsNone uf (pool, []) = State uf (Set.fromList pool)
+applyActionsUntilThereIsNone uf (pool, actions) =
+  let uf' = updateUnionFind uf actions
+   in applyActionsUntilThereIsNone uf' (updatePool uf' pool)
+
+-- | Relate two variables in the state
+relate :: Var -> Var -> Bool -> State -> State
+relate var1 var2 sameSign (State uf pool) =
+  if var1 == var2
+    then State uf pool -- no-op
+    else -- decide which variable to be the root
+
+      let (root, child) = (var1 `min` var2, var1 `max` var2)
+          uf' = UnionFind.relate uf root child sameSign
+          poolResult = Either.partitionEithers $ map (relatePolyB root child sameSign) (Set.toList pool)
+       in applyActionsUntilThereIsNone uf' poolResult
+
+assign :: Var -> Bool -> State -> State
+assign var val (State uf pool) =
+  let uf' = UnionFind.assign uf var val
+      poolResult = Either.partitionEithers $ map (assignPolyB var val) (Set.toList pool)
+   in applyActionsUntilThereIsNone uf' poolResult
+
+insert :: PolyB -> State -> State
+insert poly (State uf pool) =
+  let poly' =  insertPolyB poly
+   in if nullPoly poly'
+        then State uf pool -- no-op
+        else case toAction poly' of
+          Left poly'' -> State uf (Set.insert poly'' pool)
+          Right action -> applyActionsUntilThereIsNone uf (Set.toList pool, [action])
+  where
+    insertPolyB :: PolyB -> PolyB
+    insertPolyB (PolyB e b) = IntSet.fold step (PolyB mempty b) e
+      where
+        step var (PolyB vars parity) =
+          case UnionFind.lookup uf var of
+            Nothing -> PolyB (IntSet.insert var vars) parity
+            Just (UnionFind.Constant val) -> PolyB vars (if val then not parity else parity)
+            Just UnionFind.Root ->
+              if var `IntSet.member` vars
+                then PolyB (IntSet.delete var vars) parity
+                else PolyB (IntSet.insert var vars) parity
+            Just (UnionFind.ChildOf root sameSign) ->
+              if root `IntSet.member` vars
+                then PolyB (IntSet.delete root vars) (if sameSign then parity else not parity)
+                else PolyB (IntSet.insert root vars) (if sameSign then parity else not parity)
+
+-- | Relate two variables in a binary polynomial, return either the updated polynomial or an action
+relatePolyB :: Var -> Var -> Bool -> PolyB -> Either PolyB Action
+relatePolyB root child sameSign (PolyB vars parity) =
+  if child `IntSet.member` vars
+    then
+      if root `IntSet.member` vars
+        then
+          if sameSign
+            then -- child + root = 0
+              toAction $ PolyB (IntSet.delete child $ IntSet.delete root vars) parity
+            else -- child + root = 1
+              toAction $ PolyB (IntSet.delete child $ IntSet.delete root vars) (not parity)
+        else
+          if sameSign
+            then -- child = root
+              toAction $ PolyB (IntSet.insert root $ IntSet.delete child vars) parity
+            else -- child = root + 1
+              toAction $ PolyB (IntSet.insert root $ IntSet.delete child vars) (not parity)
+    else Left (PolyB vars parity) -- no-op
+
+-- | Assign a variable to a value in a binary polynomial, return either the updated polynomial or an action
+assignPolyB :: Var -> Bool -> PolyB -> Either PolyB Action
+assignPolyB var val (PolyB vars parity) =
+  if var `IntSet.member` vars
+    then toAction (PolyB (IntSet.delete var vars) (if val then not parity else parity))
+    else Left (PolyB vars parity) -- no-op

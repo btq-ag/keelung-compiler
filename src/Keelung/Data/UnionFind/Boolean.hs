@@ -26,7 +26,6 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Debug.Trace
 import Keelung (Var)
 import Prelude hiding (lookup)
 
@@ -73,7 +72,7 @@ export (UnionFind xs) = (IntMap.mapMaybe f xs, IntMap.mapMaybe g xs)
 
 -- | Assign a value to a variable.
 assign :: UnionFind -> Var -> Bool -> UnionFind
-assign (UnionFind xs) var value = traceShow xs $ trace ("$" <> show var <> " := " <> show value) $ assign' (UnionFind xs) var value (IntMap.lookup var xs)
+assign (UnionFind xs) var value = assign' (UnionFind xs) var value (IntMap.lookup var xs)
 
 assign' :: UnionFind -> Var -> Bool -> Maybe VarStatus -> UnionFind
 assign' (UnionFind xs) var value varStatus = case varStatus of
@@ -91,9 +90,9 @@ assign' (UnionFind xs) var value varStatus = case varStatus of
 relate :: UnionFind -> Var -> Var -> Bool -> UnionFind
 relate (UnionFind xs) var1 var2 sign =
   case var1 `compare` var2 of
-    LT -> traceShow xs $ trace ("$" <> show var1 <> " == " <> (if sign then "" else "-") <> "$" <> show var2) $ compose (UnionFind xs) (var1, IntMap.lookup var1 xs) (var2, IntMap.lookup var2 xs) sign
+    LT -> compose (UnionFind xs) (var1, IntMap.lookup var1 xs) (var2, IntMap.lookup var2 xs) sign
     EQ -> UnionFind xs
-    GT -> traceShow xs $ trace ("$" <> show var2 <> " == " <> (if sign then "" else "-") <> "$" <> show var1) $ compose (UnionFind xs) (var2, IntMap.lookup var2 xs) (var1, IntMap.lookup var1 xs) sign
+    GT -> compose (UnionFind xs) (var2, IntMap.lookup var2 xs) (var1, IntMap.lookup var1 xs) sign
 
 compose :: UnionFind -> (Var, Maybe VarStatus) -> (Var, Maybe VarStatus) -> Bool -> UnionFind
 compose (UnionFind xs) (root, status1) (child, status2) sign =
@@ -121,16 +120,16 @@ compose (UnionFind xs) (root, status1) (child, status2) sign =
             IntMap.insert child (IsChildOf root sign) xs
       (Just (IsChildOf anotherRoot sign'), Nothing) -> relate (UnionFind xs) anotherRoot child (sign == sign')
       (Just (IsRoot same1 opposite1), Just (IsRoot same2 opposite2)) ->
-          let childrenOfChildRemoved = IntMap.withoutKeys (IntMap.withoutKeys xs opposite2) same2
-              childrenOfChildUpdated = IntMap.fromSet (const (IsChildOf root sign)) same2 <> IntMap.fromSet (const (IsChildOf root (not sign))) opposite2 <> childrenOfChildRemoved
-           in UnionFind
-                $ IntMap.insert
-                  root
-                  ( if sign
-                      then IsRoot (IntSet.insert child (same1 <> same2)) (opposite1 <> opposite2)
-                      else IsRoot (same1 <> opposite2) (IntSet.insert child (opposite1 <> same2))
-                  )
-                $ IntMap.insert child (IsChildOf root sign) childrenOfChildUpdated
+        let childrenOfChildRemoved = IntMap.withoutKeys (IntMap.withoutKeys xs opposite2) same2
+            childrenOfChildUpdated = IntMap.fromSet (const (IsChildOf root sign)) same2 <> IntMap.fromSet (const (IsChildOf root (not sign))) opposite2 <> childrenOfChildRemoved
+         in UnionFind
+              $ IntMap.insert
+                root
+                ( if sign
+                    then IsRoot (IntSet.insert child (same1 <> same2)) (opposite1 <> opposite2)
+                    else IsRoot (same1 <> opposite2) (IntSet.insert child (opposite1 <> same2))
+                )
+              $ IntMap.insert child (IsChildOf root sign) childrenOfChildUpdated
       (Just (IsRoot same1 opposite1), Just (IsChildOf anotherRoot2 sign2)) ->
         case root `compare` anotherRoot2 of
           LT -> compose (UnionFind xs) (root, Just (IsRoot same1 opposite1)) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (sign == sign2)
