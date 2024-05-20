@@ -94,7 +94,7 @@ data Stage
   | Solved
       ( IntMap Bool, -- assignments of variables
         IntMap (IntSet, IntSet), -- equivelent classes of variables
-        Set (Bool, IntSet) -- equations with more than 2 variable (summed to 0 or 1)
+        Set (Bool, IntSet) -- relations with more than 2 variable (summed to 0 or 1)
       )
 
 solve :: Stage -> Stage
@@ -122,14 +122,14 @@ solve (Solving constant coeffs state) =
               -- var1 + var2 == remainder
               solve $
                 Solving constant' coeffs' (relate var1 var2 (not remainder) state)
-            _ -> solve $ solve $ Solving constant' coeffs' (addEquation remainder vars state)
+            _ -> solve $ solve $ Solving constant' coeffs' (addPolyB (PolyB vars remainder) state)
 
 --------------------------------------------------------------------------------
 
 data State
   = State
       UnionFind -- UnionFind: for unary relation (variable assignment) and binary relation (variable equivalence)
-      (Set (Bool, IntSet)) -- equation pool: for relations with more than 2 variables, summed to 0 or 1
+      (Set PolyB) -- other relations: for relations with more than 2 variables, summed to 0 or 1
   deriving (Eq, Show)
 
 empty :: State
@@ -137,68 +137,52 @@ empty = State UnionFind.empty mempty
 
 -- | Assign a variable to a value in the state
 assign :: Var -> Bool -> State -> State
-assign var val (State uf eqs) = State (UnionFind.assign uf var val) (assignOnEquations var val eqs)
+assign var val (State uf rels) = State (UnionFind.assign uf var val) (assignOnRelations var val rels)
 
--- | Assign a variable to a value in the equation pool
-assignOnEquations :: Var -> Bool -> Set (Bool, IntSet) -> Set (Bool, IntSet)
-assignOnEquations var val = Set.map $ \(summedToOne, equation) ->
-  if var `IntSet.member` equation
-    then (if val then not summedToOne else summedToOne, IntSet.delete var equation)
-    else (summedToOne, equation)
+-- | Assign a variable to a value in the relation pool
+assignOnRelations :: Var -> Bool -> Set PolyB -> Set PolyB
+assignOnRelations var val = Set.map $ \(PolyB vars parity) ->
+  if var `IntSet.member` vars
+    then PolyB (IntSet.delete var vars) (if val then not parity else parity)
+    else PolyB vars parity
 
 -- | Relate two variables in the state
 relate :: Var -> Var -> Bool -> State -> State
-relate var1 var2 sameSign (State uf eqs) = State (UnionFind.relate uf var1 var2 sameSign) (relateOnEquations var1 var2 sameSign eqs)
+relate var1 var2 sameSign (State uf rels) = State (UnionFind.relate uf var1 var2 sameSign) (relateOnRelations var1 var2 sameSign rels)
 
--- | Relate two variables in the equation pool
-relateOnEquations :: Var -> Var -> Bool -> Set (Bool, IntSet) -> Set (Bool, IntSet)
-relateOnEquations var1 var2 sameSign =
+-- | Relate two variables in the relation pool
+relateOnRelations :: Var -> Var -> Bool -> Set PolyB -> Set PolyB
+relateOnRelations var1 var2 sameSign =
   if var1 == var2
     then id -- no-op
     else
       let (root, child) = (var1 `min` var2, var1 `max` var2)
-       in Set.map $ \(summedToOne, equation) ->
-            if child `IntSet.member` equation
+       in Set.map $ \(PolyB vars parity) ->
+            if child `IntSet.member` vars
               then
-                if root `IntSet.member` equation
+                if root `IntSet.member` vars
                   then
                     if sameSign
                       then -- child + root = 0
-                        (summedToOne, IntSet.delete child $ IntSet.delete root equation)
+                        PolyB (IntSet.delete child $ IntSet.delete root vars) parity
                       else -- child + root = 1
-                        (not summedToOne, IntSet.delete child $ IntSet.delete root equation)
+                        PolyB (IntSet.delete child $ IntSet.delete root vars) (not parity)
                   else
                     if sameSign
                       then -- child = root
-                        (summedToOne, IntSet.insert root $ IntSet.delete child equation)
+                        PolyB (IntSet.insert root $ IntSet.delete child vars) parity
                       else -- child = root + 1
-                        (not summedToOne, IntSet.insert root $ IntSet.delete child equation)
-              else (summedToOne, equation) -- no-op
+                        PolyB (IntSet.insert root $ IntSet.delete child vars) (not parity)
+              else PolyB vars parity -- no-op
 
-addEquation :: Bool -> IntSet -> State -> State
-addEquation summedToOne equation (State uf eqs) =
-  let (summedToOne', equation') = substEquation uf (summedToOne, equation)
-   in case IntSet.toList equation' of
-        [] -> State uf eqs
-        [var] -> assign var summedToOne' (State uf eqs)
-        [var1, var2] -> relate var1 var2 (not summedToOne') (State uf eqs)
-        _ -> State uf $ Set.insert (summedToOne', equation') eqs
-
-substEquation :: UnionFind -> (Bool, IntSet) -> (Bool, IntSet)
-substEquation uf (b, e) = IntSet.fold step (b, mempty) e
-  where
-    step var (summedToOne, equation) =
-      case UnionFind.lookup uf var of
-        Nothing -> (summedToOne, IntSet.insert var equation)
-        Just (UnionFind.Constant val) -> (if val then not summedToOne else summedToOne, equation)
-        Just UnionFind.Root ->
-          if var `IntSet.member` equation
-            then (summedToOne, IntSet.delete var equation)
-            else (summedToOne, IntSet.insert var equation)
-        Just (UnionFind.ChildOf root sameSign) ->
-          if root `IntSet.member` equation
-            then (if sameSign then summedToOne else not summedToOne, IntSet.delete root equation)
-            else (if sameSign then summedToOne else not summedToOne, IntSet.insert root equation)
+addPolyB :: PolyB -> State -> State
+addPolyB poly (State uf rels) =
+  let PolyB vars parity = substPolyB uf poly
+   in case IntSet.toList vars of
+        [] -> State uf rels
+        [var] -> assign var parity (State uf rels)
+        [var1, var2] -> relate var1 var2 (not parity) (State uf rels)
+        _ -> State uf $ Set.insert (PolyB vars parity) rels
 
 -- Nothing -> IntSet.insert var equation
 
@@ -208,6 +192,34 @@ export ::
     IntMap (IntSet, IntSet), -- equivelent classes of variables
     Set (Bool, IntSet) -- equations with more than 2 variable (summed to 0 or 1)
   )
-export (State uf eqs) =
+export (State uf rels) =
   let (assignments, eqClasses) = UnionFind.export uf
-   in (assignments, eqClasses, Set.filter ((> 2) . IntSet.size . snd) eqs)
+   in (assignments, eqClasses, Set.map fromPolyB $ Set.filter ((> 2) . polyBSize) rels)
+
+--------------------------------------------------------------------------------
+
+-- | Binary field polynomial
+data PolyB = PolyB IntSet Bool
+  deriving (Eq, Ord, Show)
+
+fromPolyB :: PolyB -> (Bool, IntSet)
+fromPolyB (PolyB vars parity) = (parity, vars)
+
+polyBSize :: PolyB -> Int
+polyBSize (PolyB vars _) = IntSet.size vars
+
+substPolyB :: UnionFind -> PolyB -> PolyB
+substPolyB uf (PolyB e b) = IntSet.fold step (PolyB mempty b) e
+  where
+    step var (PolyB vars parity) =
+      case UnionFind.lookup uf var of
+        Nothing -> PolyB (IntSet.insert var vars) parity
+        Just (UnionFind.Constant val) -> PolyB vars (if val then not parity else parity)
+        Just UnionFind.Root ->
+          if var `IntSet.member` vars
+            then PolyB (IntSet.delete var vars) (not parity)
+            else PolyB (IntSet.insert var vars) parity
+        Just (UnionFind.ChildOf root sameSign) ->
+          if root `IntSet.member` vars
+            then PolyB (IntSet.delete root vars) (if sameSign then not parity else parity)
+            else PolyB (IntSet.insert root vars) (if sameSign then parity else not parity)
