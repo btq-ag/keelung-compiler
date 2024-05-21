@@ -14,6 +14,7 @@ tests :: SpecWith ()
 tests = do
   describe "Witness Solver" $ do
     Solver.BinRep.tests
+    Solver.BinRep.tests
 
     describe "`generateWitness" $ do
       it "`generateWitness` 1" $ do

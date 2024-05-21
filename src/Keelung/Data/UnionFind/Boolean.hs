@@ -62,8 +62,8 @@ lookup (UnionFind xs) var = case IntMap.lookup var xs of
   Just (IsChildOf root sign) -> Just (ChildOf root sign)
 
 -- | Export the UnionFind data structure to assignements and relations.
-export :: UnionFind -> (IntMap Bool, IntMap (IntSet, IntSet))
-export (UnionFind xs) = (IntMap.mapMaybe f xs, IntMap.mapMaybe g xs)
+export :: UnionFind -> (IntMap Bool, [(IntSet, IntSet)])
+export (UnionFind xs) = (IntMap.mapMaybe f xs, map (\(k, (ys, zs)) -> (IntSet.insert k ys, zs)) (IntMap.toList (IntMap.mapMaybe g xs)))
   where
     f (IsConstant b) = Just b
     f _ = Nothing

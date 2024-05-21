@@ -61,9 +61,9 @@ run polynomial =
         Solved result -> Just result
 
 data Result = Result
-  { resultAssigmnet :: IntMap Bool,
-    resultEquivClass :: IntMap (IntSet, IntSet),
-    resultRelations :: [(Bool, IntSet)]
+  { resultAssigmnet :: IntMap Bool, -- learned variable assignments
+    resultEquivClass :: [(IntSet, IntSet)], -- learned variable equivalence classes, variables of the same class but with different signs are placed in different part of the pair
+    resultRelations :: [(Bool, IntSet)] -- boolean polynomials, [(parity, variables)]
   }
   deriving (Eq, Show)
 
