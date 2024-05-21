@@ -1,6 +1,6 @@
 -- | Specialized solver for addative constraints on binary fields.
 --   Intended to be qualified as `Binary`
-module Keelung.Solver.Binary (run) where
+module Keelung.Solver.Binary (run, Result (..)) where
 
 import Data.Bits qualified
 import Data.Either qualified as Either
@@ -9,8 +9,6 @@ import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Data.Set (Set)
-import Data.Set qualified as Set
 import Keelung (Var)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
@@ -50,9 +48,7 @@ import Keelung.Data.UnionFind.Boolean qualified as UnionFind
 --              A + B + C = 0
 --              C = 0
 --          4. learned facts: A = B, C = 0
---
---   TODO: return equivelent classes of variables instead of just polynomials
-run :: (GaloisField n, Integral n) => Poly n -> Maybe (IntMap Bool, IntMap (IntSet, IntSet), Set (Bool, IntSet))
+run :: (GaloisField n, Integral n) => Poly n -> Maybe Result
 run polynomial =
   let initStage =
         Solving
@@ -63,6 +59,13 @@ run polynomial =
         Solving {} -> error "[ panic ] Solver: Impossible"
         Failed -> Nothing
         Solved result -> Just result
+
+data Result = Result
+  { resultAssigmnet :: IntMap Bool,
+    resultEquivClass :: IntMap (IntSet, IntSet),
+    resultRelations :: [(Bool, IntSet)]
+  }
+  deriving (Eq, Show)
 
 -- | Coefficients are represented as a map from variable to Integer coefficient.
 type Coefficients = IntMap Integer
@@ -92,11 +95,7 @@ data Stage
       Coefficients -- coefficients of the polynomial
       State
   | Failed
-  | Solved
-      ( IntMap Bool, -- assignments of variables
-        IntMap (IntSet, IntSet), -- equivelent classes of variables
-        Set (Bool, IntSet) -- relations with more than 2 variable (summed to 0 or 1)
-      )
+  | Solved Result
 
 solve :: Stage -> Stage
 solve Failed = Failed
@@ -119,43 +118,38 @@ solve (Solving constant coeffs state) =
               -- trace ("\n$" <> show var <> " := " <> show remainder) $
               --   traceShow state $
               --     traceShow (assign var remainder state) $
-                    -- var == remainder
-                    solve $
-                      Solving constant' coeffs' (assign var remainder state)
+              -- var == remainder
+              solve $
+                Solving constant' coeffs' (assign var remainder state)
             [var1, var2] ->
               -- trace ("\n$" <> show var1 <> " == " <> (if not remainder then "" else "-") <> "$" <> show var2) $
               --   traceShow state $
               --     traceShow (relate var1 var2 (not remainder) state) $
-                    -- var1 + var2 == remainder
-                    solve $
-                      Solving constant' coeffs' (relate var1 var2 (not remainder) state)
+              -- var1 + var2 == remainder
+              solve $
+                Solving constant' coeffs' (relate var1 var2 (not remainder) state)
             _ ->
               -- trace ("\n+ " <> show (PolyB vars remainder)) $
               --   traceShow state $
               --   traceShow (insert (PolyB vars remainder) state) $
-                  solve $
-                    Solving constant' coeffs' (insert (PolyB vars remainder) state)
+              solve $
+                Solving constant' coeffs' (insert (PolyB vars remainder) state)
 
 --------------------------------------------------------------------------------
 
 data State
   = State
       UnionFind -- UnionFind: for unary relation (variable assignment) and binary relation (variable equivalence)
-      (Set PolyB) -- other relations: for relations with more than 2 variables, summed to 0 or 1
+      [PolyB] -- other relations: for relations with more than 2 variables, summed to 0 or 1
   deriving (Eq, Show)
 
 empty :: State
 empty = State UnionFind.empty mempty
 
-export ::
-  State ->
-  ( IntMap Bool, -- assignments of variables
-    IntMap (IntSet, IntSet), -- equivelent classes of variables
-    Set (Bool, IntSet) -- equations with more than 2 variable (summed to 0 or 1)
-  )
+export :: State -> Result
 export (State uf rels) =
   let (assignments, eqClasses) = UnionFind.export uf
-   in (assignments, eqClasses, Set.map fromPolyB $ Set.filter ((> 0) . polyBSize) rels)
+   in Result assignments eqClasses (map fromPolyB $ filter ((> 0) . polyBSize) rels)
 
 --------------------------------------------------------------------------------
 
@@ -226,7 +220,7 @@ updatePool uf = foldr step (mempty, [])
 -- | Apply actions on the relation pool until there is no more actions to apply.
 --   Finds the fixed point of `updatePool . updateUnionFind`
 applyActionsUntilThereIsNone :: UnionFind -> ([PolyB], [Action]) -> State
-applyActionsUntilThereIsNone uf (pool, []) = State uf (Set.fromList pool)
+applyActionsUntilThereIsNone uf (pool, []) = State uf pool
 applyActionsUntilThereIsNone uf (pool, actions) =
   let uf' = updateUnionFind uf actions
    in applyActionsUntilThereIsNone uf' (updatePool uf' pool)
@@ -240,23 +234,23 @@ relate var1 var2 sameSign (State uf pool) =
 
       let (root, child) = (var1 `min` var2, var1 `max` var2)
           uf' = UnionFind.relate uf root child sameSign
-          poolResult = Either.partitionEithers $ map (relatePolyB root child sameSign) (Set.toList pool)
+          poolResult = Either.partitionEithers $ map (relatePolyB root child sameSign) pool
        in applyActionsUntilThereIsNone uf' poolResult
 
 assign :: Var -> Bool -> State -> State
 assign var val (State uf pool) =
   let uf' = UnionFind.assign uf var val
-      poolResult = Either.partitionEithers $ map (assignPolyB var val) (Set.toList pool)
+      poolResult = Either.partitionEithers $ map (assignPolyB var val) pool
    in applyActionsUntilThereIsNone uf' poolResult
 
 insert :: PolyB -> State -> State
 insert poly (State uf pool) =
-  let poly' =  insertPolyB poly
+  let poly' = insertPolyB poly
    in if nullPoly poly'
         then State uf pool -- no-op
         else case toAction poly' of
-          Left poly'' -> State uf (Set.insert poly'' pool)
-          Right action -> applyActionsUntilThereIsNone uf (Set.toList pool, [action])
+          Left poly'' -> State uf (poly'' : pool)
+          Right action -> applyActionsUntilThereIsNone uf (pool, [action])
   where
     insertPolyB :: PolyB -> PolyB
     insertPolyB (PolyB e b) = IntSet.fold step (PolyB mempty b) e
