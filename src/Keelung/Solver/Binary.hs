@@ -9,6 +9,7 @@ import Data.IntMap (IntMap)
 import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
+import Debug.Trace
 import Keelung (Var)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
@@ -115,25 +116,25 @@ solve (Solving constant coeffs state) =
                 then Failed -- 1 = 0
                 else solve $ Solving constant' coeffs' state -- no-op
             [var] ->
-              -- trace ("\n$" <> show var <> " := " <> show remainder) $
-              --   traceShow state $
-              --     traceShow (assign var remainder state) $
-              -- var == remainder
-              solve $
-                Solving constant' coeffs' (assign var remainder state)
+              trace ("\n$" <> show var <> " := " <> show remainder) $
+                traceShow state $
+                  traceShow (assign var remainder state) $
+                    -- var == remainder
+                    solve $
+                      Solving constant' coeffs' (assign var remainder state)
             [var1, var2] ->
-              -- trace ("\n$" <> show var1 <> " == " <> (if not remainder then "" else "-") <> "$" <> show var2) $
-              --   traceShow state $
-              --     traceShow (relate var1 var2 (not remainder) state) $
-              -- var1 + var2 == remainder
-              solve $
-                Solving constant' coeffs' (relate var1 var2 (not remainder) state)
+              trace ("\n$" <> show var1 <> " == " <> (if not remainder then "" else "-") <> "$" <> show var2) $
+                traceShow state $
+                  traceShow (relate var1 var2 (not remainder) state) $
+                    -- var1 + var2 == remainder
+                    solve $
+                      Solving constant' coeffs' (relate var1 var2 (not remainder) state)
             _ ->
-              -- trace ("\n+ " <> show (PolyB vars remainder)) $
-              --   traceShow state $
-              --   traceShow (insert (PolyB vars remainder) state) $
-              solve $
-                Solving constant' coeffs' (insert (PolyB vars remainder) state)
+              trace ("\n+ " <> show (PolyB vars remainder)) $
+                traceShow state $
+                  traceShow (insert (PolyB vars remainder) state) $
+                    solve $
+                      Solving constant' coeffs' (insert (PolyB vars remainder) state)
 
 --------------------------------------------------------------------------------
 
@@ -163,20 +164,18 @@ fromPolyB (PolyB vars parity) = (parity, vars)
 polyBSize :: PolyB -> Int
 polyBSize (PolyB vars _) = IntSet.size vars
 
-nullPoly :: PolyB -> Bool
-nullPoly (PolyB vars _) = IntSet.null vars
-
 substPolyB :: UnionFind -> PolyB -> PolyB
-substPolyB uf (PolyB e b) =
-  IntSet.fold step (PolyB mempty b) e
+substPolyB uf (PolyB e b) = trace (show (PolyB e b) <> " ==> " <> show (IntSet.fold step (PolyB mempty b) e)) $
+  IntSet.fold (\var acc -> trace (show acc <> " -- $"<> show var <> " -> " <> show (step var acc)) $ step var acc) (PolyB mempty b) e
   where
     step var (PolyB vars parity) =
       case UnionFind.lookup uf var of
         Nothing -> PolyB (IntSet.insert var vars) parity
         Just (UnionFind.Constant val) -> PolyB vars (if val then not parity else parity)
         Just UnionFind.Root ->
+          traceShow ("ROOT", var)$ 
           if var `IntSet.member` vars
-            then PolyB (IntSet.delete var vars) (not parity)
+            then PolyB (IntSet.delete var vars) parity
             else PolyB (IntSet.insert var vars) parity
         Just (UnionFind.ChildOf root sameSign) ->
           if root `IntSet.member` vars
@@ -188,6 +187,7 @@ substPolyB uf (PolyB e b) =
 data Action
   = Assign Var Bool -- variable assignment
   | Relate Var Var Bool -- variable equivalence
+  | NoOp -- no-op
   deriving (Eq, Ord, Show)
 
 -- | If a PolyB has only 1 variable, convert it to an assignment.
@@ -196,7 +196,7 @@ data Action
 toAction :: PolyB -> Either PolyB Action
 toAction (PolyB vars parity) =
   case IntSet.toList vars of
-    [] -> error "[ panic ] Solver: Impossible"
+    [] -> Right NoOp
     [var] -> Right (Assign var parity)
     [var1, var2] -> Right (Relate var1 var2 (not parity))
     _ -> Left (PolyB vars parity)
@@ -207,6 +207,7 @@ updateUnionFind = foldr step
   where
     step (Assign var val) xs = UnionFind.assign xs var val
     step (Relate var1 var2 sameSign) xs = UnionFind.relate xs var1 var2 sameSign
+    step NoOp xs = xs
 
 -- | Given a pool of relations, derive actions from them.
 updatePool :: UnionFind -> [PolyB] -> ([PolyB], [Action])
@@ -237,20 +238,20 @@ relate var1 var2 sameSign (State uf pool) =
           poolResult = Either.partitionEithers $ map (relatePolyB root child sameSign) pool
        in applyActionsUntilThereIsNone uf' poolResult
 
+-- | Assign a variable to a value in the state
 assign :: Var -> Bool -> State -> State
 assign var val (State uf pool) =
   let uf' = UnionFind.assign uf var val
       poolResult = Either.partitionEithers $ map (assignPolyB var val) pool
    in applyActionsUntilThereIsNone uf' poolResult
 
+-- | Insert a binary polynomial into the state
 insert :: PolyB -> State -> State
 insert poly (State uf pool) =
   let poly' = insertPolyB poly
-   in if nullPoly poly'
-        then State uf pool -- no-op
-        else case toAction poly' of
-          Left poly'' -> State uf (poly'' : pool)
-          Right action -> applyActionsUntilThereIsNone uf (pool, [action])
+   in case toAction poly' of
+        Left poly'' -> State uf (poly'' : pool)
+        Right action -> applyActionsUntilThereIsNone uf (pool, [action])
   where
     insertPolyB :: PolyB -> PolyB
     insertPolyB (PolyB e b) = IntSet.fold step (PolyB mempty b) e
