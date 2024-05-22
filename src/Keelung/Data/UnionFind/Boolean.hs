@@ -26,7 +26,6 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Debug.Trace
 import Keelung (Var)
 import Prelude hiding (lookup)
 
@@ -132,15 +131,15 @@ compose (UnionFind xs) (root, status1) (child, status2) sign =
                 )
               $ IntMap.insert child (IsChildOf root sign) childrenOfChildUpdated
       (Just (IsRoot same1 opposite1), Just (IsChildOf anotherRoot2 sign2)) ->
-        case root `compare` anotherRoot2 of
+        case child `compare` anotherRoot2 of
           LT -> compose (UnionFind xs) (root, Just (IsRoot same1 opposite1)) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (sign == sign2)
           EQ -> UnionFind xs
           GT -> compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (root, Just (IsRoot same1 opposite1)) (sign == sign2)
       (Just (IsChildOf anotherRoot1 sign1), Just (IsRoot same2 opposite2)) ->
-        case root `compare` anotherRoot1 of
-          LT -> compose (UnionFind xs) (root, Just (IsRoot same2 opposite2)) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (sign == sign1)
+        case child `compare` anotherRoot1 of
+          LT -> compose (UnionFind xs) (child, Just (IsRoot same2 opposite2)) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (sign == sign1)
           EQ -> UnionFind xs
-          GT -> compose (UnionFind xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (root, Just (IsRoot same2 opposite2)) (sign == sign1)
+          GT -> compose (UnionFind xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (child, Just (IsRoot same2 opposite2)) (sign == sign1)
       (Just (IsChildOf anotherRoot1 sign1), Just (IsChildOf anotherRoot2 sign2)) ->
         if anotherRoot1 < anotherRoot2
           then compose (UnionFind xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) ((sign1 == sign2) == sign)
