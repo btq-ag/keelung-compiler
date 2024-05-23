@@ -2,6 +2,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Redundant return" #-}
 
 module Test.Solver.Binary (tests, run) where
 
@@ -27,22 +29,22 @@ tests = describe "Binary" $ do
   -- describe "satisfiable" $ do
   --   it "test" $ do
   --     -- Satisfiable B 0b1110001 + B 0b10111111$0 + B 0b111111$1 + B 0b11100101$2 + B 0b10010100$3 + B 0b1001110$4 (fromList [(0,False),(1,False),(2,True),(3,True),(4,False)])
-
   --     let polynomial = case Poly.buildEither 0b1110001 [(0, 0b10111111), (1, 0b111111), (2, 0b11100101), (3, 0b10010100), (4, 0b1001110)] of
   --           Left _ -> error "Poly.buildEither"
   --           Right p -> p :: Poly (Binary 283)
   --         assignments = IntMap.fromList [(0, False), (1, False), (2, True), (3, True), (4, False)]
   --     let actual = Binary.run polynomial
+  --     print actual
   --     case actual of
   --       Nothing -> fail "No solution found"
   --       Just result -> satisfies assignments result `shouldBe` True
 
--- it "Binary 283" $ do
---   property $ \(Satisfiable polynomial assignments) -> do
---     let actual = Binary.run (polynomial :: Poly (Binary 283))
---     case actual of
---       Nothing -> fail "No solution found"
---       Just result -> satisfies assignments result `shouldBe` True
+  it "Binary 283" $ do
+    property $ \(Satisfiable polynomial assignments) -> do
+      let actual = Binary.run (polynomial :: Poly (Binary 283))
+      case actual of
+        Nothing -> fail "No solution found"
+        Just result -> satisfies assignments result `shouldBe` True
 
 -- describe "other cases" $ do
 --   it "$0 = 0" $ do
@@ -142,8 +144,8 @@ satisfies expected (Binary.Result actual equivClass relations) =
           | IntSet.member var oppositeSign = Just (oppositeSign, sameSign)
           | otherwise = Nothing
 
-    satisfiesRelation :: IntMap Bool -> (Bool, IntSet) -> Bool
-    satisfiesRelation xs (parity, vars) =
+    satisfiesRelation :: IntMap Bool -> Binary.PolyB -> Bool
+    satisfiesRelation xs (Binary.PolyB vars parity) =
       parity
         == foldr
           ( \var acc -> case IntMap.lookup var xs of

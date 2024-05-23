@@ -1,6 +1,6 @@
 -- | Specialized solver for addative constraints on binary fields.
 --   Intended to be qualified as `Binary`
-module Keelung.Solver.Binary (run, Result (..)) where
+module Keelung.Solver.Binary (run, Result (..), PolyB (..)) where
 
 import Control.Monad ((<=<))
 import Data.Bits qualified
@@ -65,7 +65,7 @@ run polynomial =
 data Result = Result
   { resultAssigmnet :: IntMap Bool, -- learned variable assignments
     resultEquivClass :: [(IntSet, IntSet)], -- learned variable equivalence classes, variables of the same class but with different signs are placed in different part of the pair
-    resultRelations :: [(Bool, IntSet)] -- boolean polynomials, [(parity, variables)]
+    resultRelations :: [PolyB] -- boolean polynomials, [(parity, variables)]
   }
   deriving (Eq, Show)
 
@@ -151,7 +151,7 @@ empty = State UnionFind.empty mempty
 export :: State -> Result
 export (State uf rels) =
   let (assignments, eqClasses) = UnionFind.export uf
-   in Result assignments eqClasses (map fromPolyB $ filter ((> 0) . polyBSize) rels)
+   in Result assignments eqClasses (filter ((> 0) . polyBSize) rels)
 
 --------------------------------------------------------------------------------
 
@@ -164,9 +164,6 @@ instance Show PolyB where
     if IntSet.null vars
       then "0"
       else List.intercalate " + " (map (("$" <>) . show) (IntSet.toList vars)) <> " = " <> (if parity then "1" else "0")
-
-fromPolyB :: PolyB -> (Bool, IntSet)
-fromPolyB (PolyB vars parity) = (parity, vars)
 
 polyBSize :: PolyB -> Int
 polyBSize (PolyB vars _) = IntSet.size vars
@@ -221,12 +218,7 @@ updateUnionFind = foldr step
 
 -- | Given a pool of relations, derive actions from them.
 updatePool :: UnionFind -> [PolyB] -> ([Action], [PolyB])
-updatePool uf = foldr step (mempty, mempty)
-  where
-    step poly (actions, pool) =
-      case substPolyB uf poly of
-        Right poly' -> (actions, poly' : pool)
-        Left action -> (action : actions, pool)
+updatePool uf = Either.partitionEithers . map (substPolyB uf)
 
 -- | Apply actions on the relation pool until there is no more actions to apply.
 --   Finds the fixed point of `updatePool . updateUnionFind`
@@ -257,27 +249,9 @@ assign var val (State uf pool) =
 
 -- | Insert a binary polynomial into the state
 insert :: PolyB -> State -> State
-insert poly (State uf pool) =
-  let poly' = insertPolyB poly
-   in case toAction poly' of
-        Right poly'' -> State uf (poly'' : pool)
-        Left action -> applyActionsUntilThereIsNone uf ([action], pool)
-  where
-    insertPolyB :: PolyB -> PolyB
-    insertPolyB (PolyB e b) = IntSet.fold step (PolyB mempty b) e
-      where
-        step var (PolyB vars parity) =
-          case UnionFind.lookup uf var of
-            Nothing -> PolyB (IntSet.insert var vars) parity
-            Just (UnionFind.Constant val) -> PolyB vars (if val then not parity else parity)
-            Just UnionFind.Root ->
-              if var `IntSet.member` vars
-                then PolyB (IntSet.delete var vars) parity
-                else PolyB (IntSet.insert var vars) parity
-            Just (UnionFind.ChildOf root sameSign) ->
-              if root `IntSet.member` vars
-                then PolyB (IntSet.delete root vars) (if sameSign then parity else not parity)
-                else PolyB (IntSet.insert root vars) (if sameSign then parity else not parity)
+insert poly (State uf pool) = case substPolyB uf poly of
+  Right poly'' -> State uf (poly'' : pool)
+  Left action -> applyActionsUntilThereIsNone uf ([action], pool)
 
 -- | Relate two variables in a binary polynomial, return either the updated polynomial or an action
 relatePolyB :: Var -> Var -> Bool -> PolyB -> Either Action PolyB
@@ -305,3 +279,5 @@ assignPolyB var val (PolyB vars parity) =
   if var `IntSet.member` vars
     then toAction (PolyB (IntSet.delete var vars) (if val then not parity else parity))
     else Right (PolyB vars parity) -- no-op
+
+--------------------------------------------------------------------------------
