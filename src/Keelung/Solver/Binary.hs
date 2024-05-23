@@ -11,6 +11,7 @@ import Data.IntMap qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.List qualified as List
+import Data.Maybe qualified as Maybe
 import Keelung (Var)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
@@ -142,16 +143,16 @@ solve (Solving constant coeffs state) =
 data State
   = State
       UnionFind -- UnionFind: for unary relation (variable assignment) and binary relation (variable equivalence)
-      [PolyB] -- other relations: for relations with more than 2 variables, summed to 0 or 1
+      Pool -- other relations: for relations with more than 2 variables, summed to 0 or 1
   deriving (Eq, Show)
 
 empty :: State
 empty = State UnionFind.empty mempty
 
 export :: State -> Result
-export (State uf rels) =
+export (State uf pool) =
   let (assignments, eqClasses) = UnionFind.export uf
-   in Result assignments eqClasses (filter ((> 0) . polyBSize) rels)
+   in Result assignments eqClasses (exportPool pool)
 
 --------------------------------------------------------------------------------
 
@@ -250,7 +251,7 @@ assign var val (State uf pool) =
 -- | Insert a binary polynomial into the state
 insert :: PolyB -> State -> State
 insert poly (State uf pool) = case substPolyB uf poly of
-  Right poly'' -> State uf (poly'' : pool)
+  Right poly'' -> applyActionsUntilThereIsNone uf (insertPool pool poly'')
   Left action -> applyActionsUntilThereIsNone uf ([action], pool)
 
 -- | Relate two variables in a binary polynomial, return either the updated polynomial or an action
@@ -281,3 +282,24 @@ assignPolyB var val (PolyB vars parity) =
     else Right (PolyB vars parity) -- no-op
 
 --------------------------------------------------------------------------------
+
+-- | For managing relations with more than 2 variables. (Relations with 1 or 2 variables are handled by the UnionFind)
+type Pool = [PolyB]
+
+-- | Insert a binary polynomial into the pool
+--   Compare the polynomial with the existing ones, and derive actions from them.
+--   Actions are generated when the inserted polynomial has a edit distance of 1 or 2 with the existing ones.
+insertPool :: Pool -> PolyB -> ([Action], Pool)
+insertPool pool poly = (Maybe.mapMaybe (calculateAction poly) pool, poly : pool)
+  where
+    calculateAction :: PolyB -> PolyB -> Maybe Action
+    calculateAction (PolyB vars1 parity1) (PolyB vars2 parity2) =
+      let diff = IntSet.difference vars1 vars2 <> IntSet.difference vars2 vars1
+       in case IntSet.toList diff of
+            [] -> Nothing -- `poly` already exists in the pool
+            [var] -> Just $ Assign var (parity1 /= parity2)
+            [var1, var2] -> Just $ Relate var1 var2 (parity1 == parity2)
+            _ -> Nothing
+
+exportPool :: Pool -> [PolyB]
+exportPool = filter ((> 2) . polyBSize)
