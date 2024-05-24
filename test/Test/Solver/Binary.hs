@@ -1,9 +1,12 @@
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
 {-# HLINT ignore "Redundant return" #-}
+{-# HLINT ignore "Use list comprehension" #-}
+{-# HLINT ignore "Redundant if" #-}
 
 module Test.Solver.Binary (tests, run) where
 
@@ -19,22 +22,25 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Solver.Binary qualified as Binary
 import Test.Hspec
 import Test.QuickCheck
-import Debug.Trace
 
 run :: IO ()
 run = hspec tests
 
--- Satisfiable B 0b11111000 + B 0b11111000$0 + B 0b10001010$1 + B 0b11111000$2 + B 0b11111000$3 + B 0b10100000$4 (fromList [(0,True),(1,False),(2,False),(3,False),(4,False)])
 tests :: SpecWith ()
 tests = describe "Binary" $ do
   describe "satisfiable" $ do
     return ()
     -- it "test" $ do
-    --   -- Satisfiable B 0b10101011 + B 0b110$0 + B 0b101011$1 + B 0b1101100$2 + B 0b11111111$3 + B 0b111000$4 + B 0b1010010$5 (fromList [(0,True),(1,False),(2,False),(3,True),(4,False),(5,True)])
-    --   let polynomial = case Poly.buildEither 0b10101011 [(0, 0b110), (1, 0b101011), (2, 0b1101100), (3, 0b11111111), (4, 0b111000), (5, 0b1010010)] of
+    --   -- Satisfiable B 0b11111000 + B 0b11111000$0 + B 0b10001010$1 + B 0b11111000$2 + B 0b11111000$3 + B 0b10100000$4 (fromList [(0,True),(1,False),(2,False),(3,False),(4,False)])
+    --   --                 11111000
+    --   --                 10001010
+    --   --                 11111000
+    --   --                 11111000
+    --   --                 10100000
+    --   let polynomial = case Poly.buildEither 0b11111000 [(0, 0b11111000), (1, 0b10001010), (2, 0b11111000), (3, 0b11111000), (4, 0b10100000)] of
     --         Left _ -> error "Poly.buildEither"
     --         Right p -> p :: Poly (Binary 283)
-    --       assignments = IntMap.fromList [(0, True), (1, False), (2, False), (3, True), (4, False), (5, True)]
+    --       assignments = IntMap.fromList [(0, True), (1, False), (2, False), (3, False), (4, False)]
     --   let actual = Binary.run polynomial
     --   print assignments
     --   print actual
@@ -42,67 +48,18 @@ tests = describe "Binary" $ do
     --     Nothing -> fail "No solution found"
     --     Just result -> satisfies assignments result `shouldBe` True
 
-    -- it "Binary 283" $ do
-    --   property $ \(Satisfiable polynomial assignments) -> do
-    --     let actual = Binary.run (polynomial :: Poly (Binary 283))
-    --     case actual of
-    --       Nothing -> fail "No solution found"
-    --       Just result -> satisfies assignments result `shouldBe` True
-
--- describe "other cases" $ do
---   it "$0 = 0" $ do
---     let polynomial = case Poly.buildEither 0 [(0, 1)] of
---           Left _ -> error "Poly.buildEither"
---           Right p -> p :: Poly (Binary 283)
---     let actual = Binary.run polynomial
---     let expected = Just $ Binary.Result (IntMap.fromList [(0, False)]) mempty mempty
---     actual `shouldBe` expected
-
---   it "$0 = 1" $ do
---     let polynomial = case Poly.buildEither 1 [(0, 1)] of
---           Left _ -> error "Poly.buildEither"
---           Right p -> p :: Poly (Binary 283)
---     let actual = Binary.run polynomial
---     let expected = Just $ Binary.Result (IntMap.fromList [(0, True)]) mempty mempty
---     actual `shouldBe` expected
-
---   it "$0 + 2$1 = 1" $ do
---     let polynomial = case Poly.buildEither 1 [(0, 1), (1, 2)] of
---           Left _ -> error "Poly.buildEither"
---           Right p -> p :: Poly (Binary 283)
---     let actual = Binary.run polynomial
---     let expected = Just $ Binary.Result (IntMap.fromList [(0, True), (1, False)]) mempty mempty
---     actual `shouldBe` expected
-
---   it "$0 + $1 = 1" $ do
---     let polynomial = case Poly.buildEither 1 [(0, 1), (1, 1)] of
---           Left _ -> error "Poly.buildEither"
---           Right p -> p :: Poly (Binary 283)
---     let actual = Binary.run polynomial
---     let expected = Just $ Binary.Result mempty [(IntSet.fromList [0], IntSet.fromList [1])] mempty
---     actual `shouldBe` expected
-
---   it "$0 + $1 = 2" $ do
---     let polynomial = case Poly.buildEither 2 [(0, 1), (1, 1)] of
---           Left _ -> error "Poly.buildEither"
---           Right p -> p :: Poly (Binary 283)
---     let actual = Binary.run polynomial
---     let expected = Nothing
---     actual `shouldBe` expected
-
---   it "$0 + $1 + 2$2 = 2" $ do
---     let polynomial = case Poly.buildEither 2 [(0, 1), (1, 1), (2, 2)] of
---           Left _ -> error "Poly.buildEither"
---           Right p -> p :: Poly (Binary 283)
---     let actual = Binary.run polynomial
---     let expected = Just $ Binary.Result (IntMap.fromList [(2, True)]) [(IntSet.fromList [0, 1], mempty)] mempty
---     actual `shouldBe` expected
+    it "Binary 283" $ do
+      property $ \(Satisfiable polynomial assignments) -> do
+        let actual = Binary.run (polynomial :: Poly (Binary 283))
+        case actual of
+          Nothing -> fail "No solution found"
+          Just result -> validate assignments result `shouldBe` []
 
 -------------------------------------------------------------------------------
 
 instance (GaloisField n, Arbitrary n) => Arbitrary (TestCase n) where
   arbitrary = do
-    numberOfTerms <- choose (1, 5)
+    numberOfTerms <- choose (1, 40)
     coefficients <- vectorOf numberOfTerms (arbitrary `suchThat` (> 0)) :: Gen [n]
 
     assignments <- vectorOf numberOfTerms arbitrary
@@ -115,18 +72,43 @@ instance (GaloisField n, Arbitrary n) => Arbitrary (TestCase n) where
 data TestCase n = Satisfiable (Poly n) (IntMap Bool)
   deriving (Show)
 
+data Error
+  = ConflictingAssignments (IntMap Bool) -- conflicting assignments
+  | EquivClassNotSatisfied (IntMap Bool) -- actual assignments
+  | RelationNotSatisfied
+      (IntMap Bool) -- expected assignments
+      (IntMap Bool) -- actual assignments
+      [Binary.PolyB] -- remaining relations
+  deriving (Eq)
+
+instance Show Error where
+  show (ConflictingAssignments assignments) = "Conflicts between the solved assignments and the expected answer: " <> show assignments
+  show (EquivClassNotSatisfied assignments) = "[ panic ] Solved assignments that conflicts with UnionFind: " <> show assignments
+  show (RelationNotSatisfied expected solved relations) =
+    "????:\n  expected assigmnents: "
+      <> show (IntMap.toList expected)
+      <> "\n  solved assignments:"
+      <> show (IntMap.toList solved)
+      <> "\n  remaining relations:"
+      <> show relations
+
 -- | An assignment satisfies the result if it's a model of the polynomial
-satisfies :: IntMap Bool -> Binary.Result -> Bool
-satisfies expected (Binary.Result actual equivClass relations) =
+validate :: IntMap Bool -> Binary.Result -> [Error]
+validate expected (Binary.Result actual equivClass _relations) =
   let difference = IntMap.difference expected actual <> IntMap.difference actual expected
       intersection = IntMap.intersectionWith (==) expected actual
-   in ( and intersection -- see if the intersected assignments are equal
-          && ( IntMap.null difference -- see if the difference is empty
-                 || ( satisfiesEquivClass difference -- see if the difference satisfies the equiv class
-                        && satisfiesRelations difference -- see if the difference satisfies the relations
-                    )
-             )
-      )
+   in if and intersection
+        then
+          if IntMap.null difference
+            then []
+            else
+              if satisfiesEquivClass difference
+                then []
+                else -- case unsatisfiedRelations difference of
+                -- [] -> []
+                -- unsatisfied -> [RelationNotSatisfied expected actual unsatisfied]
+                  [EquivClassNotSatisfied actual]
+        else [ConflictingAssignments difference]
   where
     satisfiesEquivClass :: IntMap Bool -> Bool
     satisfiesEquivClass = Maybe.isJust . IntMap.foldrWithKey step (Just IntMap.empty)
@@ -147,17 +129,20 @@ satisfies expected (Binary.Result actual equivClass relations) =
           | IntSet.member var oppositeSign = Just (oppositeSign, sameSign)
           | otherwise = Nothing
 
-    satisfiesRelation :: IntMap Bool -> Binary.PolyB -> Bool
-    satisfiesRelation xs (Binary.PolyB vars parity) =
-      traceShow (xs, vars, parity) $
-      parity
-        == foldr
-          ( \var acc -> case IntMap.lookup var xs of
-              Nothing -> error "[ panic ] Variables in relations not in model"
-              Just val -> if val then not acc else acc
-          )
-          True
-          (IntSet.toList vars)
+    -- satisfiesRelation :: IntMap Bool -> Binary.PolyB -> Bool
+    -- satisfiesRelation xs (Binary.PolyB vars parity) =
+    --   parity
+    --     == foldr
+    --       ( \var acc -> case IntMap.lookup var xs of
+    --           Nothing -> error "[ panic ] Variables in relations not in model"
+    --           Just val -> if val then not acc else acc
+    --       )
+    --       True
+    --       (IntSet.toList vars)
 
-    satisfiesRelations :: IntMap Bool -> Bool
-    satisfiesRelations xs = all (satisfiesRelation xs) relations
+    -- unsatisfiedRelations :: IntMap Bool -> [Binary.PolyB]
+    -- unsatisfiedRelations xs = filter (not . satisfiesRelation xs) (Set.toList relations)
+
+-- | An assignment satisfies the result if it's a model of the polynomial
+satisfies :: IntMap Bool -> Binary.Result -> Bool
+satisfies expected = null . validate expected

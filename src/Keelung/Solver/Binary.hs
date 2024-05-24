@@ -2,7 +2,6 @@
 --   Intended to be qualified as `Binary`
 module Keelung.Solver.Binary (run, Result (..), PolyB (..)) where
 
-import Control.Monad ((<=<))
 import Data.Bits qualified
 import Data.Either qualified as Either
 import Data.Field.Galois (GaloisField)
@@ -12,13 +11,13 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.List qualified as List
 import Data.Maybe qualified as Maybe
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Keelung (Var)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.UnionFind.Boolean (UnionFind)
 import Keelung.Data.UnionFind.Boolean qualified as UnionFind
-import Data.Set (Set)
-import qualified Data.Set as Set
 
 -- | What this solver does:
 --      Assume that all variables are Boolean:
@@ -241,48 +240,21 @@ relate var1 var2 sameSign (State uf pool) =
 
       let (root, child) = (var1 `min` var2, var1 `max` var2)
           uf' = UnionFind.relate uf root child sameSign
-          poolResult = Either.partitionEithers $ map (relatePolyB root child sameSign <=< substPolyB uf') $ Set.toList pool
+          poolResult = Either.partitionEithers $ map (substPolyB uf') $ Set.toList pool
        in applyActionsUntilThereIsNone uf' poolResult
 
 -- | Assign a variable to a value in the state
 assign :: Var -> Bool -> State -> State
 assign var val (State uf pool) =
   let uf' = UnionFind.assign uf var val
-      poolResult = Either.partitionEithers $ map (assignPolyB var val) $ Set.toList pool
+      poolResult = Either.partitionEithers $ map (substPolyB uf') $ Set.toList pool
    in applyActionsUntilThereIsNone uf' poolResult
 
 -- | Insert a binary polynomial into the state
 insert :: PolyB -> State -> State
-insert poly (State uf pool) = case substPolyB uf poly of
-  Right poly'' -> applyActionsUntilThereIsNone uf (insertPool pool poly'')
-  Left action -> applyActionsUntilThereIsNone uf ([action], Set.toList pool)
-
--- | Relate two variables in a binary polynomial, return either the updated polynomial or an action
-relatePolyB :: Var -> Var -> Bool -> PolyB -> Either Action PolyB
-relatePolyB root child sameSign (PolyB vars parity) =
-  if child `IntSet.member` vars
-    then
-      if root `IntSet.member` vars
-        then
-          if sameSign
-            then -- child + root = 0
-              toAction $ PolyB (IntSet.delete child $ IntSet.delete root vars) parity
-            else -- child + root = 1
-              toAction $ PolyB (IntSet.delete child $ IntSet.delete root vars) (not parity)
-        else
-          if sameSign
-            then -- child = root
-              toAction $ PolyB (IntSet.insert root $ IntSet.delete child vars) parity
-            else -- child = root + 1
-              toAction $ PolyB (IntSet.insert root $ IntSet.delete child vars) (not parity)
-    else Right (PolyB vars parity) -- no-op
-
--- | Assign a variable to a value in a binary polynomial, return either the updated polynomial or an action
-assignPolyB :: Var -> Bool -> PolyB -> Either Action PolyB
-assignPolyB var val (PolyB vars parity) =
-  if var `IntSet.member` vars
-    then toAction (PolyB (IntSet.delete var vars) (if val then not parity else parity))
-    else Right (PolyB vars parity) -- no-op
+insert poly (State uf pool) = applyActionsUntilThereIsNone uf $ case substPolyB uf poly of
+  Right poly'' -> insertPool pool poly''
+  Left action -> ([action], Set.toList pool)
 
 --------------------------------------------------------------------------------
 
