@@ -17,6 +17,8 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.UnionFind.Boolean (UnionFind)
 import Keelung.Data.UnionFind.Boolean qualified as UnionFind
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 -- | What this solver does:
 --      Assume that all variables are Boolean:
@@ -66,7 +68,7 @@ run polynomial =
 data Result = Result
   { resultAssigmnet :: IntMap Bool, -- learned variable assignments
     resultEquivClass :: [(IntSet, IntSet)], -- learned variable equivalence classes, variables of the same class but with different signs are placed in different part of the pair
-    resultRelations :: [PolyB] -- boolean polynomials, [(parity, variables)]
+    resultRelations :: Set PolyB -- boolean polynomials, [(parity, variables)]
   }
   deriving (Eq, Show)
 
@@ -132,7 +134,7 @@ solve (Solving constant coeffs state) =
               solve $
                 Solving constant' coeffs' (relate var1 var2 (not remainder) state)
             _ ->
-              -- trace ("\n+ " <> show (PolyB vars remainder)) $
+              -- trace ("\ninsert " <> show (PolyB vars remainder)) $
               --   traceShow state $
               --     traceShow (insert (PolyB vars remainder) state) $
               solve $
@@ -163,7 +165,7 @@ data PolyB = PolyB IntSet Bool
 instance Show PolyB where
   show (PolyB vars parity) =
     if IntSet.null vars
-      then "0"
+      then if parity then "1" else "0"
       else List.intercalate " + " (map (("$" <>) . show) (IntSet.toList vars)) <> " = " <> (if parity then "1" else "0")
 
 polyBSize :: PolyB -> Int
@@ -171,6 +173,7 @@ polyBSize (PolyB vars _) = IntSet.size vars
 
 substPolyB :: UnionFind -> PolyB -> Either Action PolyB
 substPolyB uf (PolyB e b) =
+  -- trace (show uf) $
   -- trace (show (PolyB e b) <> " ==> " <> show (IntSet.fold step (PolyB mempty b) e)) $
   toAction $ IntSet.fold step (PolyB mempty b) e
   where
@@ -224,7 +227,7 @@ updatePool uf = Either.partitionEithers . map (substPolyB uf)
 -- | Apply actions on the relation pool until there is no more actions to apply.
 --   Finds the fixed point of `updatePool . updateUnionFind`
 applyActionsUntilThereIsNone :: UnionFind -> ([Action], [PolyB]) -> State
-applyActionsUntilThereIsNone uf ([], pool) = State uf pool
+applyActionsUntilThereIsNone uf ([], pool) = State uf (Set.fromList pool)
 applyActionsUntilThereIsNone uf (actions, pool) =
   let uf' = updateUnionFind uf actions
    in applyActionsUntilThereIsNone uf' (updatePool uf' pool)
@@ -238,21 +241,21 @@ relate var1 var2 sameSign (State uf pool) =
 
       let (root, child) = (var1 `min` var2, var1 `max` var2)
           uf' = UnionFind.relate uf root child sameSign
-          poolResult = Either.partitionEithers $ map (relatePolyB root child sameSign <=< substPolyB uf') pool
+          poolResult = Either.partitionEithers $ map (relatePolyB root child sameSign <=< substPolyB uf') $ Set.toList pool
        in applyActionsUntilThereIsNone uf' poolResult
 
 -- | Assign a variable to a value in the state
 assign :: Var -> Bool -> State -> State
 assign var val (State uf pool) =
   let uf' = UnionFind.assign uf var val
-      poolResult = Either.partitionEithers $ map (assignPolyB var val) pool
+      poolResult = Either.partitionEithers $ map (assignPolyB var val) $ Set.toList pool
    in applyActionsUntilThereIsNone uf' poolResult
 
 -- | Insert a binary polynomial into the state
 insert :: PolyB -> State -> State
 insert poly (State uf pool) = case substPolyB uf poly of
   Right poly'' -> applyActionsUntilThereIsNone uf (insertPool pool poly'')
-  Left action -> applyActionsUntilThereIsNone uf ([action], pool)
+  Left action -> applyActionsUntilThereIsNone uf ([action], Set.toList pool)
 
 -- | Relate two variables in a binary polynomial, return either the updated polynomial or an action
 relatePolyB :: Var -> Var -> Bool -> PolyB -> Either Action PolyB
@@ -284,13 +287,13 @@ assignPolyB var val (PolyB vars parity) =
 --------------------------------------------------------------------------------
 
 -- | For managing relations with more than 2 variables. (Relations with 1 or 2 variables are handled by the UnionFind)
-type Pool = [PolyB]
+type Pool = Set PolyB
 
 -- | Insert a binary polynomial into the pool
 --   Compare the polynomial with the existing ones, and derive actions from them.
 --   Actions are generated when the inserted polynomial has a edit distance of 1 or 2 with the existing ones.
-insertPool :: Pool -> PolyB -> ([Action], Pool)
-insertPool pool poly = (Maybe.mapMaybe (calculateAction poly) pool, poly : pool)
+insertPool :: Pool -> PolyB -> ([Action], [PolyB])
+insertPool pool poly = (Maybe.mapMaybe (calculateAction poly) (Set.toList pool), poly : Set.toList pool)
   where
     calculateAction :: PolyB -> PolyB -> Maybe Action
     calculateAction (PolyB vars1 parity1) (PolyB vars2 parity2) =
@@ -301,5 +304,5 @@ insertPool pool poly = (Maybe.mapMaybe (calculateAction poly) pool, poly : pool)
             [var1, var2] -> Just $ Relate var1 var2 (parity1 == parity2)
             _ -> Nothing
 
-exportPool :: Pool -> [PolyB]
-exportPool = filter ((> 2) . polyBSize)
+exportPool :: Pool -> Set PolyB
+exportPool = Set.filter ((> 2) . polyBSize)

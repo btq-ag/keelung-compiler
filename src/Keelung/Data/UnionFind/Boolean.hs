@@ -1,6 +1,7 @@
+{-# HLINT ignore "Use list comprehension" #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use list comprehension" #-}
 module Keelung.Data.UnionFind.Boolean
   ( UnionFind,
     empty,
@@ -106,9 +107,12 @@ compose (UnionFind xs) (root, status1) (child, status2) sign =
           IntMap.insert root (if sign then IsRoot (IntSet.singleton child) mempty else IsRoot mempty (IntSet.singleton child)) $
             IntMap.insert child (IsChildOf root sign) xs
       (Nothing, Just (IsRoot same opposite)) ->
-        UnionFind $
-          IntMap.insert root (if sign then IsRoot (IntSet.insert child same) opposite else IsRoot opposite (IntSet.insert child same)) $
-            IntMap.insert child (IsChildOf root sign) xs
+        let grandchildrenSame = IntMap.fromDistinctAscList $ map (,IsChildOf root sign) $ IntSet.toAscList same
+            grandchildrenOpposite = IntMap.fromDistinctAscList $ map (,IsChildOf root (not sign)) $ IntSet.toAscList opposite
+         in UnionFind $
+              grandchildrenSame
+                <> grandchildrenOpposite
+                <> IntMap.insert root (if sign then IsRoot (IntSet.insert child same) opposite else IsRoot opposite (IntSet.insert child same)) (IntMap.insert child (IsChildOf root sign) xs)
       (Nothing, Just (IsChildOf anotherRoot sign')) ->
         case root `compare` anotherRoot of
           LT -> compose (UnionFind xs) (root, Nothing) (anotherRoot, IntMap.lookup anotherRoot xs) (sign == sign')

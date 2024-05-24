@@ -19,23 +19,24 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Solver.Binary qualified as Binary
 import Test.Hspec
 import Test.QuickCheck
+import Debug.Trace
 
 run :: IO ()
 run = hspec tests
 
--- Satisfiable B 0b10101011 + B 0b110$0 + B 0b101011$1 + B 0b1101100$2 + B 0b11111111$3 + B 0b111000$4 + B 0b1010010$5 (fromList [(0,True),(1,False),(2,False),(3,True),(4,False),(5,True)])
-
+-- Satisfiable B 0b11111000 + B 0b11111000$0 + B 0b10001010$1 + B 0b11111000$2 + B 0b11111000$3 + B 0b10100000$4 (fromList [(0,True),(1,False),(2,False),(3,False),(4,False)])
 tests :: SpecWith ()
 tests = describe "Binary" $ do
   describe "satisfiable" $ do
     return ()
     -- it "test" $ do
-    --   -- Satisfiable B 0b10111100 + B 0b10100000$0 + B 0b1000$1 + B 0b10111100$2 + B 0b10101011$3 + B 0b10110100$4 + B 0b100001$5 (fromList [(0,False),(1,False),(2,True),(3,False),(4,False),(5,False)])
-    --   let polynomial = case Poly.buildEither 0b10111100 [(0, 0b10100000), (1, 0b1000), (2, 0b10111100), (3, 0b10101011), (4, 0b10110100), (5, 0b100001)] of
+    --   -- Satisfiable B 0b10101011 + B 0b110$0 + B 0b101011$1 + B 0b1101100$2 + B 0b11111111$3 + B 0b111000$4 + B 0b1010010$5 (fromList [(0,True),(1,False),(2,False),(3,True),(4,False),(5,True)])
+    --   let polynomial = case Poly.buildEither 0b10101011 [(0, 0b110), (1, 0b101011), (2, 0b1101100), (3, 0b11111111), (4, 0b111000), (5, 0b1010010)] of
     --         Left _ -> error "Poly.buildEither"
     --         Right p -> p :: Poly (Binary 283)
-    --       assignments = IntMap.fromList [(0, False), (1, False), (2, True), (3, False), (4, False), (5, False)]
+    --       assignments = IntMap.fromList [(0, True), (1, False), (2, False), (3, True), (4, False), (5, True)]
     --   let actual = Binary.run polynomial
+    --   print assignments
     --   print actual
     --   case actual of
     --     Nothing -> fail "No solution found"
@@ -148,6 +149,7 @@ satisfies expected (Binary.Result actual equivClass relations) =
 
     satisfiesRelation :: IntMap Bool -> Binary.PolyB -> Bool
     satisfiesRelation xs (Binary.PolyB vars parity) =
+      traceShow (xs, vars, parity) $
       parity
         == foldr
           ( \var acc -> case IntMap.lookup var xs of
