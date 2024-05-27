@@ -80,6 +80,7 @@ library
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
       Keelung.Data.UnionFind.Boolean
+      Keelung.Data.UnionFind.Field
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
@@ -174,6 +175,7 @@ executable keelungc
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
       Keelung.Data.UnionFind.Boolean
+      Keelung.Data.UnionFind.Field
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
@@ -329,6 +331,7 @@ test-suite keelung-test
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
       Keelung.Data.UnionFind.Boolean
+      Keelung.Data.UnionFind.Field
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad

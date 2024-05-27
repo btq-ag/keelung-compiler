@@ -37,8 +37,15 @@ import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
--- | Monad for R1CS interpretation / witness generation
-type M n = ExceptT (Error n) (RWS Env (Seq (Log n)) (IntMap n))
+-- | Monad for R1CS solving / witness generation
+type M n =
+  ExceptT
+    (Error n)
+    ( RWS
+        Env
+        (Seq (Log n)) -- for debugging
+        (IntMap n) -- variable assignments
+    )
 
 runM :: (GaloisField n, Integral n) => Bool -> Ranges -> FieldInfo -> Inputs n -> M n a -> (Either (Error n, IntMap n) (Vector n), LogReport n)
 runM debug boolVarRanges fieldInfo inputs p =

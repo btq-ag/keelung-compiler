@@ -2,13 +2,11 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
-{-# HLINT ignore "Redundant return" #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# HLINT ignore "Redundant if" #-}
 
-module Test.Solver.Binary (tests, run) where
+module Test.Solver.Binary (tests, run, satisfies) where
 
 import Data.Field.Galois
 import Data.IntMap (IntMap)
@@ -29,25 +27,6 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "Binary" $ do
   describe "satisfiable" $ do
-    return ()
-    -- it "test" $ do
-    --   -- Satisfiable B 0b11111000 + B 0b11111000$0 + B 0b10001010$1 + B 0b11111000$2 + B 0b11111000$3 + B 0b10100000$4 (fromList [(0,True),(1,False),(2,False),(3,False),(4,False)])
-    --   --                 11111000
-    --   --                 10001010
-    --   --                 11111000
-    --   --                 11111000
-    --   --                 10100000
-    --   let polynomial = case Poly.buildEither 0b11111000 [(0, 0b11111000), (1, 0b10001010), (2, 0b11111000), (3, 0b11111000), (4, 0b10100000)] of
-    --         Left _ -> error "Poly.buildEither"
-    --         Right p -> p :: Poly (Binary 283)
-    --       assignments = IntMap.fromList [(0, True), (1, False), (2, False), (3, False), (4, False)]
-    --   let actual = Binary.run polynomial
-    --   print assignments
-    --   print actual
-    --   case actual of
-    --     Nothing -> fail "No solution found"
-    --     Just result -> satisfies assignments result `shouldBe` True
-
     it "Binary 283" $ do
       property $ \(Satisfiable polynomial assignments) -> do
         let actual = Binary.run (polynomial :: Poly (Binary 283))
@@ -129,19 +108,19 @@ validate expected (Binary.Result actual equivClass _relations) =
           | IntSet.member var oppositeSign = Just (oppositeSign, sameSign)
           | otherwise = Nothing
 
-    -- satisfiesRelation :: IntMap Bool -> Binary.PolyB -> Bool
-    -- satisfiesRelation xs (Binary.PolyB vars parity) =
-    --   parity
-    --     == foldr
-    --       ( \var acc -> case IntMap.lookup var xs of
-    --           Nothing -> error "[ panic ] Variables in relations not in model"
-    --           Just val -> if val then not acc else acc
-    --       )
-    --       True
-    --       (IntSet.toList vars)
+-- satisfiesRelation :: IntMap Bool -> Binary.PolyB -> Bool
+-- satisfiesRelation xs (Binary.PolyB vars parity) =
+--   parity
+--     == foldr
+--       ( \var acc -> case IntMap.lookup var xs of
+--           Nothing -> error "[ panic ] Variables in relations not in model"
+--           Just val -> if val then not acc else acc
+--       )
+--       True
+--       (IntSet.toList vars)
 
-    -- unsatisfiedRelations :: IntMap Bool -> [Binary.PolyB]
-    -- unsatisfiedRelations xs = filter (not . satisfiesRelation xs) (Set.toList relations)
+-- unsatisfiedRelations :: IntMap Bool -> [Binary.PolyB]
+-- unsatisfiedRelations xs = filter (not . satisfiesRelation xs) (Set.toList relations)
 
 -- | An assignment satisfies the result if it's a model of the polynomial
 satisfies :: IntMap Bool -> Binary.Result -> Bool
