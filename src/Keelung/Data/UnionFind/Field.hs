@@ -1,1 +1,318 @@
-module Keelung.Data.UnionFind.Field () where 
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
+
+module Keelung.Data.UnionFind.Field
+  ( -- * Construction
+    UnionFind,
+    new,
+
+    -- * Operations
+    assign,
+    relate,
+
+    -- * Conversions,
+
+    -- * Queries
+    relationBetween,
+    size,
+    isValid,
+  )
+where
+
+import Control.DeepSeq (NFData)
+import Control.Monad.Except
+import Control.Monad.Writer
+import Data.Field.Galois (GaloisField)
+import Data.IntMap.Strict (IntMap)
+import Data.IntMap.Strict qualified as IntMap
+import GHC.Generics (Generic)
+import Keelung (Var)
+import Keelung.Compiler.Compile.Error (Error (..))
+import Keelung.Compiler.Relations.Monad
+import Prelude hiding (lookup)
+
+--------------------------------------------------------------------------------
+
+newtype UnionFind n = UnionFind {unUnionFind :: IntMap (VarStatus n)} -- relation to the parent
+  deriving (Show, Eq, Generic, Functor)
+
+instance (NFData n) => NFData (UnionFind n)
+
+-- | Creates a new UnionFind, O(1)
+new :: UnionFind n
+new = UnionFind mempty
+
+--------------------------------------------------------------------------------
+
+-- | Assigns a value to a variable, O(lg n)
+assign :: (GaloisField n, Integral n) => Var -> n -> UnionFind n -> RelM n (Maybe (UnionFind n))
+assign var value (UnionFind relations) = case IntMap.lookup var relations of
+  -- The variable is not in the map, so we add it as a constant
+  Nothing -> return $ Just $ UnionFind $ IntMap.insert var (IsConstant value) relations
+  -- The variable is already a constant, so we check if the value is the same
+  Just (IsConstant oldValue) ->
+    if oldValue == value
+      then return Nothing
+      else throwError (ConflictingValuesF oldValue value)
+  -- The variable is already a root, so we:
+  --    1. Make its children constants
+  --    2. Make the root itself a constant
+  Just (IsRoot toChildren) ->
+    return $
+      Just $
+        UnionFind $
+          foldl
+            ( \rels (child, relationToChild) ->
+                -- child = relationToChild var
+                -- var = value
+                --    =>
+                -- child = relationToChild value
+                IntMap.insert
+                  child
+                  (IsConstant (execLinRel relationToChild value))
+                  rels
+            )
+            (IntMap.insert var (IsConstant value) relations)
+            (IntMap.toList toChildren)
+  -- The variable is already a child of another variable, so we:
+  --    1. Make the parent a constant (by calling `assign` recursively)
+  -- child = relation parent
+  -- =>
+  -- parent = relation^-1 child
+  Just (IsChildOf parent relationToChild) -> assign parent (execLinRel (invertLinRel relationToChild) value) (UnionFind relations)
+
+-- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
+relate :: (GaloisField n, Integral n) => Var -> LinRel n -> Var -> UnionFind n -> RelM n (Maybe (UnionFind n))
+relate a relation b relations = relateWithLookup (a, lookupInternal a relations) relation (b, lookupInternal b relations) relations
+
+-- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
+relateWithLookup :: (GaloisField n, Integral n) => (Var, VarStatus n) -> LinRel n -> (Var, VarStatus n) -> UnionFind n -> RelM n (Maybe (UnionFind n))
+relateWithLookup (a, aLookup) relation (b, bLookup) relations =
+  if a == b -- if the variables are the same, do nothing and return the original relations
+    then return Nothing
+    else case compareSeniority a b of
+      LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+      GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
+      EQ -> case compare (childrenSizeOf aLookup) (childrenSizeOf bLookup) of
+        LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+        GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
+        EQ -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+        where
+          childrenSizeOf :: VarStatus n -> Int
+          childrenSizeOf (IsRoot children) = IntMap.size children
+          childrenSizeOf (IsConstant _) = 0
+          childrenSizeOf (IsChildOf parent _) = childrenSizeOf (lookupInternal parent relations)
+
+-- | Relates a child to a parent, O(lg n)
+--   child = relation parent
+relateChildToParent :: (GaloisField n, Integral n) => (Var, VarStatus n) -> LinRel n -> (Var, VarStatus n) -> UnionFind n -> RelM n (Maybe (UnionFind n))
+relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) relations =
+  if child == parent
+    then return Nothing -- no-op
+    else case parentLookup of
+      -- The parent is a constant, so we make the child a constant:
+      --    * for the parent: do nothing
+      --    * for the child: assign it the value of the parent with `relationToChild` applied
+      IsConstant value -> assign child (execLinRel relationToChild value) relations
+      -- The parent has other children
+      IsRoot children -> case childLookup of
+        -- The child also has its grandchildren, so we relate all these grandchildren to the parent, too:
+        --    * for the parent: add the child and its grandchildren to the children map
+        --    * for the child: point the child to the parent and add the relation
+        --    * for the grandchildren: point them to the new parent
+        IsRoot toGrandChildren -> do
+          let newSiblings = IntMap.insert child relationToChild $ IntMap.map (relationToChild <>) toGrandChildren
+          return $
+            Just $
+              UnionFind $
+                IntMap.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
+                -- add the child and its grandchildren to the parent
+                  IntMap.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
+                    IntMap.foldlWithKey' -- point the grandchildren to the new parent
+                      ( \rels grandchild relationToGrandChild -> IntMap.insert grandchild (IsChildOf parent (relationToGrandChild <> relationToChild)) rels
+                      )
+                      (unUnionFind relations)
+                      toGrandChildren
+        --
+        -- The child is a constant, so we make the parent a constant, too:
+        --  * for the parent: assign it the value of the child with the inverted relation applied
+        --  * for the child: do nothing
+        IsConstant value -> assign parent (execLinRel (invertLinRel relationToChild) value) relations
+        -- The child is already a child of another variable `parent2`:
+        --    * for the another variable `parent2`: point `parent2` to `parent` with `invertLinRel parent2ToChild <> relationToChild`
+        --    * for the parent: add the child and `parent2` to the children map
+        --    * for the child: point it to the `parent` with `relationToParent`
+        IsChildOf parent2 parent2ToChild ->
+          if parent2 `compareSeniority` parent == GT
+            then --
+            -- child = relationToChild parent
+            -- child = parent2ToChild parent2
+            --    => parent = (invertLinRel relationToChild <> parent2ToChild) parent2
+            --    or parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
+              relateWithLookup (parent, parentLookup) (invertLinRel relationToChild <> parent2ToChild) (parent2, lookupInternal parent2 relations) relations
+            else do
+              --
+              -- child = relationToChild parent
+              -- child = parent2ToChild parent2
+              --    => parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
+              --    or parent = (invertLinRel relationToChild <> parent2ToChild) parent2
+              relateWithLookup (parent2, lookupInternal parent2 relations) (invertLinRel parent2ToChild <> relationToChild) (parent, parentLookup) $
+                UnionFind $
+                  IntMap.insert child (IsChildOf parent relationToChild) $
+                    unUnionFind relations
+
+      -- The parent is a child of another variable, so we relate the child to the grandparent instead
+      IsChildOf grandparent relationFromGrandparent -> relateWithLookup (child, childLookup) (relationToChild <> relationFromGrandparent) (grandparent, lookupInternal grandparent relations) relations
+
+--------------------------------------------------------------------------------
+
+-- | Calculates the relation between two variables, O(lg n)
+relationBetween :: (GaloisField n, Integral n) => Var -> Var -> UnionFind n -> Maybe (n, n)
+relationBetween var1 var2 xs =
+  fromLinRel <$> case (lookupInternal var1 xs, lookupInternal var2 xs) of
+    (IsConstant _, _) -> Nothing
+    (_, IsConstant _) -> Nothing
+    (IsRoot _, IsRoot _) ->
+      if var1 == var2
+        then Just mempty
+        else Nothing
+    (IsRoot _, IsChildOf parent2 relationWithParent2) ->
+      if var1 == parent2
+        then -- var2 = relationWithParent2 parent2
+        -- var1 = parent2
+        -- =>
+        -- var2 = relationWithParent2 var1
+          Just $ invertLinRel relationWithParent2
+        else Nothing
+    (IsChildOf parent1 relationWithParent1, IsRoot _) ->
+      if parent1 == var2
+        then -- var1 = relationWithParent1 parent1
+        -- parent1 = var2
+        -- =>
+        -- var1 = relationWithParent1 var2
+          Just relationWithParent1
+        else Nothing
+    (IsChildOf parent1 relationWithParent1, IsChildOf parent2 relationWithParent2) ->
+      if parent1 == parent2
+        then -- var1 = relationWithParent1 parent1
+        -- var2 = relationWithParent2 parent2
+        -- parent1 == parent2
+        --   =>
+        -- var1 = relationWithParent1 parent2
+        -- var2 = relationWithParent2 parent2
+          Just $ relationWithParent1 <> invertLinRel relationWithParent2
+        else -- Just $ relationWithParent1 <> invertLinRel relationWithParent2
+          Nothing
+
+-- | Returns the number of variables in the Reference, O(1)
+size :: UnionFind n -> Int
+size = IntMap.size . unUnionFind
+
+--------------------------------------------------------------------------------
+
+data VarStatus n
+  = IsConstant n
+  | -- | contains the relations to the children
+    IsRoot (IntMap (LinRel n))
+  | -- | child = relation parent
+    IsChildOf Var (LinRel n)
+  deriving (Show, Eq, Generic, Functor)
+
+instance (NFData n) => NFData (VarStatus n)
+
+-- | Returns the result of looking up a variable, O(lg n)
+lookupInternal :: Var -> UnionFind n -> VarStatus n
+lookupInternal var (UnionFind relations) = case IntMap.lookup var relations of
+  Nothing -> IsRoot mempty
+  Just result -> result
+
+--------------------------------------------------------------------------------
+
+-- | Result of looking up a variable in the Relations
+-- data Lookup n = Root | Constant n | ChildOf n Var n
+--   deriving (Eq, Show)
+
+-- lookup :: (GaloisField n) => SliceRelations -> Var -> UnionFind n -> Lookup n
+-- lookup relationsS (B (RefUBit refU index)) relationsR =
+--   let -- look in the SliceRelations first
+--       lookupSliceRelations = case SliceRelations.refUSegmentsRefUBit refU index relationsS of
+--         Nothing -> lookupUnionFind
+--         Just (Left (parent, index')) -> ChildOf 1 (B (RefUBit parent index')) 0
+--         Just (Right bitVal) -> Constant (if bitVal then 1 else 0)
+--       -- look in the UnionFind later if we cannot find any result in the SliceRelations
+--       lookupUnionFind = case lookupInternal (B (RefUBit refU index)) relationsR of
+--         IsConstant value -> Constant value
+--         IsRoot _ -> Root
+--         IsChildOf parent (LinRel a b) -> ChildOf a parent b
+--    in lookupSliceRelations
+-- lookup _ var relations =
+--   case lookupInternal var relations of
+--     IsConstant value -> Constant value
+--     IsRoot _ -> Root
+--     IsChildOf parent (LinRel a b) -> ChildOf a parent b
+
+--------------------------------------------------------------------------------
+
+-- | Relation representing a linear function between two variables, i.e. x = ay + b
+data LinRel n = LinRel n n
+  deriving (Show, Eq, NFData, Generic, Functor)
+
+instance (Num n) => Semigroup (LinRel n) where
+  -- x = a1 * y + b1
+  -- y = a2 * z + b2
+  -- =>
+  -- x = a1 * (a2 * z + b2) + b1
+  --   = (a1 * a2) * z + (a1 * b2 + b1)
+  LinRel a1 b1 <> LinRel a2 b2 = LinRel (a1 * a2) (a1 * b2 + b1)
+
+instance (Num n) => Monoid (LinRel n) where
+  mempty = LinRel 1 0
+
+-- | Extracts the coefficients from a LinRel
+fromLinRel :: LinRel n -> (n, n)
+fromLinRel (LinRel a b) = (a, b)
+
+-- | Computes the inverse of a relation
+--      x = ay + b
+--        =>
+--      y = (x - b) / a
+invertLinRel :: (GaloisField n, Integral n) => LinRel n -> LinRel n
+invertLinRel (LinRel a b) = LinRel (recip a) (-b / a)
+
+-- | `execLinRel relation parent = child`
+execLinRel :: (GaloisField n, Integral n) => LinRel n -> n -> n
+execLinRel (LinRel a b) value = a * value + b
+
+--------------------------------------------------------------------------------
+
+-- | For Testing
+
+-- | A Reference is valid if:
+--          1. all children of a parent recognize the parent as their parent
+isValid :: (GaloisField n, Integral n) => UnionFind n -> Bool
+isValid relations = allChildrenRecognizeTheirParent relations && rootsAreSenior relations
+
+-- | A Reference is valid if all children of a parent recognize the parent as their parent
+allChildrenRecognizeTheirParent :: (GaloisField n, Integral n) => UnionFind n -> Bool
+allChildrenRecognizeTheirParent relations =
+  let families = IntMap.mapMaybe isParent (unUnionFind relations)
+
+      isParent (IsRoot children) = Just children
+      isParent _ = Nothing
+
+      recognizeParent parent child relation = case lookupInternal child relations of
+        IsChildOf parent' relation' -> parent == parent' && relation == relation'
+        _ -> False
+      childrenAllRecognizeParent parent = and . IntMap.elems . IntMap.mapWithKey (recognizeParent parent)
+   in IntMap.foldlWithKey' (\acc parent children -> acc && childrenAllRecognizeParent parent children) True families
+
+-- | A Reference is valid if the seniority of the root of a family is greater than equal the seniority of all its children
+rootsAreSenior :: UnionFind n -> Bool
+rootsAreSenior = IntMap.foldlWithKey' go True . unUnionFind
+  where
+    go :: Bool -> Var -> VarStatus n -> Bool
+    go False _ _ = False
+    go True _ (IsConstant _) = True
+    go True var (IsRoot children) = all (\child -> compareSeniority var child /= LT) (IntMap.keys children)
+    go True var (IsChildOf parent _) = compareSeniority parent var /= LT

@@ -58,7 +58,7 @@ run polynomial =
         Solving
           (toInteger (Poly.constant polynomial))
           (fmap toInteger (Poly.coeffs polynomial))
-          empty
+          new
    in case solve initStage of
         Solving {} -> error "[ panic ] Solver: Impossible"
         Failed -> Nothing
@@ -147,8 +147,8 @@ data State
       Pool -- other relations: for relations with more than 2 variables, summed to 0 or 1
   deriving (Eq, Show)
 
-empty :: State
-empty = State UnionFind.empty mempty
+new :: State
+new = State UnionFind.new mempty
 
 export :: State -> Result
 export (State uf pool) =

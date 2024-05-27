@@ -21,11 +21,9 @@ module Keelung.Compiler.Relations.Reference
     -- * Queries
     Lookup (..),
     lookup,
-    VarStatus (..),
-    lookupInternal,
     relationBetween,
-    isValid,
     size,
+    isValid,
   )
 where
 

@@ -14,12 +14,12 @@ tests :: SpecWith ()
 tests = describe "Boolean UnionFind" $ do
   it "relate" $ do
     property $ \relates -> do
-      let xs = foldl applyRelate UnionFind.empty (relates :: [Relate])
+      let xs = foldl applyRelate UnionFind.new (relates :: [Relate])
       UnionFind.validate xs `shouldBe` []
 
   it "relate and then assign once" $ do
     property $ \(relates, assign) -> do
-      let xs = foldl applyRelate UnionFind.empty (relates :: [Relate])
+      let xs = foldl applyRelate UnionFind.new (relates :: [Relate])
       let xs' = applyAssign xs assign
       UnionFind.validate xs' `shouldBe` []
 

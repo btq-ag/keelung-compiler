@@ -3,8 +3,9 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Keelung.Data.UnionFind.Boolean
-  ( UnionFind,
-    empty,
+  ( -- * Construction
+    UnionFind,
+    new,
 
     -- * Operations
     assign,
@@ -46,8 +47,8 @@ data VarStatus
 newtype UnionFind = UnionFind (IntMap VarStatus) deriving (Show, Eq)
 
 -- | Create an empty UnionFind data structure.
-empty :: UnionFind
-empty = UnionFind mempty
+new :: UnionFind
+new = UnionFind mempty
 
 --------------------------------------------------------------------------------
 

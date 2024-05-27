@@ -27,6 +27,9 @@ instance Seniority RefF where
 instance Seniority Ref where
   compareSeniority = compare `on` hasLevel
 
+instance Seniority Int where
+  compareSeniority = compare
+
 --------------------------------------------------------------------------------
 
 class HasLevel a where
