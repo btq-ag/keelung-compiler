@@ -14,7 +14,6 @@ module Keelung.Compiler.Relations.Reference
     assign,
     relateR,
     relateB,
-    markChanged,
 
     -- * Conversions,
     toConstraints,
@@ -142,46 +141,34 @@ assign var value (RefRelations relations) = case Map.lookup var relations of
   -- child = relation parent
   -- =>
   -- parent = relation^-1 child
-  Just (IsChildOf parent relationToChild) ->
-    case invertLinRel relationToChild of
-      Nothing -> error "[ panic ] assign: relation is not invertible"
-      Just relationToParent -> assign parent (execLinRel relationToParent value) (RefRelations relations)
+  Just (IsChildOf parent relationToChild) -> assign parent (execLinRel (invertLinRel relationToChild) value) (RefRelations relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relate :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> RelM n (RefRelations n)
-relate a relation b relations =
-  case compareSeniority a b of
-    LT -> relateChildToParent a relation b relations
-    GT -> case invertLinRel relation of
-      Nothing -> error "[ panic ] relate: relation is not invertible"
-      Just rel -> relateChildToParent b rel a relations
-    EQ -> case compare (childrenSizeOf a) (childrenSizeOf b) of
-      LT -> relateChildToParent a relation b relations
-      GT -> case invertLinRel relation of
-        Nothing -> error "[ panic ] relate: relation is not invertible"
-        Just rel -> relateChildToParent b rel a relations
-      EQ -> relateChildToParent a relation b relations
-      where
-        childrenSizeOf ref = case lookupInternal ref relations of
-          IsRoot children -> Map.size children
-          IsConstant _ -> 0
-          IsChildOf parent _ -> childrenSizeOf parent
+relate a relation b relations = relateWithLookup (a, lookupInternal a relations) relation (b, lookupInternal b relations) relations
+
+-- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
+relateWithLookup :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> RelM n (RefRelations n)
+relateWithLookup (a, aLookup) relation (b, bLookup) relations =
+  if a == b -- if the variables are the same, do nothing and return the original relations
+    then return relations
+    else case compareSeniority a b of
+      LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+      GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
+      EQ -> case compare (childrenSizeOf aLookup) (childrenSizeOf bLookup) of
+        LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+        GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
+        EQ -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+        where
+          childrenSizeOf :: VarStatus n -> Int
+          childrenSizeOf (IsRoot children) = Map.size children
+          childrenSizeOf (IsConstant _) = 0
+          childrenSizeOf (IsChildOf parent _) = childrenSizeOf (lookupInternal parent relations)
 
 -- | Specialized version of `relate` for relating a variable to a constant
 --    var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> RelM n (RefRelations n)
-relateR relationsS x slope y intercept xs =
-  case (x, y, slope, intercept) of
-    (_, _, 0, value) -> assign x value xs
-    (refA, refB, _, _) ->
-      composeLookup
-        xs
-        refA
-        refB
-        slope
-        intercept
-        (lookup relationsS refA xs)
-        (lookup relationsS refB xs)
+relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> RelM n (RefRelations n)
+relateR x slope y intercept = relate x (LinRel slope intercept) y
 
 -- | Specialized version of `relate` for relating Boolean variables
 relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> RelM n (RefRelations n)
@@ -189,17 +176,17 @@ relateB refA (polarity, refB) = relate (B refA) (if polarity then LinRel 1 0 els
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
-relateChildToParent :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> RelM n (RefRelations n)
-relateChildToParent child relationToChild parent relations =
+relateChildToParent :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> RelM n (RefRelations n)
+relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) relations =
   if child == parent
-    then return relations
-    else case lookupInternal parent relations of
+    then return relations -- no-op
+    else case parentLookup of
       -- The parent is a constant, so we make the child a constant:
       --    * for the parent: do nothing
       --    * for the child: assign it the value of the parent with `relationToChild` applied
       IsConstant value -> assign child (execLinRel relationToChild value) relations
       -- The parent has other children
-      IsRoot children -> case lookupInternal child relations of
+      IsRoot children -> case childLookup of
         -- The child also has its grandchildren, so we relate all these grandchildren to the parent, too:
         --    * for the parent: add the child and its grandchildren to the children map
         --    * for the child: point the child to the parent and add the relation
@@ -210,13 +197,7 @@ relateChildToParent child relationToChild parent relations =
           return $
             RefRelations $
               Map.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
-              -- add the child and its grandchildren to the parent
-              -- add the child and its grandchildren to the parent
-              -- add the child and its grandchildren to the parent
-              -- add the child and its grandchildren to the parent
-              -- add the child and its grandchildren to the parent
-              -- add the child and its grandchildren to the parent
-              -- add the child and its grandchildren to the parent
+                 -- add the child and its grandchildren to the parent
                 Map.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
                   Map.foldlWithKey' -- point the grandchildren to the new parent
                     ( \rels grandchild relationToGrandChild -> Map.insert grandchild (IsChildOf parent (relationToGrandChild <> relationToChild)) rels
@@ -227,9 +208,7 @@ relateChildToParent child relationToChild parent relations =
         -- The child is a constant, so we make the parent a constant, too:
         --  * for the parent: assign it the value of the child with the inverted relation applied
         --  * for the child: do nothing
-        IsConstant value -> case invertLinRel relationToChild of
-          Nothing -> error "[ panic ] relate: relation is not invertible"
-          Just relationToParent -> assign parent (execLinRel relationToParent value) relations
+        IsConstant value -> assign parent (execLinRel (invertLinRel relationToChild) value) relations
         -- The child is already a child of another variable `parent2`:
         --    * for the another variable `parent2`: point `parent2` to `parent` with `invertLinRel parent2ToChild <> relationToChild`
         --    * for the parent: add the child and `parent2` to the children map
@@ -241,35 +220,21 @@ relateChildToParent child relationToChild parent relations =
             -- child = parent2ToChild parent2
             --    => parent = (invertLinRel relationToChild <> parent2ToChild) parent2
             --    or parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
-            case invertLinRel relationToChild of
-              Just relationToChild' -> relate parent (relationToChild' <> parent2ToChild) parent2 relations
-              Nothing -> case invertLinRel parent2ToChild of
-                Just parent2ToChild' -> relate parent2 (parent2ToChild' <> relationToChild) parent relations
-                Nothing -> error "[ panic ] relateChildToParent: relation is not transitive!"
+              relateWithLookup (parent, parentLookup) (invertLinRel relationToChild <> parent2ToChild) (parent2, lookupInternal parent2 relations) relations
             else do
               --
               -- child = relationToChild parent
               -- child = parent2ToChild parent2
               --    => parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
               --    or parent = (invertLinRel relationToChild <> parent2ToChild) parent2
-              case invertLinRel parent2ToChild of
-                Just parent2ToChild' -> do
-                  markChanged
-                  relate parent2 (parent2ToChild' <> relationToChild) parent $
-                    RefRelations $
-                      Map.insert child (IsChildOf parent relationToChild) $
-                        unRefRelations relations
-                Nothing -> case invertLinRel relationToChild of
-                  Just relationToChild' -> do
-                    markChanged
-                    relate parent (relationToChild' <> parent2ToChild) parent2 $
-                      RefRelations $
-                        Map.insert child (IsChildOf parent relationToChild) $
-                          unRefRelations relations
-                  Nothing -> return relations -- cannot relate parent' to parent, so we do nothing
+              markChanged
+              relateWithLookup (parent2, lookupInternal parent2 relations) (invertLinRel parent2ToChild <> relationToChild) (parent, parentLookup) $
+                RefRelations $
+                  Map.insert child (IsChildOf parent relationToChild) $
+                    unRefRelations relations
 
       -- The parent is a child of another variable, so we relate the child to the grandparent instead
-      IsChildOf grandparent relationFromGrandparent -> relate child (relationToChild <> relationFromGrandparent) grandparent relations
+      IsChildOf grandparent relationFromGrandparent -> relateWithLookup (child, childLookup) (relationToChild <> relationFromGrandparent) (grandparent, lookupInternal grandparent relations) relations
 
 --------------------------------------------------------------------------------
 
@@ -289,7 +254,7 @@ relationBetween var1 var2 xs =
         -- var1 = parent2
         -- =>
         -- var2 = relationWithParent2 var1
-          invertLinRel relationWithParent2
+          Just $ invertLinRel relationWithParent2
         else Nothing
     (IsChildOf parent1 relationWithParent1, IsRoot _) ->
       if parent1 == var2
@@ -307,14 +272,7 @@ relationBetween var1 var2 xs =
         --   =>
         -- var1 = relationWithParent1 parent2
         -- var2 = relationWithParent2 parent2
-        case invertLinRel relationWithParent2 of
-          Just rel ->
-            -- var1 = relationWithParent1 parent2
-            -- parent2 = rel var2
-            --   =>
-            -- var1 = (relationWithParent1 . rel) var2
-            Just $ relationWithParent1 <> rel
-          Nothing -> Nothing
+          Just $ relationWithParent1 <> invertLinRel relationWithParent2
         else -- Just $ relationWithParent1 <> invertLinRel relationWithParent2
           Nothing
 
@@ -414,66 +372,66 @@ lookup _ var relations =
     IsRoot _ -> Root
     IsChildOf parent (LinRel a b) -> ChildOf a parent b
 
-composeLookup :: (GaloisField n, Integral n) => RefRelations n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> RelM n (RefRelations n)
-composeLookup xs refA refB slope intercept relationA relationB = case (relationA, relationB) of
-  (Root, Root) ->
-    -- rootA = slope * rootB + intercept
-    relateF refA slope refB intercept xs
-  (Root, Constant n) ->
-    -- rootA = slope * n + intercept
-    assign refA (slope * n + intercept) xs
-  (Root, ChildOf slopeB rootB interceptB) ->
-    -- rootA = slope * refB + intercept && refB = slopeB * rootB + interceptB
-    -- =>
-    -- rootA = slope * (slopeB * rootB + interceptB) + intercept
-    -- =>
-    -- rootA = slope * slopeB * rootB + slope * interceptB + intercept
-    relateF refA (slope * slopeB) rootB (slope * interceptB + intercept) xs
-  (Constant n, Root) ->
-    -- n = slope * rootB + intercept
-    -- =>
-    -- rootB = (n - intercept) / slope
-    assign refB ((n - intercept) / slope) xs
-  (Constant n, Constant m) ->
-    -- n = slope * m + intercept
-    -- =>
-    -- n - intercept = slope * m
-    -- =>
-    -- m = (n - intercept) / slope
-    if m == (n - intercept) / slope
-      then return xs
-      else throwError $ ConflictingValuesF m ((n - intercept) / slope)
-  (Constant n, ChildOf slopeB rootB interceptB) ->
-    -- n = slope * (slopeB * rootB + interceptB) + intercept
-    -- =>
-    -- slope * (slopeB * rootB + interceptB) = n - intercept
-    -- =>
-    -- slopeB * rootB + interceptB = (n - intercept) / slope
-    -- =>
-    -- slopeB * rootB = (n - intercept) / slope - interceptB
-    -- =>
-    -- rootB = ((n - intercept) / slope - interceptB) / slopeB
-    assign rootB (((n - intercept) / slope - interceptB) / slopeB) xs
-  (ChildOf slopeA rootA interceptA, Root) ->
-    -- refA = slopeA * rootA + interceptA = slope * rootB + intercept
-    -- =>
-    -- rootA = (slope * rootB + intercept - interceptA) / slopeA
-    relateF rootA (slope / slopeA) refB ((intercept - interceptA) / slopeA) xs
-  (ChildOf slopeA rootA interceptA, Constant n) ->
-    -- refA = slopeA * rootA + interceptA = slope * n + intercept
-    -- =>
-    -- rootA = (slope * n + intercept - interceptA) / slopeA
-    assign rootA ((slope * n + intercept - interceptA) / slopeA) xs
-  (ChildOf slopeA rootA interceptA, ChildOf slopeB rootB interceptB) ->
-    -- refA = slopeA * rootA + interceptA = slope * (slopeB * rootB + interceptB) + intercept
-    -- =>
-    -- slopeA * rootA = slope * slopeB * rootB + slope * interceptB + intercept - interceptA
-    -- =>
-    -- rootA = (slope * slopeB * rootB + slope * interceptB + intercept - interceptA) / slopeA
-    relateF rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
-  where
-    relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> RelM n (RefRelations n)
-    relateF var1 slope' var2 intercept' = relate var1 (LinRel slope' intercept') var2
+-- composeLookup :: (GaloisField n, Integral n) => RefRelations n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> RelM n (RefRelations n)
+-- composeLookup xs refA refB slope intercept relationA relationB = case (relationA, relationB) of
+--   (Root, Root) ->
+--     -- rootA = slope * rootB + intercept
+--     relateF refA slope refB intercept xs
+--   (Root, Constant n) ->
+--     -- rootA = slope * n + intercept
+--     assign refA (slope * n + intercept) xs
+--   (Root, ChildOf slopeB rootB interceptB) ->
+--     -- rootA = slope * refB + intercept && refB = slopeB * rootB + interceptB
+--     -- =>
+--     -- rootA = slope * (slopeB * rootB + interceptB) + intercept
+--     -- =>
+--     -- rootA = slope * slopeB * rootB + slope * interceptB + intercept
+--     relateF refA (slope * slopeB) rootB (slope * interceptB + intercept) xs
+--   (Constant n, Root) ->
+--     -- n = slope * rootB + intercept
+--     -- =>
+--     -- rootB = (n - intercept) / slope
+--     assign refB ((n - intercept) / slope) xs
+--   (Constant n, Constant m) ->
+--     -- n = slope * m + intercept
+--     -- =>
+--     -- n - intercept = slope * m
+--     -- =>
+--     -- m = (n - intercept) / slope
+--     if m == (n - intercept) / slope
+--       then return xs
+--       else throwError $ ConflictingValuesF m ((n - intercept) / slope)
+--   (Constant n, ChildOf slopeB rootB interceptB) ->
+--     -- n = slope * (slopeB * rootB + interceptB) + intercept
+--     -- =>
+--     -- slope * (slopeB * rootB + interceptB) = n - intercept
+--     -- =>
+--     -- slopeB * rootB + interceptB = (n - intercept) / slope
+--     -- =>
+--     -- slopeB * rootB = (n - intercept) / slope - interceptB
+--     -- =>
+--     -- rootB = ((n - intercept) / slope - interceptB) / slopeB
+--     assign rootB (((n - intercept) / slope - interceptB) / slopeB) xs
+--   (ChildOf slopeA rootA interceptA, Root) ->
+--     -- refA = slopeA * rootA + interceptA = slope * rootB + intercept
+--     -- =>
+--     -- rootA = (slope * rootB + intercept - interceptA) / slopeA
+--     relateF rootA (slope / slopeA) refB ((intercept - interceptA) / slopeA) xs
+--   (ChildOf slopeA rootA interceptA, Constant n) ->
+--     -- refA = slopeA * rootA + interceptA = slope * n + intercept
+--     -- =>
+--     -- rootA = (slope * n + intercept - interceptA) / slopeA
+--     assign rootA ((slope * n + intercept - interceptA) / slopeA) xs
+--   (ChildOf slopeA rootA interceptA, ChildOf slopeB rootB interceptB) ->
+--     -- refA = slopeA * rootA + interceptA = slope * (slopeB * rootB + interceptB) + intercept
+--     -- =>
+--     -- slopeA * rootA = slope * slopeB * rootB + slope * interceptB + intercept - interceptA
+--     -- =>
+--     -- rootA = (slope * slopeB * rootB + slope * interceptB + intercept - interceptA) / slopeA
+--     relateF rootA (slope * slopeB / slopeA) rootB ((slope * interceptB + intercept - interceptA) / slopeA) xs
+--   where
+--     relateF :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> RelM n (RefRelations n)
+--     relateF var1 slope' var2 intercept' = relate var1 (LinRel slope' intercept') var2
 
 --------------------------------------------------------------------------------
 
@@ -515,8 +473,8 @@ renderLinRel (var, LinRel x y) = go (LinRel (recip x) (-y / x))
 --      x = ay + b
 --        =>
 --      y = (x - b) / a
-invertLinRel :: (GaloisField n, Integral n) => LinRel n -> Maybe (LinRel n)
-invertLinRel (LinRel a b) = Just (LinRel (recip a) (-b / a))
+invertLinRel :: (GaloisField n, Integral n) => LinRel n -> LinRel n
+invertLinRel (LinRel a b) = LinRel (recip a) (-b / a)
 
 -- | `execLinRel relation parent = child`
 execLinRel :: (GaloisField n, Integral n) => LinRel n -> n -> n

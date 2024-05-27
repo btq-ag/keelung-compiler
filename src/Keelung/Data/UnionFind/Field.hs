@@ -12,9 +12,7 @@ module Keelung.Data.UnionFind.Field
 
     -- * Operations
     assign,
-    relateR,
-    relateB,
-    markChanged,
+    relate,
 
     -- * Conversions,
     toConstraints,
@@ -166,26 +164,6 @@ relate a relation b relations =
           IsRoot children -> Map.size children
           IsConstant _ -> 0
           IsChildOf parent _ -> childrenSizeOf parent
-
--- | Specialized version of `relate` for relating a variable to a constant
---    var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => SliceRelations -> Ref -> n -> Ref -> n -> RefRelations n -> RelM n (RefRelations n)
-relateR relationsS x slope y intercept xs =
-  case (x, y, slope, intercept) of
-    (_, _, 0, value) -> assign x value xs
-    (refA, refB, _, _) ->
-      composeLookup
-        xs
-        refA
-        refB
-        slope
-        intercept
-        (lookup relationsS refA xs)
-        (lookup relationsS refB xs)
-
--- | Specialized version of `relate` for relating Boolean variables
-relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> RelM n (RefRelations n)
-relateB refA (polarity, refB) = relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB)
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
@@ -414,8 +392,8 @@ lookup _ var relations =
     IsRoot _ -> Root
     IsChildOf parent (LinRel a b) -> ChildOf a parent b
 
-composeLookup :: (GaloisField n, Integral n) => RefRelations n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> RelM n (RefRelations n)
-composeLookup xs refA refB slope intercept relationA relationB = case (relationA, relationB) of
+_composeLookup :: (GaloisField n, Integral n) => RefRelations n -> Ref -> Ref -> n -> n -> Lookup n -> Lookup n -> RelM n (RefRelations n)
+_composeLookup xs refA refB slope intercept relationA relationB = case (relationA, relationB) of
   (Root, Root) ->
     -- rootA = slope * rootB + intercept
     relateF refA slope refB intercept xs

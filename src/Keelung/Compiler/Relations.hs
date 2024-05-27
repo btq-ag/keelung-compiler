@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 module Keelung.Compiler.Relations
   ( Relations (..),
@@ -76,7 +76,7 @@ assignB ref val = assignR (B ref) (if val then 1 else 0)
 
 assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> RelM n (Relations n)
 assignS slice int relations = do
-  RefRelations.markChanged
+  markChanged
   return $
     relations
       { relationsS = SliceRelations.assign slice (U.new (Slice.sliceEnd slice - Slice.sliceStart slice) int) (relationsS relations)
@@ -87,11 +87,11 @@ relateB refA (polarity, refB) = updateRelationsR (RefRelations.relateB refA (pol
 
 -- var = slope * var2 + intercept
 relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> RelM n (Relations n)
-relateR x slope y intercept xs = updateRelationsR (RefRelations.relateR (relationsS xs) x slope y intercept) xs
+relateR x slope y intercept = updateRelationsR (RefRelations.relateR x slope y intercept)
 
 relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> RelM n (Relations n)
 relateS slice1 slice2 relations = do
-  RefRelations.markChanged
+  markChanged
   return $
     relations
       { relationsS = SliceRelations.relate slice1 slice2 (relationsS relations)
