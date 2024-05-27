@@ -105,37 +105,35 @@ new = RefRelations mempty
 --------------------------------------------------------------------------------
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> RelM n (RefRelations n)
+assign :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> RelM n (Maybe (RefRelations n))
 assign var value (RefRelations relations) = case Map.lookup var relations of
   -- The variable is not in the map, so we add it as a constant
-  Nothing -> do
-    markChanged
-    return $ RefRelations $ Map.insert var (IsConstant value) relations
+  Nothing -> return $ Just $ RefRelations $ Map.insert var (IsConstant value) relations
   -- The variable is already a constant, so we check if the value is the same
   Just (IsConstant oldValue) ->
     if oldValue == value
-      then return (RefRelations relations)
+      then return Nothing
       else throwError (ConflictingValuesF oldValue value)
   -- The variable is already a root, so we:
   --    1. Make its children constants
   --    2. Make the root itself a constant
-  Just (IsRoot toChildren) -> do
-    markChanged
+  Just (IsRoot toChildren) ->
     return $
-      RefRelations $
-        foldl
-          ( \rels (child, relationToChild) ->
-              -- child = relationToChild var
-              -- var = value
-              --    =>
-              -- child = relationToChild value
-              Map.insert
-                child
-                (IsConstant (execLinRel relationToChild value))
-                rels
-          )
-          (Map.insert var (IsConstant value) relations)
-          (Map.toList toChildren)
+      Just $
+        RefRelations $
+          foldl
+            ( \rels (child, relationToChild) ->
+                -- child = relationToChild var
+                -- var = value
+                --    =>
+                -- child = relationToChild value
+                Map.insert
+                  child
+                  (IsConstant (execLinRel relationToChild value))
+                  rels
+            )
+            (Map.insert var (IsConstant value) relations)
+            (Map.toList toChildren)
   -- The variable is already a child of another variable, so we:
   --    1. Make the parent a constant (by calling `assign` recursively)
   -- child = relation parent
@@ -144,14 +142,14 @@ assign var value (RefRelations relations) = case Map.lookup var relations of
   Just (IsChildOf parent relationToChild) -> assign parent (execLinRel (invertLinRel relationToChild) value) (RefRelations relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> RelM n (RefRelations n)
+relate :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> RelM n (Maybe (RefRelations n))
 relate a relation b relations = relateWithLookup (a, lookupInternal a relations) relation (b, lookupInternal b relations) relations
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relateWithLookup :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> RelM n (RefRelations n)
+relateWithLookup :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> RelM n (Maybe (RefRelations n))
 relateWithLookup (a, aLookup) relation (b, bLookup) relations =
   if a == b -- if the variables are the same, do nothing and return the original relations
-    then return relations
+    then return Nothing
     else case compareSeniority a b of
       LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
       GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
@@ -167,19 +165,19 @@ relateWithLookup (a, aLookup) relation (b, bLookup) relations =
 
 -- | Specialized version of `relate` for relating a variable to a constant
 --    var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> RelM n (RefRelations n)
+relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> RelM n (Maybe (RefRelations n))
 relateR x slope y intercept = relate x (LinRel slope intercept) y
 
 -- | Specialized version of `relate` for relating Boolean variables
-relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> RelM n (RefRelations n)
+relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> RelM n (Maybe (RefRelations n))
 relateB refA (polarity, refB) = relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB)
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
-relateChildToParent :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> RelM n (RefRelations n)
+relateChildToParent :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> RelM n (Maybe (RefRelations n))
 relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) relations =
   if child == parent
-    then return relations -- no-op
+    then return Nothing -- no-op
     else case parentLookup of
       -- The parent is a constant, so we make the child a constant:
       --    * for the parent: do nothing
@@ -192,18 +190,18 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
         --    * for the child: point the child to the parent and add the relation
         --    * for the grandchildren: point them to the new parent
         IsRoot toGrandChildren -> do
-          markChanged
           let newSiblings = Map.insert child relationToChild $ Map.map (relationToChild <>) toGrandChildren
           return $
-            RefRelations $
-              Map.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
-                 -- add the child and its grandchildren to the parent
-                Map.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
-                  Map.foldlWithKey' -- point the grandchildren to the new parent
-                    ( \rels grandchild relationToGrandChild -> Map.insert grandchild (IsChildOf parent (relationToGrandChild <> relationToChild)) rels
-                    )
-                    (unRefRelations relations)
-                    toGrandChildren
+            Just $
+              RefRelations $
+                Map.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
+                -- add the child and its grandchildren to the parent
+                  Map.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
+                    Map.foldlWithKey' -- point the grandchildren to the new parent
+                      ( \rels grandchild relationToGrandChild -> Map.insert grandchild (IsChildOf parent (relationToGrandChild <> relationToChild)) rels
+                      )
+                      (unRefRelations relations)
+                      toGrandChildren
         --
         -- The child is a constant, so we make the parent a constant, too:
         --  * for the parent: assign it the value of the child with the inverted relation applied
@@ -227,7 +225,6 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
               -- child = parent2ToChild parent2
               --    => parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
               --    or parent = (invertLinRel relationToChild <> parent2ToChild) parent2
-              markChanged
               relateWithLookup (parent2, lookupInternal parent2 relations) (invertLinRel parent2ToChild <> relationToChild) (parent, parentLookup) $
                 RefRelations $
                   Map.insert child (IsChildOf parent relationToChild) $

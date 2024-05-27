@@ -81,10 +81,10 @@ freshRefU width = do
   modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ RefUX width index
 
-execRelations :: (Relations n -> Relations.RelM n (Relations n)) -> M n ()
+execRelations :: (Relations n -> Relations.RelM n (Maybe (Relations n))) -> M n ()
 execRelations f = do
   cs <- get
-  result <- lift $ lift $ (Relations.runRelM . f) (cmRelations cs)
+  result <- lift $ lift $ f (cmRelations cs)
   case result of
     Nothing -> return ()
     Just relations -> put cs {cmRelations = relations}
