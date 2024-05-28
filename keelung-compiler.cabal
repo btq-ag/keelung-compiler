@@ -258,6 +258,7 @@ test-suite keelung-test
       Test.Data.PolyRS
       Test.Data.RefUSegments
       Test.Data.UnionFind.Boolean
+      Test.Data.UnionFind.Field
       Test.Experiment
       Test.Intergration
       Test.Optimization
