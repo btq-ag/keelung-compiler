@@ -28,7 +28,10 @@ instance Seniority Ref where
   compareSeniority = compare `on` hasLevel
 
 instance Seniority Int where
-  compareSeniority = compare
+  compareSeniority x y = case x `compare` y of 
+    EQ -> EQ
+    LT -> GT
+    GT -> LT
 
 --------------------------------------------------------------------------------
 

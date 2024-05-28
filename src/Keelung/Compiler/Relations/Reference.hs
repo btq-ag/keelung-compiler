@@ -196,7 +196,7 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
                 -- add the child and its grandchildren to the parent
                   Map.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
                     Map.foldlWithKey' -- point the grandchildren to the new parent
-                      ( \rels grandchild relationToGrandChild -> Map.insert grandchild (IsChildOf parent (relationToGrandChild <> relationToChild)) rels
+                      ( \rels grandchild relationToGrandChild -> Map.insert grandchild (IsChildOf parent (relationToChild <> relationToGrandChild)) rels
                       )
                       (unRefRelations relations)
                       toGrandChildren

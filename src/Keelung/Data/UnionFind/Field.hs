@@ -1,6 +1,9 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use list comprehension" #-}
 
 module Keelung.Data.UnionFind.Field
   ( -- * Construction
@@ -33,14 +36,28 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import GHC.Generics (Generic)
-import Keelung (Var)
+import Keelung (N (N), Var)
 import Keelung.Compiler.Relations.Monad (Seniority (compareSeniority))
+import Keelung.Data.N qualified as N
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
 
 newtype UnionFind n = UnionFind {unUnionFind :: IntMap (VarStatus n)} -- relation to the parent
-  deriving (Show, Eq, Generic, Functor)
+  deriving (Eq, Generic, Functor)
+
+instance (GaloisField n, Integral n) => Show (UnionFind n) where
+  show (UnionFind relations) =
+    "UnionFind\n"
+      <> mconcat (map (<> "\n") (concatMap toString (IntMap.toList relations)))
+    where
+      showVar var = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
+
+      toString (var, IsConstant value) = [showVar var <> " = " <> show value]
+      toString (var, IsRoot toChildren) = case map renderLinRel (IntMap.toList toChildren) of
+        [] -> [showVar var <> " = []"] -- should never happen
+        (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
+      toString (_var, IsChildOf _parent _relation) = ["$" <> show _parent <> " = $" <> show _var <> " " <> show _relation]
 
 instance (NFData n) => NFData (UnionFind n)
 
@@ -131,19 +148,11 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
                 UnionFind $
                   IntMap.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
                   -- add the child and its grandchildren to the parent
-                  -- add the child and its grandchildren to the parent
-                  -- add the child and its grandchildren to the parent
-                  -- add the child and its grandchildren to the parent
-                  -- add the child and its grandchildren to the parent
-                  -- add the child and its grandchildren to the parent
-                  -- add the child and its grandchildren to the parent
                     IntMap.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
                       IntMap.foldlWithKey' -- point the grandchildren to the new parent
-                        ( \rels grandchild relationToGrandChild -> IntMap.insert grandchild (IsChildOf parent (relationToGrandChild <> relationToChild)) rels
-                        )
+                        (\rels grandchild relationToGrandChild -> IntMap.insert grandchild (IsChildOf parent (relationToChild <> relationToGrandChild)) rels)
                         (unUnionFind relations)
                         toGrandChildren
-        --
         -- The child is a constant, so we make the parent a constant, too:
         --  * for the parent: assign it the value of the child with the inverted relation applied
         --  * for the child: do nothing
@@ -161,7 +170,6 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
             --    or parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
               relateWithLookup (parent, parentLookup) (invertLinRel relationToChild <> parent2ToChild) (parent2, lookupInternal parent2 relations) relations
             else do
-              --
               -- child = relationToChild parent
               -- child = parent2ToChild parent2
               --    => parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
@@ -277,13 +285,33 @@ fromLinRel (LinRel a b) = (a, b)
 -- | Computes the inverse of a relation
 --      x = ay + b
 --        =>
---      y = (x - b) / a
+--      y = (1/a) x + (-b/a)
 invertLinRel :: (GaloisField n, Integral n) => LinRel n -> LinRel n
-invertLinRel (LinRel a b) = LinRel (recip a) (-b / a)
+invertLinRel (LinRel a b) = LinRel (recip a) ((-b) / a)
 
 -- | `execLinRel relation parent = child`
 execLinRel :: (GaloisField n, Integral n) => LinRel n -> n -> n
 execLinRel (LinRel a b) value = a * value + b
+
+-- | Render LinRel to some child as a string
+renderLinRel :: (GaloisField n, Integral n) => (Int, LinRel n) -> String
+renderLinRel (var, rel) = go rel
+  where
+    var' = "$" <> show var
+
+    go (LinRel (-1) 1) = "¬" <> var'
+    go (LinRel a b) =
+      let slope = case a of
+            1 -> var'
+            (-1) -> "-" <> var'
+            _ -> show (N a) <> var'
+          intercept = case b of
+            0 -> ""
+            _ ->
+              if N.isPositive b
+                then " + " <> show (N b)
+                else " - " <> show (N (-b))
+       in slope <> intercept
 
 --------------------------------------------------------------------------------
 
@@ -316,13 +344,12 @@ allChildrenRecognizeTheirParent relations =
         _ -> False
       childrenNotRecognizeParent parent = IntMap.filterWithKey (\child status -> not $ recognizeParent parent child status)
    in --  . IntMap.elems . IntMap.mapWithKey (recognizeParent parent)
-      IntMap.foldlWithKey'
-        ( \acc parent children ->
+      concatMap
+        ( \(parent, children) ->
             let badChildren = childrenNotRecognizeParent parent children
-             in if null badChildren then acc else ChildrenNotRecognizingParent parent (IntMap.keysSet badChildren) : acc
+             in if null badChildren then [] else [ChildrenNotRecognizingParent parent (IntMap.keysSet badChildren)]
         )
-        []
-        families
+        $ IntMap.toList families
 
 -- | A Reference is valid if the seniority of the root of a family is greater than equal the seniority of all its children
 rootsAreSenior :: UnionFind n -> [Error]

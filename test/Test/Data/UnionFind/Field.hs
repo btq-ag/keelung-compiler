@@ -15,6 +15,16 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Field UnionFind" $ do
+  -- it "test" $ do
+  --   --
+  --   -- $300 = 2 * $200 + 8  <=> 9 * $300 + 13 = $200
+  --   --                          3 * $300 + 4 = $100
+  --   -- $200 = 3 * $100 + 1  <=> 6 * $200 + 11 = $100
+  --   -- 
+  --   let relates = [Relate 200 2 300 8, Relate 100 3 200 1]
+  --   let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
+  --   UnionFind.validate xs `shouldBe` []
+
   it "relate" $ do
     property $ \relates -> do
       let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
@@ -31,11 +41,11 @@ data Relate n = Relate Var n Var n -- var1 = slope * var2 + intercept
 instance (GaloisField n, Integral n) => Show (Relate n) where 
     show (Relate var1 slope var2 intercept) = "$" <> show var1 <> " = " <> show (N slope) <> " * $" <> show var2 <> " + " <> show (N intercept)
 
-instance (Arbitrary n) => Arbitrary (Relate n) where
+instance (Arbitrary n, Eq n, Num n) => Arbitrary (Relate n) where
   arbitrary =
     Relate
       <$> chooseInt (0, 100) -- var1
-      <*> arbitrary
+      <*> (arbitrary `suchThat` (/= 0))
       <*> chooseInt (0, 100) -- var2
       <*> arbitrary
 
