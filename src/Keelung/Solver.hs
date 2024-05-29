@@ -238,7 +238,14 @@ shrinkAddBySubst xs = do
       -- c + coeff var = 0
       assign "add" var (-c / coeff)
       return Eliminated
-    Polynomial changed xs' -> return $ shrinkedOrStuck [changed] xs'
+    Polynomial changed xs' -> case viewBinomial changed xs' of
+      Just (Binomial _ _ c (x, a) (y, b)) -> do
+        -- c + a x + b y = 0
+        --    =>
+        -- x = (-b / a) y + (-c / a)
+        relate "add" x (-b / a) y (-c / a)
+        return $ shrinkedOrStuck [changed] xs'
+      Nothing -> return $ shrinkedOrStuck [changed] xs'
 
 -- | Shrinking a multiplicative constraint by substitution
 shrinkMulBySubst :: (GaloisField n, Integral n) => Poly n -> Poly n -> Either n (Poly n) -> M n (Result (Constraint n))

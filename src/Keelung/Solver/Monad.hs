@@ -71,7 +71,7 @@ tryLog x = do
 -- | Asssign a value to a variable, with message for debugging
 assign :: (GaloisField n, Integral n) => String -> Var -> n -> M n ()
 assign msg var val = do
-  tryLog $ LogBindVar msg var val
+  tryLog $ LogAssign msg var val
   context <- get
   forM_ (UnionFind.assign var val context) put
 
@@ -88,6 +88,20 @@ assignSegment msg (Segments xs) val = foldM_ bindSegment 0 xs
       forM_ [0 .. w - 1] $ \i -> do
         assign msg (var + i) (if Data.Bits.testBit val (offset + i) then 1 else 0)
       return (offset + w)
+
+-- | Relate a variable to another variable: var1 = slope * var2 + intercept
+relate ::
+  (GaloisField n, Integral n) =>
+  String -> -- message for debugging
+  Var -> -- var1
+  n -> -- slope
+  Var -> -- var2
+  n -> -- intercept
+  M n ()
+relate msg var1 slope var2 intercept = do
+  tryLog $ LogRelate msg var1 slope var2 intercept
+  context <- get
+  forM_ (UnionFind.relate var1 slope var2 intercept context) put
 
 -- | See if a variable is a Boolean variable
 isBooleanVar :: Var -> M n Bool
@@ -280,13 +294,15 @@ instance (Integral n, GaloisField n) => Show (LogReport n) where
 
 -- | Data structure for log entries
 data Log n
-  = LogBindVar String Var n
+  = LogAssign String Var n
+  | LogRelate String Var n Var n
   | LogEliminateConstraint (Constraint n)
   | LogShrinkConstraint (Constraint n) (Constraint n)
   | LogBinRepDetection (Poly n) [(Var, Bool)]
 
 instance (Integral n, GaloisField n) => Show (Log n) where
-  show (LogBindVar msg var val) = "  BIND  " <> take 10 (msg <> "          ") <> "  $" <> show var <> " := " <> show (N val)
+  show (LogAssign msg var val) = "  ASGN  " <> take 10 (msg <> "          ") <> "  $" <> show var <> " = " <> show (N val)
+  show (LogRelate msg var1 slope var2 intercept) = "  RELT  " <> take 10 (msg <> "          ") <> "  $" <> show var1 <> " = " <> show (N slope) <> " * $" <> show var2 <> " + " <> show (N intercept)
   show (LogEliminateConstraint c) = "  ELIM  " <> show (fmap N c)
   show (LogShrinkConstraint c1 c2) = "  SHNK  " <> show (fmap N c1) <> "\n    ->  " <> show (fmap N c2)
   show (LogBinRepDetection poly assignments) =
@@ -354,3 +370,20 @@ data PolyView n
       Bool -- changed by substitution
       (Poly n) -- polynomial after substitution
   deriving (Show, Eq, Ord, Functor)
+
+-- | For representing a binomial
+data BinomialView n
+  = Binomial
+      Bool -- changed by substitution
+      (Poly n) -- polynomial after substitution
+      n -- constant term
+      (Var, n) -- variable and coefficient
+      (Var, n) -- variable and coefficient
+  deriving (Show, Eq, Ord, Functor)
+
+-- | View of a polynomial with more than 1 variable as a binomial
+viewBinomial :: (Num n, Eq n) => Bool -> Poly n -> Maybe (BinomialView n)
+viewBinomial changed poly = case Poly.view poly of
+  (constant, xs) -> case IntMap.toList xs of
+    [(var1, coeff1), (var2, coeff2)] -> Just $ Binomial changed poly constant (var1, coeff1) (var2, coeff2)
+    _ -> Nothing
