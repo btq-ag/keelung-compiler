@@ -15,6 +15,7 @@ module Keelung.Data.UnionFind.Field
     relate,
 
     -- * Conversions,
+    export,
 
     -- * Queries
     Lookup (..),
@@ -35,6 +36,7 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
+import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (N (N), Var)
 import Keelung.Compiler.Relations.Monad (Seniority (compareSeniority))
@@ -45,6 +47,8 @@ import Prelude hiding (lookup)
 
 newtype UnionFind n = UnionFind {unUnionFind :: IntMap (VarStatus n)} -- relation to the parent
   deriving (Eq, Generic, Functor)
+
+instance (Serialize n) => Serialize (UnionFind n)
 
 instance (GaloisField n, Integral n) => Show (UnionFind n) where
   show (UnionFind relations) =
@@ -184,6 +188,24 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
 
 --------------------------------------------------------------------------------
 
+export ::
+  UnionFind n ->
+  ( IntMap n, -- constant assignments
+    IntMap (IntMap (n, n)) -- roots with mappings to their children with `(slope, intercept)`
+  )
+export (UnionFind relations) = (constants, roots)
+  where
+    constants = IntMap.mapMaybe toConstant relations
+    roots = IntMap.mapMaybe toRoot relations
+
+    toConstant (IsConstant value) = Just value
+    toConstant _ = Nothing
+
+    toRoot (IsRoot children) = Just $ IntMap.map fromLinRel children
+    toRoot _ = Nothing
+
+--------------------------------------------------------------------------------
+
 -- | Calculates the relation between two variables, O(lg n)
 relationBetween :: (GaloisField n, Integral n) => Var -> Var -> UnionFind n -> Maybe (n, n)
 relationBetween var1 var2 xs =
@@ -239,6 +261,8 @@ data VarStatus n
 
 instance (NFData n) => NFData (VarStatus n)
 
+instance (Serialize n) => Serialize (VarStatus n)
+
 -- | Returns the result of looking up a variable, O(lg n)
 lookupInternal :: Var -> UnionFind n -> VarStatus n
 lookupInternal var (UnionFind relations) = case IntMap.lookup var relations of
@@ -277,6 +301,8 @@ instance (Num n) => Semigroup (LinRel n) where
 
 instance (Num n) => Monoid (LinRel n) where
   mempty = LinRel 1 0
+
+instance (Serialize n) => Serialize (LinRel n)
 
 -- | Extracts the coefficients from a LinRel
 fromLinRel :: LinRel n -> (n, n)

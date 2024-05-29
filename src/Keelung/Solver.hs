@@ -29,6 +29,7 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
+import Keelung.Data.UnionFind.Field qualified as UnionFind
 import Keelung.Solver.BinRep qualified as BinRep
 import Keelung.Solver.Binary qualified as Binary
 import Keelung.Solver.Monad
@@ -120,8 +121,12 @@ goThroughManyTimes constraints = do
 goThroughOnce :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n (Result (Seq (Constraint n)))
 goThroughOnce constraints = mconcat <$> mapM shrink (toList constraints)
 
-lookupVar :: Var -> M n (Maybe n)
-lookupVar var = gets (IntMap.lookup var)
+lookupVar :: GaloisField n => Var -> M n (Maybe n)
+lookupVar var = do
+  context <- get
+  case UnionFind.lookup var context of
+    UnionFind.Constant val -> return $ Just val
+    _ -> return Nothing
 
 -- | If all segments are assigned values, then return the combined value of the segments
 lookupSegments :: (GaloisField n, Integral n) => Segments -> M n (Maybe U)
@@ -226,8 +231,8 @@ shrinkAdd (Stuck polynomial) = return (Stuck polynomial)
 -- | Shrinking an Polynomial by substitution
 shrinkAddBySubst :: (GaloisField n, Integral n) => Poly n -> M n (Result (Poly n))
 shrinkAddBySubst xs = do
-  bindings <- get
-  case substAndView bindings xs of
+  context <- get
+  case substAndView context xs of
     Constant c -> eliminateIfHold c 0
     Uninomial _ _ c (var, coeff) -> do
       -- c + coeff var = 0
