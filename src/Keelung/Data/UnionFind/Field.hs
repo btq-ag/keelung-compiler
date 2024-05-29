@@ -16,6 +16,7 @@ module Keelung.Data.UnionFind.Field
 
     -- * Conversions,
     export,
+    renderFamilies,
 
     -- * Queries
     Lookup (..),
@@ -61,7 +62,7 @@ instance (GaloisField n, Integral n) => Show (UnionFind n) where
       toString (var, IsRoot toChildren) = case map renderLinRel (IntMap.toList toChildren) of
         [] -> [showVar var <> " = []"] -- should never happen
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
-      toString (_var, IsChildOf _parent _relation) = ["$" <> show _parent <> " = $" <> show _var <> " " <> show _relation]
+      toString (_var, IsChildOf _parent _relation) = []
 
 instance (NFData n) => NFData (UnionFind n)
 
@@ -188,10 +189,13 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
 
 --------------------------------------------------------------------------------
 
+-- | Exports the UnionFind as a pair of:
+--    1. a map from the constant variables to their values
+--    2. a map from the root variables to their children with the relation `(slope, intercept)`
 export ::
   UnionFind n ->
-  ( IntMap n, -- constant assignments
-    IntMap (IntMap (n, n)) -- roots with mappings to their children with `(slope, intercept)`
+  ( IntMap n, -- constants
+    IntMap (IntMap (n, n)) -- families
   )
 export (UnionFind relations) = (constants, roots)
   where
@@ -203,6 +207,15 @@ export (UnionFind relations) = (constants, roots)
 
     toRoot (IsRoot children) = Just $ IntMap.map fromLinRel children
     toRoot _ = Nothing
+
+-- | Helper function to render the families resulted from `export`
+renderFamilies :: (GaloisField n, Integral n) => IntMap (IntMap (n, n)) -> String
+renderFamilies families = mconcat (map (<> "\n") (concatMap toString (IntMap.toList families)))
+  where
+    showVar var = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
+    toString (root, toChildren) = case map renderLinRel (IntMap.toList (fmap (uncurry LinRel) toChildren)) of
+      [] -> [showVar root <> " = []"] -- should never happen
+      (x : xs) -> showVar root <> " = " <> x : map ("           = " <>) xs
 
 --------------------------------------------------------------------------------
 

@@ -68,23 +68,25 @@ tryLog x = do
   inDebugMode <- asks envDebugMode
   when inDebugMode $ tell (pure x)
 
-bindVar :: (GaloisField n, Integral n) => String -> Var -> n -> M n ()
-bindVar msg var val = do
+-- | Asssign a value to a variable, with message for debugging
+assign :: (GaloisField n, Integral n) => String -> Var -> n -> M n ()
+assign msg var val = do
   tryLog $ LogBindVar msg var val
   context <- get
   forM_ (UnionFind.assign var val context) put
 
-bindSegments :: (GaloisField n, Integral n) => String -> Segments -> U -> M n ()
-bindSegments msg (Segments xs) val = foldM_ bindSegment 0 xs
+-- | Assign a value to a segment (a series of variables)
+assignSegment :: (GaloisField n, Integral n) => String -> Segments -> U -> M n ()
+assignSegment msg (Segments xs) val = foldM_ bindSegment 0 xs
   where
     bindSegment :: (GaloisField n, Integral n) => Int -> Segment -> M n Int
     bindSegment offset (SegConst x) = return (offset + widthOf x)
     bindSegment offset (SegVar var) = do
-      bindVar msg var (if Data.Bits.testBit val offset then 1 else 0)
+      assign msg var (if Data.Bits.testBit val offset then 1 else 0)
       return (offset + 1)
     bindSegment offset (SegVars w var) = do
       forM_ [0 .. w - 1] $ \i -> do
-        bindVar msg (var + i) (if Data.Bits.testBit val (offset + i) then 1 else 0)
+        assign msg (var + i) (if Data.Bits.testBit val (offset + i) then 1 else 0)
       return (offset + w)
 
 -- | See if a variable is a Boolean variable
@@ -229,11 +231,15 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (BooleanConstraintError var val) =
     "expected the value of $" <> show var <> " to be either 0 or 1, but got `" <> show (N val) <> "`"
   show (StuckError context constraints) =
-    let (assignments, _roots) = UnionFind.export context
+    let (assignments, roots) = UnionFind.export context
      in "stuck when trying to solve these constraints: \n"
           <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
           <> "while these variables have been solved: \n"
           <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList assignments)
+          <> ( if IntMap.null roots
+                 then ""
+                 else "and these equivalence classes have been formed: \n" <> UnionFind.renderFamilies roots
+             )
   show (ModInvError segments p) =
     "Unable to calculate '" <> show segments <> " `modInv` " <> show p <> "'"
   show (DividendIsZeroError segments) =
@@ -339,6 +345,12 @@ substAndView context xs =
 -- | View of result after substituting a polynomial
 data PolyView n
   = Constant n
-  | Uninomial Bool (Poly n) n (Var, n)
-  | Polynomial Bool (Poly n)
+  | Uninomial -- 0 = c + ax
+      Bool -- changed by substitution
+      (Poly n) -- polynomial after substitution
+      n -- constant term
+      (Var, n) -- variable and coefficient
+  | Polynomial
+      Bool -- changed by substitution
+      (Poly n) -- polynomial after substitution
   deriving (Show, Eq, Ord, Functor)

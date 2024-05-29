@@ -198,7 +198,7 @@ shrinkAdd (Stuck (AddConstraint polynomial)) = do
           -- we have a binary representation
           -- we can now assign the variables
           forM_ (IntMap.toList boolAssignments) $ \(var, val) -> do
-            bindVar "bin rep bool" var (if val then 1 else 0)
+            assign "bin rep bool" var (if val then 1 else 0)
           return Eliminated
 
     trySolveAddativeConstraintOnBinaryFields :: (GaloisField n, Integral n) => Poly n -> M n (Result (Poly n))
@@ -217,10 +217,10 @@ shrinkAdd (Stuck (AddConstraint polynomial)) = do
         then case Binary.run poly of
           Nothing -> return (Stuck poly)
           -- Just (assignments, eqClasses) -> do
-          --   mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
+          --   mapM_ (\(var, val) -> assign "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
           --   return Eliminated
           -- Just (assignments, eqClasses) -> do
-          --   mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
+          --   mapM_ (\(var, val) -> assign "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
           --   return (Shrinked polynomial')
           Just (Binary.Result {}) -> do
             -- TODO: handle this case
@@ -236,7 +236,7 @@ shrinkAddBySubst xs = do
     Constant c -> eliminateIfHold c 0
     Uninomial _ _ c (var, coeff) -> do
       -- c + coeff var = 0
-      bindVar "add" var (-c / coeff)
+      assign "add" var (-c / coeff)
       return Eliminated
     Polynomial changed xs' -> return $ shrinkedOrStuck [changed] xs'
 
@@ -255,7 +255,7 @@ shrinkMulBySubst as bs (Left c) = do
       -- a * coeff * var = c - a * b
       --    =>
       -- var = (c - a * b) / (coeff * a)
-      bindVar "mul 1" var ((c - a * b) / (coeff * a))
+      assign "mul 1" var ((c - a * b) / (coeff * a))
       return Eliminated
     (Constant a, Polynomial _ bs') -> case Poly.multiplyBy a bs' of
       Left constant -> eliminateIfHold constant c
@@ -263,7 +263,7 @@ shrinkMulBySubst as bs (Left c) = do
     (Uninomial {}, Constant 0) -> eliminateIfHold 0 c -- 'c' should be 0
     (Uninomial _ _ a (var, coeff), Constant b) -> do
       -- (a + coeff var) * b = c
-      bindVar "mul 2" var ((c - a * b) / (coeff * b))
+      assign "mul 2" var ((c - a * b) / (coeff * b))
       return Eliminated
     (Uninomial av as' constA (varA, coeffA), Uninomial bv bs' constB (varB, coeffB)) ->
       if c == 1
@@ -275,11 +275,11 @@ shrinkMulBySubst as bs (Left c) = do
               -- as = 1
               --    =>
               -- constA + coeffA * varA = 1
-              bindVar "mul a*b=1" varA ((1 - constA) / coeffA)
+              assign "mul a*b=1" varA ((1 - constA) / coeffA)
               -- bs = 1
               --    =>
               -- constB + coeffB * varB = 1
-              bindVar "mul a*b=1" varB ((1 - constB) / coeffB)
+              assign "mul a*b=1" varB ((1 - constB) / coeffB)
               return Eliminated
             else return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
         else return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
@@ -295,7 +295,7 @@ shrinkMulBySubst as bs (Right cs) = do
     (Constant a, Constant b, Constant c) -> eliminateIfHold (a * b) c
     (Constant a, Constant b, Uninomial _ _ c (var, coeff)) -> do
       -- a * b - c = coeff var
-      bindVar "mul 3" var ((a * b - c) / coeff)
+      assign "mul 3" var ((a * b - c) / coeff)
       return Eliminated
     (Constant a, Constant b, Polynomial _ cs') -> return $ Shrinked $ AddConstraint (Poly.addConstant (-a * b) cs')
     -- return $ Shrinked $ R1C (Left a) (Left b) (Right cs')
@@ -310,7 +310,7 @@ shrinkMulBySubst as bs (Right cs) = do
           -- a * coeff * var = c - a * b
           --    =>
           -- var = (c - a * b) / (coeff * a)
-          bindVar "mul 4" var ((c - a * b) / (coeff * a))
+          assign "mul 4" var ((c - a * b) / (coeff * a))
           return Eliminated
     (Constant a, Uninomial _ bs' _ _, Uninomial _ cs' _ _) -> case Poly.multiplyBy (-a) bs' of
       Left constant -> return $ Shrinked $ AddConstraint (Poly.addConstant constant cs')
@@ -340,7 +340,7 @@ shrinkMulBySubst as bs (Right cs) = do
         then eliminateIfHold 0 c
         else do
           -- (a + coeff var) * b = c
-          bindVar "mul 5" var ((c - a * b) / (coeff * b))
+          assign "mul 5" var ((c - a * b) / (coeff * b))
           return Eliminated
     (Uninomial _ as' _ _, Constant b, Uninomial _ cs' _ _) -> case Poly.multiplyBy (-b) as' of
       Left constant -> return $ Shrinked $ AddConstraint (Poly.addConstant constant cs')
@@ -421,7 +421,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           when (expectedQuotientVal /= actualQuotientVal) $
             throwError $
               ConflictingValues "quotient value mismatch with remainder unknown"
-          bindSegments "remainder" remainderVar expectedRemainderVal
+          assignSegment "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Just divisorVal, Nothing, Just actualRemainderVal) -> do
           when (toInteger divisorVal == 0) $
@@ -431,15 +431,15 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError $
               ConflictingValues "remainder value mismatch with quotient unknown"
-          bindSegments "quotient" quotientVar expectedQuotientVal
+          assignSegment "quotient" quotientVar expectedQuotientVal
           return Eliminated
         (Just divisorVal, Nothing, Nothing) -> do
           when (toInteger divisorVal == 0) $
             throwError $
               DivisorIsZeroError divisorVar
           let (expectedQuotientVal, expectedRemainderVal) = if isCarryLess then dividendVal `U.clDivMod` divisorVal else dividendVal `divMod` divisorVal
-          bindSegments "quotient" quotientVar expectedQuotientVal
-          bindSegments "remainder" remainderVar expectedRemainderVal
+          assignSegment "quotient" quotientVar expectedQuotientVal
+          assignSegment "remainder" remainderVar expectedRemainderVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Just actualRemainderVal) -> do
           let expectedDivisorVal = if isCarryLess then dividendVal `U.clDiv` actualQuotientVal else dividendVal `div` actualQuotientVal
@@ -447,7 +447,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
           when (expectedRemainderVal /= actualRemainderVal) $
             throwError $
               ConflictingValues "remainder value mismatch with divisor unknown"
-          bindSegments "divisor" divisorVar expectedDivisorVal
+          assignSegment "divisor" divisorVar expectedDivisorVal
           return Eliminated
         (Nothing, Just actualQuotientVal, Nothing) -> do
           -- if the quotient is 0, then we know that:
@@ -460,8 +460,8 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
                 if toInteger dividendVal == 0
                   then throwError $ DividendIsZeroError dividendVar
                   else return $ if isCarryLess then dividendVal `U.clDivMod` actualQuotientVal else dividendVal `divMod` actualQuotientVal
-          bindSegments "divisor" divisorVar expectedDivisorVal
-          bindSegments "remainder" remainderVar expectedRemainderVal
+          assignSegment "divisor" divisorVar expectedDivisorVal
+          assignSegment "remainder" remainderVar expectedRemainderVal
           return Eliminated
         _ -> return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
     Nothing -> do
@@ -473,7 +473,7 @@ shrinkDivMod isCarryLess (dividendVar, divisorVar, quotientVar, remainderVar) = 
                 if isCarryLess
                   then (divisorVal `U.clMul` quotientVal) `Data.Bits.xor` remainderVal
                   else divisorVal * quotientVal + remainderVal
-          bindSegments "dividend" dividendVar dividendVal
+          assignSegment "dividend" dividendVar dividendVal
           return Eliminated
         _ -> do
           return $ Stuck (dividendVar, divisorVar, quotientVar, remainderVar)
@@ -500,8 +500,8 @@ shrinkModInv (i, o, n, p) = do
           let width = widthOf i
           -- iVal * result = n * p + 1
           let nVal = U.new width ((toInteger iVal * result - 1) `div` p)
-          bindSegments "ModInv n" n nVal
-          bindSegments "ModInv" o (U.new width result)
+          assignSegment "ModInv n" n nVal
+          assignSegment "ModInv" o (U.new width result)
           return Eliminated
         Nothing -> throwError $ ModInvError i p
     Nothing -> return $ Stuck (i, o, n, p)
