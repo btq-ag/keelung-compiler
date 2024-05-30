@@ -75,6 +75,11 @@ traceShowWhen :: (Show s) => Bool -> s -> a -> a
 traceShowWhen True msg = Trace.traceShow msg
 traceShowWhen False _ = id
 
+-- | Like 'traceShowId', but only when a condition is met
+traceShowIdWhen :: (Show s) => Bool -> s -> s
+traceShowIdWhen True = Trace.traceShowId
+traceShowIdWhen False = id
+
 -- | Like 'traceShowWhen', but for monadic actions
 traceShowWhenM :: (Monad m, Show s) => Bool -> s -> m ()
 traceShowWhenM True msg = Trace.traceShowM msg

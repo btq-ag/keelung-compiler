@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Test.Experiment (run, tests) where
 
@@ -24,6 +25,20 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Experiment" $ do
+
+
+  it "variable dividend / constant divisor" $ do
+      let program divisor = do
+            dividend <- input Public :: Comp (UInt 8)
+            performDivMod dividend divisor
+      let (dividend, divisor) = (44, 2)
+      let expected = [dividend `div` divisor, dividend `mod` divisor]
+      -- check gf181 (program (fromIntegral divisor)) [dividend] [] expected
+      -- check (Prime 17) (program (fromIntegral divisor)) [dividend] [] expected
+      -- check (Binary 7) (program (fromIntegral divisor)) [dividend] [] expected
+      debugSolver (Binary 7) (program (fromIntegral divisor)) [dividend] []
+
+
   -- it "Homemade div/mod" $ do
   --   let program = do
   --         dividend <- input Public :: Comp (UInt 8)
@@ -45,12 +60,13 @@ tests = describe "Experiment" $ do
   -- debug gf181 program
 
   -- check gf181 program [10, 3] [] [3]
-  it "PK inverse" $ do
-    testInversePK 0x00 0x00
+  -- it "PK inverse" $ do
+  --   testInversePK 0x00 0x00
 
 testInversePK :: Integer -> Integer -> IO ()
 testInversePK inputs expected = do
-  testSolver pkField (input Public >>= inversePK) [inputs] [] [expected]
+  -- testSolver pkField (input Public >>= inversePK) [inputs] [] [expected]
+  debugSolver pkField (input Public >>= inversePK) [inputs] []
 
 pkField :: FieldType
 pkField = Binary 340282366920938463463374607431768211457

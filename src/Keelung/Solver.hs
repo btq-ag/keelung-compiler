@@ -245,7 +245,8 @@ shrinkAddBySubst xs = do
         -- x = (-b / a) y + (-c / a)
         relate "add" x (-b / a) y (-c / a)
         return $ shrinkedOrStuck [changed] xs'
-      Nothing -> return $ shrinkedOrStuck [changed] xs'
+      Nothing -> 
+        return $ shrinkedOrStuck [changed] xs'
 
 -- | Shrinking a multiplicative constraint by substitution
 shrinkMulBySubst :: (GaloisField n, Integral n) => Poly n -> Poly n -> Either n (Poly n) -> M n (Result (Constraint n))

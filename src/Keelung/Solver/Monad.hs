@@ -283,14 +283,20 @@ data LogReport n = LogReport
 instance (Integral n, GaloisField n) => Show (LogReport n) where
   show (LogReport initState entries finalState) =
     let (initAssignments, _) = UnionFind.export initState
-        (finalAssignments, _finalRoots) = UnionFind.export finalState
+        (finalAssignments, finalRoots) = UnionFind.export finalState
      in "<Solver Log Report>\n"
-          <> "Initial State:\n"
+          <> "Initial assignments:\n"
           <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList initAssignments)
           <> "Entries:\n"
           <> concatMap (\entry -> show entry <> "\n") entries
-          <> "Final State:\n"
+          <> "Final assignments:\n"
           <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList finalAssignments)
+          <> ( if IntMap.null finalRoots
+                 then ""
+                 else
+                   "Final equivalence classes:\n"
+                     <> UnionFind.renderFamilies finalRoots
+             )
 
 -- | Data structure for log entries
 data Log n
