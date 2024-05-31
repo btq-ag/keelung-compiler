@@ -41,7 +41,6 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (N (N), Var)
 import Keelung.Compiler.Relations.Monad (Seniority (compareSeniority))
-import Keelung.Compiler.Util
 import Keelung.Data.N qualified as N
 import Prelude hiding (lookup)
 
@@ -107,20 +106,19 @@ assign var value (UnionFind relations) = case IntMap.lookup var relations of
   -- child = relation parent
   -- =>
   -- parent = relation^-1 child
-  Just (IsChildOf parent relationToChild) -> assign parent (execLinRel (invertLinRel relationToChild) value) (UnionFind relations)
+  Just (IsChildOf parent relationToChild) ->
+    assign parent (execLinRel (invertLinRel relationToChild) value) (UnionFind relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relate :: (GaloisField n, Integral n) => Var -> n -> Var -> n -> UnionFind n -> Maybe (UnionFind n)
-relate a slope b intercept relations = traceShowWhen ((a == 4 || a == 5) && (a /= 51 && a /= 52 && b /= 51 && b /= 52)) ("RELATE", a, LinRel slope intercept, b) relateWithLookup (a, lookupInternal a relations) (LinRel slope intercept) (b, lookupInternal b relations) relations
+relate a slope b intercept relations = relateWithLookup (a, lookupInternal a relations) (LinRel slope intercept) (b, lookupInternal b relations) relations
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relateWithLookup :: (GaloisField n, Integral n) => (Var, VarStatus n) -> LinRel n -> (Var, VarStatus n) -> UnionFind n -> Maybe (UnionFind n)
 relateWithLookup (a, aLookup) relation (b, bLookup) relations =
   if a == b -- if the variables are the same, do nothing and return the original relations
     then Nothing
-    else
-      traceShowWhen ((a == 4 || a == 5) && (a /= 51 && a /= 52 && b /= 51 && b /= 52)) ("??", a, relation, invertLinRel relation, b) $ 
-       case compareSeniority a b of
+    else case compareSeniority a b of
       LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
       GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
       EQ -> case compare (childrenSizeOf aLookup) (childrenSizeOf bLookup) of
@@ -151,10 +149,11 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
       let newSiblings = IntMap.insert child relationToChild $ IntMap.map (relationToChild <>) toGrandChildren
        in Just $
             UnionFind $
-              IntMap.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
-              -- add the child and its grandchildren to the parent
-                IntMap.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
-                  IntMap.foldlWithKey' -- point the grandchildren to the new parent
+              IntMap.insert parent (IsRoot (children <> newSiblings)) $
+                IntMap.insert child (IsChildOf parent relationToChild) $ -- add the child and its grandchildren to the parent
+                -- add the child and its grandchildren to the parent
+                  IntMap.foldlWithKey' -- point the child to the parent
+                  -- point the grandchildren to the new parent
                     (\rels grandchild relationToGrandChild -> IntMap.insert grandchild (IsChildOf parent (relationToChild <> relationToGrandChild)) rels)
                     (unUnionFind relations)
                     toGrandChildren
@@ -173,19 +172,19 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
         -- child = parent2ToChild parent2
         --    => parent = (invertLinRel relationToChild <> parent2ToChild) parent2
         --    or parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
-          traceWhen (child == 5) "IsRoot -> IsChildOf 1 " relateWithLookup (parent, parentLookup) (invertLinRel relationToChild <> parent2ToChild) (parent2, lookupInternal parent2 relations) relations
+          relateWithLookup (parent, parentLookup) (invertLinRel relationToChild <> parent2ToChild) (parent2, lookupInternal parent2 relations) relations
         else do
           -- child = relationToChild parent
           -- child = parent2ToChild parent2
           --    => parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
           --    or parent = (invertLinRel relationToChild <> parent2ToChild) parent2
-          traceWhen (child == 5) "IsRoot -> IsChildOf 2" relateWithLookup (parent2, lookupInternal parent2 relations) (invertLinRel parent2ToChild <> relationToChild) (parent, parentLookup) $
+          relateWithLookup (parent2, lookupInternal parent2 relations) (invertLinRel parent2ToChild <> relationToChild) (parent, parentLookup) $
             UnionFind $
               IntMap.insert child (IsChildOf parent relationToChild) $
                 unUnionFind relations
 
   -- The parent is a child of another variable, so we relate the child to the grandparent instead
-  IsChildOf grandparent relationFromGrandparent -> traceWhen (child == 5) "IsChildOf" relateWithLookup (child, childLookup) (relationToChild <> relationFromGrandparent) (grandparent, lookupInternal grandparent relations) relations
+  IsChildOf grandparent relationFromGrandparent -> relateWithLookup (child, childLookup) (relationToChild <> relationFromGrandparent) (grandparent, lookupInternal grandparent relations) relations
 
 --------------------------------------------------------------------------------
 

@@ -35,8 +35,8 @@ tests = describe "Experiment" $ do
       let expected = [dividend `div` divisor, dividend `mod` divisor]
       -- check gf181 (program (fromIntegral divisor)) [dividend] [] expected
       -- check (Prime 17) (program (fromIntegral divisor)) [dividend] [] expected
-      -- check (Binary 7) (program (fromIntegral divisor)) [dividend] [] expected
-      debugSolver (Binary 7) (program (fromIntegral divisor)) [dividend] []
+      check (Binary 7) (program (fromIntegral divisor)) [dividend] [] expected
+      -- debugSolver (Binary 7) (program (fromIntegral divisor)) [dividend] []
 
 
   -- it "Homemade div/mod" $ do
@@ -65,8 +65,8 @@ tests = describe "Experiment" $ do
 
 testInversePK :: Integer -> Integer -> IO ()
 testInversePK inputs expected = do
-  -- testSolver pkField (input Public >>= inversePK) [inputs] [] [expected]
-  debugSolver pkField (input Public >>= inversePK) [inputs] []
+  testSolver pkField (input Public >>= inversePK) [inputs] [] [expected]
+  -- debugSolver pkField (input Public >>= inversePK) [inputs] []
 
 pkField :: FieldType
 pkField = Binary 340282366920938463463374607431768211457
