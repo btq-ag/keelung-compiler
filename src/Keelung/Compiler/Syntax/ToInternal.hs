@@ -1,9 +1,12 @@
+{-# LANGUAGE TupleSections #-}
+
 module Keelung.Compiler.Syntax.ToInternal (run) where
 
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
 import Data.Sequence (Seq (..), (|>))
+import Data.Sequence qualified as Seq
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo
 import Keelung.Data.U qualified as U
@@ -13,11 +16,12 @@ import Keelung.Syntax.Encode.Syntax qualified as T
 
 run :: (GaloisField n, Integral n) => FieldInfo -> T.Elaborated -> Internal n
 run fieldInfo (T.Elaborated expr comp) =
-  let T.Computation counters assertions sideEffects = comp
+  let T.Computation counters assertions hints sideEffects = comp
       proxy = 0
    in runM counters (fieldWidth fieldInfo) $ do
         exprs <- sameType proxy <$> convertExprAndAllocOutputVar expr
         assertions' <- concat <$> mapM convertExpr assertions
+        hints' <- convertHints hints
         counters' <- get
         sideEffects' <- mapM convertSideEffect sideEffects
         return $
@@ -26,6 +30,7 @@ run fieldInfo (T.Elaborated expr comp) =
               internalFieldBitWidth = fieldWidth fieldInfo,
               internalCounters = counters',
               internalAssertions = assertions',
+              internalHints = hints',
               internalSideEffects = sideEffects'
             }
   where
@@ -40,6 +45,15 @@ type M n = StateT Counters (Reader Width)
 
 runM :: Counters -> Width -> M n a -> a
 runM counters width f = runReader (evalStateT f counters) width
+
+--------------------------------------------------------------------------------
+
+convertHints :: (GaloisField n, Integral n) => T.Hints -> M n (Hints n)
+convertHints (T.Hints fs bs uss) =
+  Hints
+    <$> mapM (\(target, hints) -> (,) <$> convertExprF target <*> mapM convertExprB hints) fs
+    <*> mapM (\(target, hints) -> (,) <$> convertExprB target <*> mapM convertExprB hints) bs
+    <*> mapM (mapM (\(target, hints) -> (,) <$> convertExprU target <*> mapM convertExprB hints)) uss
 
 --------------------------------------------------------------------------------
 
@@ -101,13 +115,14 @@ convertExprU expr = case expr of
   T.VarUI w var -> return $ VarUI w var
   T.VarUP w var -> return $ VarUP w var
   T.AddU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure True
+  T.AddV w xs -> chainExprsOfAssocOpAddV w <$> mapM convertExprU xs
   T.SubU w x y -> chainExprsOfAssocOpAddU w <$> convertExprU x <*> pure True <*> convertExprU y <*> pure False
   T.AESMulU _ x y -> AESMulU <$> convertExprU x <*> convertExprU y
   T.MulU w x y -> MulU w <$> convertExprU x <*> convertExprU y
-  T.MulD w x y -> MulU w <$> convertExprU x <*> convertExprU y
-  T.MulV w x y -> MulU w <$> convertExprU x <*> convertExprU y
   T.CLMulU w x y -> CLMulU w <$> convertExprU x <*> convertExprU y
   T.MMIU w x p -> MMIU w <$> convertExprU x <*> pure (U.new w p)
+  T.DivU w x y -> DivU w <$> convertExprU x <*> convertExprU y
+  T.ModU w x y -> ModU w <$> convertExprU x <*> convertExprU y
   T.AndU w x y -> chainExprsOfAssocOpAndU w <$> convertExprU x <*> convertExprU y
   T.OrU w x y -> chainExprsOfAssocOpOrU w <$> convertExprU x <*> convertExprU y
   T.XorU w x y -> chainExprsOfAssocOpXorU w <$> convertExprU x <*> convertExprU y
@@ -185,6 +200,13 @@ chainExprsOfAssocOpAddU w x xSign y ySign = case (x, y) of
     AddU w ((x, xSign) :<| ys)
   -- there's nothing left we can do
   _ -> AddU w ((x, xSign) :<| (y, ySign) :<| mempty)
+
+chainExprsOfAssocOpAddV :: (GaloisField n, Integral n) => Width -> [ExprU n] -> ExprU n
+chainExprsOfAssocOpAddV w [] = ValU (U.new w 0)
+chainExprsOfAssocOpAddV w xs = AddU w (Seq.fromList (map (,True) xs))
+
+-- chainExprsOfAssocOpAddV w (x:y:xs) =
+-- foldl (\x y -> chainExprsOfAssocOpAddU w x True y True) (ValU (U.new w 0))
 
 chainExprsOfAssocOpAndB :: ExprB n -> ExprB n -> ExprB n
 chainExprsOfAssocOpAndB x y = case (x, y) of

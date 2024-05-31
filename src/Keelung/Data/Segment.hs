@@ -81,7 +81,7 @@ null = (== 0) . widthOf
 --   May result in invalid empty segments!
 unsafeSplit :: Int -> Segment -> (Segment, Segment)
 unsafeSplit index segment = case segment of
-  Constant val -> (Constant (U.slice val (0, index)), Constant (U.slice val (index, widthOf val)))
+  Constant val -> (Constant (U.slice (0, index) val), Constant (U.slice (index, widthOf val) val))
   ChildOf slice -> let (slice1, slice2) = Slice.split index slice in (ChildOf slice1, ChildOf slice2)
   ParentOf len children ->
     let splittedChildren = fmap (Set.map (Slice.split index)) children

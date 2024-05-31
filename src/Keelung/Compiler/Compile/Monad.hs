@@ -5,6 +5,7 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Field.Galois (GaloisField)
+import Data.Map qualified as Map
 import Data.Sequence qualified as Seq
 import Data.Set qualified as Set
 import Keelung (widthOf)
@@ -52,6 +53,7 @@ runM options compilers counters program =
             mempty
             mempty
             mempty
+            mempty
         )
     )
 
@@ -79,10 +81,10 @@ freshRefU width = do
   modifyCounter $ addCount (Intermediate, WriteUInt width) 1
   return $ RefUX width index
 
-execRelations :: (Relations n -> Relations.RelM n (Relations n)) -> M n ()
+execRelations :: (Relations n -> Relations.RelM n (Maybe (Relations n))) -> M n ()
 execRelations f = do
   cs <- get
-  result <- lift $ lift $ (Relations.runRelM . f) (cmRelations cs)
+  result <- lift $ lift $ f (cmRelations cs)
   case result of
     Nothing -> return ()
     Just relations -> put cs {cmRelations = relations}
@@ -91,6 +93,15 @@ execRelations f = do
 addOccurrenceOnRefUBit :: (GaloisField n, Integral n) => Ref -> M n ()
 addOccurrenceOnRefUBit (B (RefUBit (RefUX width var) i)) = modify' (\cs -> cs {cmOccurrenceU = OccurU.increase width var (i, i + 1) (cmOccurrenceU cs)})
 addOccurrenceOnRefUBit _ = return ()
+
+memoDivMod :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> RefU -> RefU -> M n ()
+memoDivMod dividend divisor quotient remainder = do
+  modify' $ \cs -> cs {cmMemoDivMod = Map.insert (dividend, divisor) (quotient, remainder) (cmMemoDivMod cs)}
+
+memoDivModLookup :: (GaloisField n, Integral n) => Either RefU U -> Either RefU U -> M n (Maybe (RefU, RefU))
+memoDivModLookup dividend divisor = do
+  memo <- gets cmMemoDivMod
+  return $ Map.lookup (dividend, divisor) memo
 
 --------------------------------------------------------------------------------
 
@@ -157,10 +168,10 @@ writeAddWithLC xs = case xs of
 
 --------------------------------------------------------------------------------
 
-writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> (n, [(Ref, n)]) -> M n ()
+writeMul :: (GaloisField n, Integral n) => (n, [(Ref, n)], [(Slice, n)]) -> (n, [(Ref, n)], [(Slice, n)]) -> (n, [(Ref, n)], [(Slice, n)]) -> M n ()
 writeMul as bs cs = writeMulWithLC (fromRefs as) (fromRefs bs) (fromRefs cs)
   where
-    fromRefs (constant, refs) = LC.new constant refs []
+    fromRefs (constant, refs, slices) = LC.new constant refs slices
 
 writeMulWithLC :: (GaloisField n, Integral n) => LC n -> LC n -> LC n -> M n ()
 writeMulWithLC (Constant x) (Constant y) (Constant z) =
@@ -239,7 +250,10 @@ writeRefUVal x c = execRelations $ Relations.assignS (Slice.fromRefU x) (toInteg
 
 -- | Assign an Integer to a Slice
 writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
-writeSliceVal x c = execRelations $ Relations.assignS x (toInteger c)
+writeSliceVal x c =
+  if widthOf x == 0
+    then return () -- no need to add a constraint for slices of width 0
+    else execRelations $ Relations.assignS x (toInteger c)
 
 -- | Assert that two RefUs are equal
 writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()

@@ -20,7 +20,7 @@ import Keelung.Compiler.Error
 import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Internal
 import Keelung.Data.FieldInfo qualified as FieldInfo
-import Keelung.Data.LC ( LC(..), (@), neg )
+import Keelung.Data.LC (LC (..), neg, (@))
 import Keelung.Data.LC qualified as LC
 import Keelung.Data.PolyL qualified as PolyL
 import Keelung.Data.Reference
@@ -31,8 +31,9 @@ import Keelung.Syntax (widthOf)
 
 -- | Compile an untyped expression to a constraint system
 run :: (GaloisField n, Integral n) => Options -> Internal n -> Either (Error n) (ConstraintModule n)
-run options (Internal untypedExprs _ counters assertions sideEffects) = left CompilerError $ runM options bootstrapCompilers counters $ do
-  forM_ untypedExprs $ \(var, expr) -> do
+run options (Internal outputExprs _ counters assertions _hints sideEffects) = left CompilerError $ runM options bootstrapCompilers counters $ do
+  -- compile output expressions
+  forM_ outputExprs $ \(var, expr) -> do
     case expr of
       ExprB x -> do
         let out = RefBO var
@@ -115,8 +116,18 @@ compileSideEffect (BitsToUInt width varU bits) = do
       polys <- step fieldWidth exprss
 
       return (poly : polys)
-compileSideEffect (DivMod width dividend divisor quotient remainder) = UInt.assertDivModU width dividend divisor quotient remainder
-compileSideEffect (CLDivMod width dividend divisor quotient remainder) = UInt.assertCLDivModU compileAssertion width dividend divisor quotient remainder
+compileSideEffect (DivMod width dividend divisor quotient remainder) = do
+  d <- wireU dividend
+  v <- wireU divisor
+  q <- wireU quotient
+  r <- wireU remainder
+  UInt.assert width d v q r
+compileSideEffect (CLDivMod width dividend divisor quotient remainder) = do
+  d <- wireU dividend
+  v <- wireU divisor
+  q <- wireU quotient
+  r <- wireU remainder
+  UInt.assertCL width d v q r
 compileSideEffect (AssertLTE width value bound) = do
   x <- UInt.wireU value
   UInt.assertLTE width x bound

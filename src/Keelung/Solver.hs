@@ -5,7 +5,6 @@ module Keelung.Solver
     Error (..),
     Log (..),
     LogReport (..),
-    module Keelung.Solver.BinRep,
   )
 where
 
@@ -15,6 +14,7 @@ import Control.Monad.RWS
 import Data.Bits qualified
 import Data.Foldable (toList)
 import Data.IntMap.Strict qualified as IntMap
+import Data.IntSet qualified as IntSet
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import Data.Vector (Vector)
@@ -24,11 +24,13 @@ import Keelung.Compiler.Options
 import Keelung.Compiler.Syntax.Inputs (Inputs)
 import Keelung.Constraint.R1C
 import Keelung.Constraint.R1CS
+import Keelung.Data.FieldInfo qualified as FieldInfo
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
-import Keelung.Solver.BinRep
+import Keelung.Solver.BinRep qualified as BinRep
+import Keelung.Solver.Binary qualified as Binary
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
 
@@ -148,7 +150,7 @@ lookupSegments (Segments segments) = do
 
 shrink :: (GaloisField n, Integral n) => Constraint n -> M n (Result (Seq (Constraint n)))
 shrink (MulConstraint as bs cs) = do
-  xs <- shrinkMul as bs cs >>= shrinkBinRep
+  xs <- shrinkMulBySubst as bs cs >>= shrinkAdd
   case xs of
     Shrinked xs' -> tryLog $ LogShrinkConstraint (MulConstraint as bs cs) xs'
     Stuck _ -> return ()
@@ -156,15 +158,74 @@ shrink (MulConstraint as bs cs) = do
     NothingToDo -> return ()
   return $ fmap Seq.singleton xs
 shrink (AddConstraint as) = do
-  as' <- shrinkAdd as >>= shrinkBinRep
+  as' <- shrinkAddBySubst as >>= shrinkAdd . fmap AddConstraint
   return $ fmap Seq.singleton as'
 shrink (BooleanConstraint var) = fmap (pure . BooleanConstraint) <$> shrinkBooleanConstraint var
 shrink (DivModConstaint divModTuple) = fmap (pure . DivModConstaint) <$> shrinkDivMod False divModTuple
 shrink (CLDivModConstaint divModTuple) = fmap (pure . CLDivModConstaint) <$> shrinkDivMod True divModTuple
 shrink (ModInvConstraint modInvTuple) = fmap (pure . ModInvConstraint) <$> shrinkModInv modInvTuple
 
-shrinkAdd :: (GaloisField n, Integral n) => Poly n -> M n (Result (Constraint n))
-shrinkAdd xs = do
+-- | Shrinking an Polynomial by means other than substitution
+shrinkAdd :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
+shrinkAdd NothingToDo = return NothingToDo
+shrinkAdd Eliminated = return Eliminated
+shrinkAdd (Shrinked polynomial) = return (Shrinked polynomial)
+shrinkAdd (Stuck (AddConstraint polynomial)) = do
+  result <- trySolveAddativeConstraintOnBinaryFields polynomial
+  case result of
+    NothingToDo -> return NothingToDo
+    Eliminated -> return Eliminated
+    Stuck polynomial' -> tryFindBinRep polynomial'
+    Shrinked polynomial' -> tryFindBinRep polynomial'
+  where
+    -- see if we can find a binary representation for the polynomial
+    tryFindBinRep :: (GaloisField n, Integral n) => Poly n -> M n (Result (Constraint n))
+    tryFindBinRep poly = do
+      Env _ boolVarRanges fieldInfo <- ask
+      let isBoolean var = case IntMap.lookupLE var boolVarRanges of
+            Nothing -> False
+            Just (index, len) -> var < index + len
+      -- see if we can find a binary representation for the polynomial
+      case BinRep.findAssignment (FieldInfo.fieldWidth fieldInfo) isBoolean polynomial of
+        Nothing -> return (Stuck (AddConstraint poly))
+        Just boolAssignments -> do
+          tryLog $ LogBinRepDetection poly (IntMap.toList boolAssignments)
+          -- we have a binary representation
+          -- we can now assign the variables
+          forM_ (IntMap.toList boolAssignments) $ \(var, val) -> do
+            bindVar "bin rep bool" var (if val then 1 else 0)
+          return Eliminated
+
+    trySolveAddativeConstraintOnBinaryFields :: (GaloisField n, Integral n) => Poly n -> M n (Result (Poly n))
+    trySolveAddativeConstraintOnBinaryFields poly = do
+      Env _ boolVarRanges fieldInfo <- ask
+      let isBoolean var = case IntMap.lookupLE var boolVarRanges of
+            Nothing -> False
+            Just (index, len) -> var < index + len
+
+      let onBinaryField = case FieldInfo.fieldTypeData fieldInfo of
+            Prime _ -> False
+            Binary _ -> True
+      let allBoolean = all isBoolean (IntSet.toList (Poly.vars poly))
+      -- traceShowM $ zip (IntSet.toList (Poly.vars poly)) (map isBoolean (IntSet.toList (Poly.vars poly)))
+      if onBinaryField && allBoolean
+        then case Binary.run poly of
+          Nothing -> return (Stuck poly)
+          -- Just (assignments, eqClasses) -> do
+          --   mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
+          --   return Eliminated
+          -- Just (assignments, eqClasses) -> do
+          --   mapM_ (\(var, val) -> bindVar "binary" var (if val then 1 else 0)) (IntMap.toList assignments)
+          --   return (Shrinked polynomial')
+          Just (Binary.Result {}) -> do
+            -- TODO: handle this case
+            return (Stuck poly)
+        else return (Stuck poly)
+shrinkAdd (Stuck polynomial) = return (Stuck polynomial)
+
+-- | Shrinking an Polynomial by substitution
+shrinkAddBySubst :: (GaloisField n, Integral n) => Poly n -> M n (Result (Poly n))
+shrinkAddBySubst xs = do
   bindings <- get
   case substAndView bindings xs of
     Constant c -> eliminateIfHold c 0
@@ -172,10 +233,11 @@ shrinkAdd xs = do
       -- c + coeff var = 0
       bindVar "add" var (-c / coeff)
       return Eliminated
-    Polynomial changed xs' -> return $ shrinkedOrStuck [changed] $ AddConstraint xs'
+    Polynomial changed xs' -> return $ shrinkedOrStuck [changed] xs'
 
-shrinkMul :: (GaloisField n, Integral n) => Poly n -> Poly n -> Either n (Poly n) -> M n (Result (Constraint n))
-shrinkMul as bs (Left c) = do
+-- | Shrinking a multiplicative constraint by substitution
+shrinkMulBySubst :: (GaloisField n, Integral n) => Poly n -> Poly n -> Either n (Poly n) -> M n (Result (Constraint n))
+shrinkMulBySubst as bs (Left c) = do
   bindings <- get
   case (substAndView bindings as, substAndView bindings bs) of
     (Constant a, Constant b) -> eliminateIfHold (a * b) c
@@ -198,14 +260,31 @@ shrinkMul as bs (Left c) = do
       -- (a + coeff var) * b = c
       bindVar "mul 2" var ((c - a * b) / (coeff * b))
       return Eliminated
-    (Uninomial av as' _ _, Uninomial bv bs' _ _) -> return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
+    (Uninomial av as' constA (varA, coeffA), Uninomial bv bs' constB (varB, coeffB)) ->
+      if c == 1
+        then do
+          avIsBoolean <- isBooleanVar varA
+          bvIsBoolean <- isBooleanVar varB
+          if avIsBoolean && bvIsBoolean
+            then do
+              -- as = 1
+              --    =>
+              -- constA + coeffA * varA = 1
+              bindVar "mul a*b=1" varA ((1 - constA) / coeffA)
+              -- bs = 1
+              --    =>
+              -- constB + coeffB * varB = 1
+              bindVar "mul a*b=1" varB ((1 - constB) / coeffB)
+              return Eliminated
+            else return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
+        else return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
     (Uninomial av as' _ _, Polynomial bv bs') -> return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
     (Polynomial _ as', Constant b) -> case Poly.multiplyBy b as' of
       Left constant -> eliminateIfHold constant c
       Right poly -> return $ Shrinked $ AddConstraint $ Poly.addConstant (-c) poly
     (Polynomial av as', Uninomial bv bs' _ _) -> return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
     (Polynomial av as', Polynomial bv bs') -> return $ shrinkedOrStuck [av, bv] $ MulConstraint as' bs' (Left c)
-shrinkMul as bs (Right cs) = do
+shrinkMulBySubst as bs (Right cs) = do
   bindings <- get
   case (substAndView bindings as, substAndView bindings bs, substAndView bindings cs) of
     (Constant a, Constant b, Constant c) -> eliminateIfHold (a * b) c

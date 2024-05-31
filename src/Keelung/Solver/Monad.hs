@@ -37,14 +37,21 @@ import Keelung.Syntax.Counters
 
 --------------------------------------------------------------------------------
 
--- | Monad for R1CS interpretation / witness generation
-type M n = ExceptT (Error n) (RWS Env (Seq (Log n)) (IntMap n))
+-- | Monad for R1CS solving / witness generation
+type M n =
+  ExceptT
+    (Error n)
+    ( RWS
+        Env
+        (Seq (Log n)) -- for debugging
+        (IntMap n) -- variable assignments
+    )
 
 runM :: (GaloisField n, Integral n) => Bool -> Ranges -> FieldInfo -> Inputs n -> M n a -> (Either (Error n, IntMap n) (Vector n), LogReport n)
 runM debug boolVarRanges fieldInfo inputs p =
   let counters = Inputs.inputCounters inputs
       initState = Inputs.toIntMap inputs
-      (result, bindings, logs) = runRWS (runExceptT p) (Env debug boolVarRanges (fieldWidth fieldInfo)) initState
+      (result, bindings, logs) = runRWS (runExceptT p) (Env debug boolVarRanges fieldInfo) initState
    in case result of
         Left err -> (Left (err, bindings), LogReport initState logs bindings)
         Right _ -> case toEither $ toTotal' (getCount counters PublicInput + getCount counters PrivateInput, bindings) of
@@ -73,6 +80,14 @@ bindSegments msg (Segments xs) val = foldM_ bindSegment 0 xs
       forM_ [0 .. w - 1] $ \i -> do
         bindVar msg (var + i) (if Data.Bits.testBit val (offset + i) then 1 else 0)
       return (offset + w)
+
+-- | See if a variable is a Boolean variable
+isBooleanVar :: Var -> M n Bool
+isBooleanVar var = do
+  boolVarRanges <- asks envBoolVars
+  return $ case IntMap.lookupLE var boolVarRanges of
+    Nothing -> False
+    Just (index, len) -> var < index + len
 
 --------------------------------------------------------------------------------
 
@@ -226,7 +241,7 @@ instance (GaloisField n, Integral n) => Show (Error n) where
 data Env = Env
   { envDebugMode :: Bool, -- enable logging when True
     envBoolVars :: Ranges, -- ranges of boolean variables
-    envFieldWidth :: Width -- width of the field
+    envFieldInfo :: FieldInfo -- information about the field
   }
 
 --------------------------------------------------------------------------------

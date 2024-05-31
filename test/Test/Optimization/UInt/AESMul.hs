@@ -49,5 +49,5 @@ tests = describe "AES Multiplication" $ do
           y <- input Public
           return $ x `aesMul` y
 
-    assertCountO0 gf181 program 143
-    assertCount gf181 program 143
+    assertCountO0 gf181 program 135
+    assertCount gf181 program 127

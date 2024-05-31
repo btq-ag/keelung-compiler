@@ -3,7 +3,8 @@
 
 {-# HLINT ignore "Redundant if" #-}
 
-module Keelung.Solver.BinRep (BinRep (..), shrinkBinRep, detectBinRep, powerOf2, assignBinRep, rangeOfBinRep) where
+-- | Intended to be qualified as `BinRep`
+module Keelung.Solver.BinRep (BinRep (..), isSatisfiable, findAssignment, range) where
 
 import Control.Monad.RWS
 import Data.Bits (xor)
@@ -11,34 +12,13 @@ import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Keelung.Compiler.Util (powerOf2)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
-import Keelung.Solver.Monad
 import Keelung.Syntax (Var, Width)
 
 -- | Trying to reduce a BinRep constraint
 data FoldState n = Start | Failed | Continue n [Candidate n] deriving (Eq, Show)
-
--- | Reduce binary representations
-shrinkBinRep :: (GaloisField n, Integral n) => Result (Constraint n) -> M n (Result (Constraint n))
-shrinkBinRep NothingToDo = return NothingToDo
-shrinkBinRep Eliminated = return Eliminated
-shrinkBinRep (Shrinked polynomial) = return (Shrinked polynomial)
-shrinkBinRep (Stuck (AddConstraint polynomial)) = do
-  Env _ boolVarRanges fieldBitWidth <- ask
-  let isBoolean var = case IntMap.lookupLE var boolVarRanges of
-        Nothing -> False
-        Just (index, len) -> var < index + len
-  case assignBinRep fieldBitWidth isBoolean polynomial of
-    Nothing -> return (Stuck (AddConstraint polynomial))
-    Just boolAssignments -> do
-      tryLog $ LogBinRepDetection polynomial (IntMap.toList boolAssignments)
-      -- we have a binary representation
-      -- we can now assign the variables
-      forM_ (IntMap.toList boolAssignments) $ \(var, val) -> do
-        bindVar "bin rep bool" var (if val then 1 else 0)
-      return Eliminated
-shrinkBinRep (Stuck polynomial) = return (Stuck polynomial)
 
 -- | Given a mapping of (Int, (Bool, Var)) pairs, where the Int indicates the power of 2, and the Bool indicates whether the coefficient is positive or negative
 --   and an Integer, derive coefficients (Boolean) for each of these variables such that the sum of the coefficients times the powers of 2 is equal to the Integer
@@ -66,11 +46,11 @@ deriveAssignments (lowerBound, upperBound) rawConstant polynomial =
 --    1. There can be at most `k` coefficients that are multiples of powers of 2 if the polynomial is a binary representation.
 --    2. These coefficients cannot be too far apart, i.e., the quotient of any 2 coefficients cannot be greater than `2^(k-1)`.
 --    3. For any 2 coefficients `a` and `b`, either `a / b` or `b / a` must be a power of 2 smaller than `2^k`.
-assignBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe (IntMap Bool)
-assignBinRep fieldBitWidth isBoolean polynomial =
+findAssignment :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> Poly n -> Maybe (IntMap Bool)
+findAssignment fieldBitWidth isBoolean polynomial =
   if IntMap.size (Poly.coeffs polynomial) > fromIntegral fieldBitWidth
     then Nothing
-    else case detectBinRep fieldBitWidth isBoolean (Poly.coeffs polynomial) of
+    else case isSatisfiable fieldBitWidth isBoolean (Poly.coeffs polynomial) of
       Nothing -> Nothing
       Just (binPoly, multiplier) ->
         case IntMap.lookupMin (binPolyCoeffs binPoly) of
@@ -89,10 +69,11 @@ assignBinRep fieldBitWidth isBoolean polynomial =
                       constant
                       (binPolyCoeffs binPoly)
 
+--------------------------------------------------------------------------------
+
 -- | Polynomial with coefficients that are multiples of powers of 2
 data BinRep n = BinRep
-  { -- | Coefficients are stored as (sign, var) pairs
-    binPolyCoeffs :: IntMap (Bool, Var),
+  { binPolyCoeffs :: IntMap (Bool, Var), -- keys are powers (of 2), values are (sign, variable)
     binPolyLowerBound :: n,
     binPolyUpperBound :: n
   }
@@ -112,7 +93,7 @@ instance (GaloisField n, Integral n) => Eq (BinRep n) where
                       ((aSign, aPower) : _, (bSign, bPower) : _) ->
                         let powerDiff = powerOf2 (aPower - bPower)
                          in if aSign == bSign then powerDiff else -powerDiff
-                      _ -> error "BinRep Eq impossible"
+                      _ -> error "[ panic ] BinRep: Eq impossible"
                  in fmap normalize flippedA == fmap ((diff *) . normalize) flippedB
           else False
     where
@@ -125,13 +106,8 @@ instance (GaloisField n, Integral n) => Eq (BinRep n) where
       normalize (True, power) = powerOf2 power
       normalize (False, power) = -(powerOf2 power)
 
-powerOf2 :: (GaloisField n, Integral n) => Int -> n
-powerOf2 n
-  | n < 0 = recip (2 ^ (-n))
-  | otherwise = 2 ^ n
-
-rangeOfBinRep :: (GaloisField n, Integral n) => IntMap (Bool, Var) -> (n, n)
-rangeOfBinRep = IntMap.foldlWithKey' go (0, 0)
+range :: (GaloisField n, Integral n) => IntMap (Bool, Var) -> (n, n)
+range = IntMap.foldlWithKey' go (0, 0)
   where
     go :: (GaloisField n, Integral n) => (n, n) -> Int -> (Bool, Var) -> (n, n)
     go (lowerBound, upperBound) power (True, _) = (lowerBound, upperBound + powerOf2 power)
@@ -139,9 +115,9 @@ rangeOfBinRep = IntMap.foldlWithKey' go (0, 0)
 
 type Candidate n = (IntMap (Bool, Var), n, n, n)
 
--- | Computes a BinRep and a multiplier: BinRep * multiplier = input polynomial
-detectBinRep :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> IntMap n -> Maybe (BinRep n, n)
-detectBinRep fieldBitWidth isBoolean xs =
+-- | If a polynomial is satisfiable, then we can represent it as the multiple of a BinRep
+isSatisfiable :: (GaloisField n, Integral n) => Width -> (Var -> Bool) -> IntMap n -> Maybe (BinRep n, n)
+isSatisfiable fieldBitWidth isBoolean xs =
   case IntMap.foldlWithKey' go Start xs of
     Start -> Nothing
     Failed -> Nothing

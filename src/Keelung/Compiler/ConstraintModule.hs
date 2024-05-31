@@ -43,6 +43,7 @@ import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U (U)
 import Keelung.Syntax.Counters hiding (getBooleanConstraintCount, getBooleanConstraintRanges, prettyBooleanConstraints, prettyVariables)
+import Data.Map (Map)
 
 --------------------------------------------------------------------------------
 
@@ -68,7 +69,9 @@ data ConstraintModule n = ConstraintModule
     -- a = b .*. q .^. r
     cmCLDivMods :: Seq (Either RefU U, Either RefU U, Either RefU U, Either RefU U),
     -- hints for generating witnesses for ModInv constraints
-    cmModInvs :: Seq (Either RefU U, Either RefU U, Either RefU U, U)
+    cmModInvs :: Seq (Either RefU U, Either RefU U, Either RefU U, U),
+    -- for divU/modU memoization
+    cmMemoDivMod :: Map (Either RefU U, Either RefU U) (RefU, RefU)
   }
   deriving (Eq, Generic, NFData, Functor)
 
@@ -190,7 +193,7 @@ addOccurrences xs cm = foldl (flip addOccurrence) cm xs
 removeOccurrences :: (UpdateOccurrences ref, Foldable t) => t ref -> ConstraintModule n -> ConstraintModule n
 removeOccurrences xs cm = foldl (flip removeOccurrence) cm xs
 
-instance (Num n) => UpdateOccurrences (PolyL n) where
+instance (Integral n, GaloisField n) => UpdateOccurrences (PolyL n) where
   addOccurrence poly cm =
     let slices = map fst $ PolyL.toSlices poly
         refs = Map.keysSet $ PolyL.polyRefs poly

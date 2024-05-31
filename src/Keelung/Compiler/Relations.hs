@@ -1,13 +1,12 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 module Keelung.Compiler.Relations
   ( Relations (..),
     RelM,
-    runRelM,
     new,
     assignR,
     assignB,
@@ -51,19 +50,21 @@ instance (GaloisField n, Integral n) => Show (Relations n) where
       <> (if SliceRelations.size slices == 0 then "" else show slices)
 
 updateRelationsR ::
-  (RefRelations.RefRelations n -> RelM n (RefRelations.RefRelations n)) ->
+  (RefRelations.RefRelations n -> RelM n (Maybe (RefRelations.RefRelations n))) ->
   Relations n ->
-  RelM n (Relations n)
+  RelM n (Maybe (Relations n))
 updateRelationsR f xs = do
-  relations <- f (relationsR xs)
-  return $ xs {relationsR = relations}
+  result <- f (relationsR xs)
+  case result of
+    Nothing -> return Nothing
+    Just relations -> return $ Just $ xs {relationsR = relations}
 
 --------------------------------------------------------------------------------
 
 new :: Options -> Relations n
 new = Relations RefRelations.new SliceRelations.new
 
-assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> RelM n (Relations n)
+assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> RelM n (Maybe (Relations n))
 assignR var val relations = case var of
   B (RefUBit refU i) ->
     if val == 0 || val == 1
@@ -71,31 +72,31 @@ assignR var val relations = case var of
       else throwError $ InvalidBooleanValue val
   _ -> updateRelationsR (RefRelations.assign var val) relations
 
-assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> RelM n (Relations n)
+assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> RelM n (Maybe (Relations n))
 assignB ref val = assignR (B ref) (if val then 1 else 0)
 
-assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> RelM n (Relations n)
-assignS slice int relations = do
-  RefRelations.markChanged
+assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> RelM n (Maybe (Relations n))
+assignS slice int relations =
   return $
-    relations
-      { relationsS = SliceRelations.assign slice (U.new (Slice.sliceEnd slice - Slice.sliceStart slice) int) (relationsS relations)
-      }
+    Just $
+      relations
+        { relationsS = SliceRelations.assign slice (U.new (Slice.sliceEnd slice - Slice.sliceStart slice) int) (relationsS relations)
+        }
 
-relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> RelM n (Relations n)
+relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> RelM n (Maybe (Relations n))
 relateB refA (polarity, refB) = updateRelationsR (RefRelations.relateB refA (polarity, refB))
 
 -- var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> RelM n (Relations n)
-relateR x slope y intercept xs = updateRelationsR (RefRelations.relateR (relationsS xs) x slope y intercept) xs
+relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> RelM n (Maybe (Relations n))
+relateR x slope y intercept = updateRelationsR (RefRelations.relateR x slope y intercept)
 
-relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> RelM n (Relations n)
+relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> RelM n (Maybe (Relations n))
 relateS slice1 slice2 relations = do
-  RefRelations.markChanged
   return $
-    relations
-      { relationsS = SliceRelations.relate slice1 slice2 (relationsS relations)
-      }
+    Just $
+      relations
+        { relationsS = SliceRelations.relate slice1 slice2 (relationsS relations)
+        }
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> Maybe (n, n)
 relationBetween var1 var2 = RefRelations.relationBetween var1 var2 . relationsR

@@ -5,8 +5,8 @@ module Keelung.Compiler.Compile.UInt
     assertLT,
     assertGTE,
     assertGT,
-    DivMod.assertDivModU,
-    DivMod.assertCLDivModU,
+    DivMod.assert,
+    DivMod.assertCL,
   )
 where
 
@@ -47,7 +47,7 @@ compile out expr = case expr of
   AddU w xs -> do
     mixed <- mapM wireUWithSign (toList xs)
     let (vars, constants) = Either.partitionEithers mixed
-    compileAdd w out vars (sum constants)
+    compileAdd w out vars (U.slice (0, w) (sum constants))
   MulU _ x y -> do
     x' <- wireU x
     y' <- wireU y
@@ -68,6 +68,30 @@ compile out expr = case expr of
     -- See: https://github.com/btq-ag/keelung-compiler/issues/14
     a' <- wireU a
     compileModInv w out a' p
+  DivU w x y -> do
+    dividend <- wireU x
+    divisor <- wireU y
+    -- before actually compiling the division, we see if the same div/mod was memoized before
+    result <- memoDivModLookup dividend divisor
+    case result of
+      Just (quotient, _) -> do
+        writeRefUEq out quotient
+      Nothing -> do
+        remainder <- freshRefU w
+        DivMod.assert w dividend divisor (Left out) (Left remainder)
+        memoDivMod dividend divisor out remainder
+  ModU w x y -> do
+    dividend <- wireU x
+    divisor <- wireU y
+    -- before actually compiling the division, we see if the same div/mod was memoized before
+    result <- memoDivModLookup dividend divisor
+    case result of
+      Just (_, remainder) -> do
+        writeRefUEq out remainder
+      Nothing -> do
+        quotient <- freshRefU w
+        DivMod.assert w dividend divisor (Left quotient) (Left out)
+        memoDivMod dividend divisor quotient out
   AndU w xs -> do
     forM_ [0 .. w - 1] $ \i -> do
       result <- compileExprB (AndB (fmap (`BitU` i) xs))
@@ -114,7 +138,7 @@ compile out expr = case expr of
     result <- wireU x
     case result of
       Left var -> writeSliceEq (Slice.fromRefU out) (Slice.Slice var i j)
-      Right val -> writeSliceVal (Slice.fromRefU out) (toInteger (U.slice val (i, j)))
+      Right val -> writeSliceVal (Slice.fromRefU out) (toInteger (U.slice (i, j) val))
   JoinU _ x y -> do
     let widthX = widthOf x
     let widthY = widthOf y

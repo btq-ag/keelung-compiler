@@ -357,7 +357,7 @@ learnFromMul poly = do
 assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
 assign (B var) value = do
   cm <- get
-  result <- lift $ lift $ Relations.runRelM $ Relations.assignB var (value == 1) (cmRelations cm)
+  result <- lift $ lift $ Relations.assignB var (value == 1) (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -365,7 +365,7 @@ assign (B var) value = do
       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 assign (F var) value = do
   cm <- get
-  result <- lift $ lift $ Relations.runRelM $ Relations.assignR (F var) value (cmRelations cm)
+  result <- lift $ lift $ Relations.assignR (F var) value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -378,8 +378,7 @@ assignS slice value = do
   result <-
     lift $
       lift $
-        Relations.runRelM $
-          Relations.assignS slice value (cmRelations cm)
+        Relations.assignS slice value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -390,7 +389,7 @@ assignS slice value = do
 relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
 relateF var1 (slope, var2, intercept) = do
   cm <- get
-  result <- lift $ lift $ Relations.runRelM $ Relations.relateR var1 slope var2 intercept (cmRelations cm)
+  result <- lift $ lift $ Relations.relateR var1 slope var2 intercept (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do
@@ -402,11 +401,7 @@ relateF var1 (slope, var2, intercept) = do
 relateS :: (GaloisField n, Integral n) => Slice -> Slice -> RoundM n Bool
 relateS slice1 slice2 = do
   cm <- get
-  result <-
-    lift $
-      lift $
-        Relations.runRelM $
-          Relations.relateS slice1 slice2 (cmRelations cm)
+  result <- lift $ lift $ Relations.relateS slice1 slice2 (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do

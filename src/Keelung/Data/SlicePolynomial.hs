@@ -31,6 +31,7 @@ import Data.IntMap qualified as IntMap
 import Data.Map (Map)
 import Data.Map qualified as Map
 import GHC.Generics (Generic)
+import Keelung.Compiler.Util (powerOf2)
 import Keelung.Data.IntervalSet (IntervalSet)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.Reference (RefU)
@@ -70,16 +71,16 @@ fromSlices :: (Integral n, GaloisField n) => [(Slice, n)] -> SlicePoly n
 fromSlices = foldr insert new
 
 -- | Convert the polynomial to a list of Slices
-toSlices :: (Num n) => SlicePoly n -> [(Slice, n)]
+toSlices :: (Integral n, GaloisField n) => SlicePoly n -> [(Slice, n)]
 toSlices = concatMap (uncurry convert) . Map.toList . unSlicePoly
   where
-    convert :: (Num n) => RefU -> IntervalSet n -> [(Slice, n)]
+    convert :: (Integral n, GaloisField n) => RefU -> IntervalSet n -> [(Slice, n)]
     convert ref xss = case IntMap.toList (IntervalSet.unIntervalSet xss) of
       [] -> []
       ((firstStart, (firstEnd, firstCount)) : xs) ->
         -- we need to know what's the first interval, so that we can adjust the multiplier of the rest
         (Slice.Slice ref firstStart firstEnd, firstCount)
-          : map (\(start, (end, count)) -> (Slice.Slice ref start end, count * 2 ^ (start - firstStart))) xs
+          : map (\(start, (end, count)) -> (Slice.Slice ref start end, count * powerOf2 (start - firstStart))) xs
 
 --------------------------------------------------------------------------------
 
@@ -95,16 +96,14 @@ insertMany slices xs = foldr insert xs slices
 
 -- | Merge two IntervalSets while maintaining the correct multiplier
 mergeEntry :: (Integral n, GaloisField n) => IntervalSet n -> IntervalSet n -> IntervalSet n
-mergeEntry a b =
-  let result = case (IntervalSet.getStartOffset a, IntervalSet.getStartOffset b) of
-        (Nothing, Nothing) -> mempty
-        (Just _, Nothing) -> a
-        (Nothing, Just _) -> b
-        (Just x, Just y) -> case x `compare` y of
-          LT -> a <> IntervalSet.multiplyBy (recip (2 ^ (y - x))) b
-          EQ -> a <> b
-          GT -> b <> IntervalSet.multiplyBy (recip (2 ^ (x - y))) a
-   in result
+mergeEntry a b = case (IntervalSet.getStartOffset a, IntervalSet.getStartOffset b) of
+  (Nothing, Nothing) -> mempty
+  (Just _, Nothing) -> a
+  (Nothing, Just _) -> b
+  (Just x, Just y) -> case x `compare` y of
+    LT -> a <> IntervalSet.multiplyBy (recip (powerOf2 (y - x))) b
+    EQ -> a <> b
+    GT -> b <> IntervalSet.multiplyBy (recip (powerOf2 (x - y))) a
 
 -- | Multiply all Slices in the polynomial by a number
 multiplyBy :: (Integral n, GaloisField n) => n -> SlicePoly n -> SlicePoly n
@@ -112,7 +111,7 @@ multiplyBy n = SlicePoly . fmap (IntervalSet.multiplyBy n) . unSlicePoly
 
 -- | Add two polynomials together
 add :: (Integral n, GaloisField n) => SlicePoly n -> SlicePoly n -> SlicePoly n
-add (SlicePoly xs) (SlicePoly ys) = SlicePoly (Map.unionWith mergeEntry xs ys)
+add (SlicePoly xs) (SlicePoly ys) = SlicePoly (Map.filter (not . IntervalSet.null) $ Map.unionWith mergeEntry xs ys)
 
 --------------------------------------------------------------------------------
 
@@ -121,7 +120,7 @@ null :: (Integral n) => SlicePoly n -> Bool
 null = all IntervalSet.null . unSlicePoly
 
 -- | Get the number of Slices in the polynomial
-size :: (Integral n) => SlicePoly n -> Int
+size :: (Integral n, GaloisField n) => SlicePoly n -> Int
 size = length . toSlices
 
 -- | Check if a PolySlice is valid

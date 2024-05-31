@@ -79,3 +79,14 @@ traceShowWhen False _ = id
 traceShowWhenM :: (Monad m, Show s) => Bool -> s -> m ()
 traceShowWhenM True msg = Trace.traceShowM msg
 traceShowWhenM False _ = return ()
+
+-- | Computes the powers of 2, takes care of negative powers and binary fields.
+powerOf2 :: (Integral n, GaloisField n) => Int -> n
+powerOf2 power =
+  let two = 2
+   in if two == 0
+        then 1
+        else
+          if power < 0
+            then recip (two ^ (-power))
+            else two ^ power

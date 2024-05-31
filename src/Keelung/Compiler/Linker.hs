@@ -4,6 +4,7 @@
 module Keelung.Compiler.Linker
   ( linkConstraintModule,
     reindexRef,
+    reindexSlice,
     Env (..),
     constructEnv,
     toConstraints,
@@ -32,6 +33,7 @@ import Keelung.Compiler.Options
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Compiler.Relations.Reference qualified as RefRelations
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
+import Keelung.Compiler.Util (powerOf2)
 import Keelung.Data.Constraint
 import Keelung.Data.FieldInfo (FieldInfo)
 import Keelung.Data.FieldInfo qualified as FieldInfo
@@ -177,7 +179,7 @@ reindexSlice env slice multiplier =
           env
           (Slice.sliceRefU slice)
           (Slice.sliceStart slice + i),
-        multiplier * (2 ^ i)
+        multiplier * powerOf2 i
       )
       | i <- [0 .. Slice.sliceEnd slice - Slice.sliceStart slice - 1]
     ]

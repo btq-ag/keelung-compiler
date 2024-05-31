@@ -4,16 +4,19 @@
 module Test.Data.IntervalTable (tests, run) where
 
 import Control.Monad (forM_)
+import Data.IntMap (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Keelung
 import Keelung.Compiler.ConstraintModule (ConstraintModule)
-import Keelung.Compiler.Linker (constructEnv, reindexRef)
+import Keelung.Compiler.Linker (constructEnv, reindexRef, reindexSlice)
 import Keelung.Compiler.Optimize.OccurU qualified as OccurU
 import Keelung.Data.IntervalTable (IntervalTable (..))
 import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Reference
-import Test.Util
+import Keelung.Data.Slice (Slice (Slice))
 import Test.Hspec
+import Test.Util
+import Keelung.Compiler.Util (powerOf2)
 
 run :: IO ()
 run = hspec tests
@@ -141,17 +144,11 @@ tests =
         cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
         let env = constructEnv cm
         let inputVar = RefUI 4 0
-        reindexRef env (B (RefUBit inputVar 0)) `shouldBe` 0
-        reindexRef env (B (RefUBit inputVar 1)) `shouldBe` 1
-        reindexRef env (B (RefUBit inputVar 2)) `shouldBe` 2
-        reindexRef env (B (RefUBit inputVar 3)) `shouldBe` 3
+        reindexSlice env (Slice inputVar 0 4) (1 :: GF181) `shouldBe` buildIntMap 4 0
         let intermediateB = RefBX 0
         reindexRef env (B intermediateB) `shouldBe` 4
         let intermediate4 = RefUX 4 0
-        reindexRef env (B (RefUBit intermediate4 0)) `shouldBe` 5
-        reindexRef env (B (RefUBit intermediate4 1)) `shouldBe` 6
-        reindexRef env (B (RefUBit intermediate4 2)) `shouldBe` 7
-        reindexRef env (B (RefUBit intermediate4 3)) `shouldBe` 8
+        reindexSlice env (Slice intermediate4 0 4) (1 :: GF181) `shouldBe` buildIntMap 4 5
 
       it "Bit test / and 1" $ do
         let program = do
@@ -162,19 +159,11 @@ tests =
         let env = constructEnv cm
         reindexRef env (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
-        reindexRef env (B (RefUBit inputVar0 0)) `shouldBe` 1
-        reindexRef env (B (RefUBit inputVar0 1)) `shouldBe` 2
-        reindexRef env (B (RefUBit inputVar0 2)) `shouldBe` 3
-        reindexRef env (B (RefUBit inputVar0 3)) `shouldBe` 4
+        reindexSlice env (Slice inputVar0 0 4) (1 :: GF181) `shouldBe` buildIntMap 4 1
         let inputVar1 = RefUP 4 0
-        reindexRef env (B (RefUBit inputVar1 0)) `shouldBe` 5
-        reindexRef env (B (RefUBit inputVar1 1)) `shouldBe` 6
-        reindexRef env (B (RefUBit inputVar1 2)) `shouldBe` 7
-        reindexRef env (B (RefUBit inputVar1 3)) `shouldBe` 8
+        reindexSlice env (Slice inputVar1 0 4) (1 :: GF181) `shouldBe` buildIntMap 4 5
         let intermediateVar0 = RefUX 4 0
-        reindexRef env (B (RefUBit intermediateVar0 1)) `shouldBe` 13
-        reindexRef env (B (RefUBit intermediateVar0 2)) `shouldBe` 14
-        reindexRef env (B (RefUBit intermediateVar0 3)) `shouldBe` 15
+        reindexSlice env (Slice intermediateVar0 0 4) (1 :: GF181) `shouldBe` buildIntMap 4 12
 
       it "Bit test / and 2" $ do
         let program = do
@@ -187,18 +176,12 @@ tests =
 
         reindexRef env (B (RefBO 0)) `shouldBe` 0
         let inputVar0 = RefUI 4 0
-        reindexRef env (B (RefUBit inputVar0 0)) `shouldBe` 1
-        reindexRef env (B (RefUBit inputVar0 1)) `shouldBe` 2
-        reindexRef env (B (RefUBit inputVar0 2)) `shouldBe` 3
-        reindexRef env (B (RefUBit inputVar0 3)) `shouldBe` 4
+        reindexSlice env (Slice inputVar0 0 4) (1 :: GF181) `shouldBe` buildIntMap 4 1
         let inputVar2 = RefUI 4 1
-        reindexRef env (B (RefUBit inputVar2 0)) `shouldBe` 5
-        reindexRef env (B (RefUBit inputVar2 1)) `shouldBe` 6
-        reindexRef env (B (RefUBit inputVar2 2)) `shouldBe` 7
-        reindexRef env (B (RefUBit inputVar2 3)) `shouldBe` 8
+        reindexSlice env (Slice inputVar2 0 4) (1 :: GF181) `shouldBe` buildIntMap 4 5
         let inputVar1 = RefUP 4 0
-        reindexRef env (B (RefUBit inputVar1 0)) `shouldBe` 9
-        reindexRef env (B (RefUBit inputVar1 1)) `shouldBe` 10
-        reindexRef env (B (RefUBit inputVar1 2)) `shouldBe` 11
-        reindexRef env (B (RefUBit inputVar1 3)) `shouldBe` 12
+        reindexSlice env (Slice inputVar1 0 4) (1 :: GF181) `shouldBe` buildIntMap 4 9
         reindexRef env (F (RefFX 0)) `shouldBe` 13
+
+buildIntMap :: (Integral n, GaloisField n) => Width -> Int -> IntMap n
+buildIntMap w i = IntMap.fromList [(j, powerOf2 (j - i)) | j <- [i .. i + w - 1]]

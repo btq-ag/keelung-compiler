@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           keelung-compiler
-version:        0.22.0
+version:        0.23.0
 description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung-compiler#readme>
 homepage:       https://github.com/btq-ag/keelung-compiler#readme
 bug-reports:    https://github.com/btq-ag/keelung-compiler/issues
@@ -79,10 +79,13 @@ library
       Keelung.Data.Slice
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
+      Keelung.Data.UnionFind.Boolean
+      Keelung.Data.UnionFind.Field
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
       Keelung.Solver
+      Keelung.Solver.Binary
       Keelung.Solver.BinRep
       Keelung.Solver.Monad
   other-modules:
@@ -171,10 +174,13 @@ executable keelungc
       Keelung.Data.Slice
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
+      Keelung.Data.UnionFind.Boolean
+      Keelung.Data.UnionFind.Field
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
       Keelung.Solver
+      Keelung.Solver.Binary
       Keelung.Solver.BinRep
       Keelung.Solver.Monad
       Basic
@@ -222,7 +228,6 @@ test-suite keelung-test
       Test.Compilation.Boolean.Equality
       Test.Compilation.Boolean.Inequality
       Test.Compilation.Boolean.Logical
-      Test.Compilation.Experiment
       Test.Compilation.Field
       Test.Compilation.Field.Arithmetics
       Test.Compilation.Field.Conditional
@@ -253,10 +258,12 @@ test-suite keelung-test
       Test.Data.LC
       Test.Data.PolyRS
       Test.Data.RefUSegments
+      Test.Data.UnionFind.Boolean
+      Test.Data.UnionFind.Field
+      Test.Experiment
       Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
-      Test.Optimization.Experiment
       Test.Optimization.Field
       Test.Optimization.UInt
       Test.Optimization.UInt.AESMul
@@ -268,6 +275,7 @@ test-suite keelung-test
       Test.Relations.Reference
       Test.Relations.Slice
       Test.Solver
+      Test.Solver.Binary
       Test.Solver.BinRep
       Test.Util
       Keelung.Compiler
@@ -324,10 +332,13 @@ test-suite keelung-test
       Keelung.Data.Slice
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
+      Keelung.Data.UnionFind.Boolean
+      Keelung.Data.UnionFind.Field
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
       Keelung.Solver
+      Keelung.Solver.Binary
       Keelung.Solver.BinRep
       Keelung.Solver.Monad
       Basic

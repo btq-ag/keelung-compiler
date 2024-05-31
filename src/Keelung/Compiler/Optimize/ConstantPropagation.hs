@@ -14,14 +14,15 @@ import Keelung.Syntax (Var)
 --------------------------------------------------------------------------------
 
 run :: (Integral n, GaloisField n) => Internal n -> Internal n
-run (Internal exprs fieldWidth counters assertions sideEffects) = runM $ do
-  sideEffects' <- mapM propagateSideEffect sideEffects
+run (Internal exprs fieldWidth counters assertions hints sideEffects) = runM $ do
+  sisdeEffects' <- mapM propagateSideEffect sideEffects -- side effects are evaluated first
   Internal
     <$> mapM (\(var, expr) -> (var,) <$> propagateExpr expr) exprs
     <*> pure fieldWidth
     <*> pure counters
     <*> mapM propagateExpr assertions
-    <*> pure sideEffects'
+    <*> propagateHints hints
+    <*> pure sisdeEffects'
 
 type Bindings n = Struct (IntMap n) (IntMap n) (IntMap Integer)
 
@@ -29,6 +30,13 @@ type M n = State (Bindings n)
 
 runM :: State (Bindings n) a -> a
 runM program = evalState program mempty
+
+propagateHints :: (Integral n, GaloisField n) => Hints n -> M n (Hints n)
+propagateHints (Hints fs bs uss) =
+  Hints
+    <$> mapM (\(target, hints) -> (,) <$> propagateExprF target <*> mapM propagateExprB hints) fs
+    <*> mapM (\(target, hints) -> (,) <$> propagateExprB target <*> mapM propagateExprB hints) bs
+    <*> mapM (mapM (\(target, hints) -> (,) <$> propagateExprU target <*> mapM propagateExprB hints)) uss
 
 propagateSideEffect :: (Integral n, GaloisField n) => SideEffect n -> M n (SideEffect n)
 propagateSideEffect sideEffect = case sideEffect of
@@ -116,6 +124,8 @@ propagateExprU e = do
     CLMulU w x y -> CLMulU w <$> propagateExprU x <*> propagateExprU y
     CLModU w x y -> CLModU w <$> propagateExprU x <*> propagateExprU y
     MMIU w x p -> MMIU w <$> propagateExprU x <*> pure p
+    DivU w x y -> DivU w <$> propagateExprU x <*> propagateExprU y
+    ModU w x y -> ModU w <$> propagateExprU x <*> propagateExprU y
     AndU w xs -> AndU w <$> mapM propagateExprU xs
     OrU w xs -> OrU w <$> mapM propagateExprU xs
     XorU w xs -> XorU w <$> mapM propagateExprU xs

@@ -31,6 +31,9 @@ module Test.Util
     assertCountIO0,
     assertCountWithOpts,
     assertCountWithOptsI,
+    -- R1CS solving 
+    testSolver,
+    testSolverWithOpts,
     -- helper functions
     compileAsConstraintModule,
     compileAsConstraintSystem,
@@ -38,9 +41,17 @@ module Test.Util
     throwErrorsWithOpts,
     throwErrors,
     gf181Info,
+    -- operands
+    Operand (..),
+    Operands (..),
+    operandToUnsignedInteger,
+    operandToSignedInteger,
+    operandToSignedVariable,
+    cassifyOperands,
   )
 where
 
+import Data.Either qualified as Either
 import Data.Field.Galois
 import Data.Proxy (Proxy (..))
 import GHC.TypeLits
@@ -56,9 +67,12 @@ import Keelung.Compiler.Util (gf181Info)
 import Keelung.Constraint.R1CS (R1CS (..))
 import Keelung.Data.FieldInfo
 import Keelung.Data.FieldInfo qualified as FieldInfo
+import Keelung.Data.U (U)
 import Keelung.Solver qualified as Solver
+import Test.Arbitrary (arbitraryUOfWidth)
 import Test.HUnit (assertFailure)
 import Test.Hspec
+import Test.QuickCheck
 
 --------------------------------------------------------------------------------
 
@@ -216,6 +230,28 @@ assertCount = assertCountWithOpts . Options.new
 assertCountI :: (GaloisField n, Integral n) => FieldType -> Compiler.Internal n -> Int -> IO ()
 assertCountI fieldType = assertCountWithOptsI (Options.new fieldType)
 
+
+--------------------------------------------------------------------------
+
+-- | Solve R1CS with inputs and see if it's the same as the expected output (takes Keelung program)
+testSolverWithOpts :: Encode t => Options -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
+testSolverWithOpts options program rawPublicInputs rawPrivateInputs expected = caseFieldType (FieldInfo.fieldTypeData (Options.optFieldInfo options)) handlePrime handleBinary
+  where
+    handlePrime :: (KnownNat n) => Proxy (Prime n) -> FieldInfo -> IO ()
+    handlePrime (_ :: Proxy (Prime n)) _ = do
+      case Compiler.solveWithOpts options program rawPublicInputs rawPrivateInputs of
+        Left err -> assertFailure (show (err :: Error (Prime n)))
+        Right actual -> actual `shouldBe` expected
+
+    handleBinary :: (KnownNat n) => Proxy (Binary n) -> FieldInfo -> IO ()
+    handleBinary (_ :: Proxy (Binary n)) _ = do
+      case Compiler.solveWithOpts options program rawPublicInputs rawPrivateInputs of
+        Left err -> assertFailure (show (err :: Error (Binary n)))
+        Right actual -> actual `shouldBe` expected
+
+testSolver :: Encode t => FieldType -> Comp t -> [Integer] -> [Integer] -> [Integer] -> IO ()
+testSolver = testSolverWithOpts . Options.new
+
 --------------------------------------------------------------------------
 
 -- | Utilities for testing
@@ -262,3 +298,52 @@ throwErrorsWithOpts options program rawPublicInputs rawPrivateInputs stError csE
 
 throwErrors :: (GaloisField n, Integral n, Encode t, Show t) => FieldType -> Comp t -> [Integer] -> [Integer] -> Error n -> Error n -> IO ()
 throwErrors = throwErrorsWithOpts . Options.new
+
+--------------------------------------------------------------------------------
+
+data Operand = Constant U | PosVar U | NegVar U
+  deriving (Show)
+
+arbitraryOperandOfWidth :: Width -> Gen Operand
+arbitraryOperandOfWidth width =
+  oneof
+    [ Constant <$> arbitraryUOfWidth width,
+      PosVar <$> arbitraryUOfWidth width,
+      NegVar <$> arbitraryUOfWidth width
+    ]
+
+-- | Default to generating Byte operands
+instance Arbitrary Operand where
+  arbitrary = arbitraryOperandOfWidth 8
+
+operandToUnsignedInteger :: Operand -> Integer
+operandToUnsignedInteger (Constant x) = toInteger x
+operandToUnsignedInteger (PosVar x) = toInteger x
+operandToUnsignedInteger (NegVar x) = toInteger x
+
+operandToSignedInteger :: Operand -> Integer
+operandToSignedInteger (Constant x) = toInteger x
+operandToSignedInteger (PosVar x) = toInteger x
+operandToSignedInteger (NegVar x) = (-toInteger x) `mod` (2 ^ widthOf x)
+
+operandToSignedVariable :: (KnownNat n) => Operand -> UInt n -> UInt n
+operandToSignedVariable (Constant _) _ = error "[ panic ] operandToSignedVariable: constant"
+operandToSignedVariable (PosVar _) var = var
+operandToSignedVariable (NegVar _) var = -var
+
+--------------------------------------------------------------------------------
+
+newtype Operands = Operands {unOperands :: [Operand]}
+  deriving (Show)
+
+instance Arbitrary Operands where
+  arbitrary = do
+    n <- chooseInt (0, 10)
+    Operands <$> vector n
+
+cassifyOperands :: Operands -> ([U], [Operand])
+cassifyOperands = Either.partitionEithers . map cassifyOperand . unOperands
+  where
+    cassifyOperand :: Operand -> Either U Operand
+    cassifyOperand (Constant x) = Left x
+    cassifyOperand x = Right x

@@ -9,11 +9,13 @@ module Keelung.Compiler.Syntax.Internal
     ExprF (..),
     ExprU (..),
     Internal (..),
+    Hints (..),
     SideEffect (..),
   )
 where
 
 import Data.Field.Galois (GaloisField)
+import Data.IntMap.Strict (IntMap)
 import Data.Sequence (Seq (..))
 import Keelung.Data.U (U)
 import Keelung.Field (N (..))
@@ -152,6 +154,8 @@ data ExprU n
   | CLMulU Width (ExprU n) (ExprU n)
   | CLModU Width (ExprU n) (ExprU n)
   | MMIU Width (ExprU n) U -- modular multiplicative inverse
+  | DivU Width (ExprU n) (ExprU n)
+  | ModU Width (ExprU n) (ExprU n)
   | -- logical operators
     AndU Width (Seq (ExprU n))
   | OrU Width (Seq (ExprU n))
@@ -183,6 +187,8 @@ instance (Show n, Integral n) => Show (ExprU n) where
     CLMulU _ x y -> chain prec " .*. " 7 $ x :<| y :<| Empty
     CLModU _ x y -> chain prec " .%. " 8 $ x :<| y :<| Empty
     MMIU _ x p -> showParen (prec > 8) $ showsPrec 9 x . showString "⁻¹ (mod " . shows p . showString ")"
+    DivU _ x y -> chain prec " / " 7 $ x :<| y :<| Empty
+    ModU _ x y -> chain prec " % " 7 $ x :<| y :<| Empty
     AndU _ xs -> chain prec " ∧ " 3 xs
     OrU _ xs -> chain prec " ∨ " 2 xs
     XorU _ xs -> chain prec " ⊕ " 4 xs
@@ -208,6 +214,8 @@ instance HasWidth (ExprU n) where
     CLMulU w _ _ -> w
     CLModU w _ _ -> w
     MMIU w _ _ -> w
+    DivU w _ _ -> w
+    ModU w _ _ -> w
     AndU w _ -> w
     OrU w _ -> w
     XorU w _ -> w
@@ -232,13 +240,15 @@ data Internal n = Internal
     internalCounters :: !Counters,
     -- | Assertions after type erasure
     internalAssertions :: ![Expr n],
+    -- | Hints for the constraint solver
+    internalHints :: !(Hints n),
     -- | Side effects
     internalSideEffects :: !(Seq (SideEffect n))
-  } 
+  }
   deriving (Eq)
 
 instance (GaloisField n, Integral n) => Show (Internal n) where
-  show (Internal expr _ counters assertions _sideEffects) =
+  show (Internal expr _ counters assertions _hints _sideEffects) =
     "Internal {\n"
       -- expressions
       <> "  Expression: "
@@ -252,6 +262,16 @@ instance (GaloisField n, Integral n) => Show (Internal n) where
       <> Counters.prettyVariables counters
       <> "\n\
          \}"
+
+--------------------------------------------------------------------------------
+
+-- | Data structure for storing hints
+data Hints n = Hints
+  { hintsF :: IntMap (ExprF n, [ExprB n]),
+    hintsB :: IntMap (ExprB n, [ExprB n]),
+    hintsU :: IntMap (IntMap (ExprU n, [ExprB n]))
+  }
+  deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 

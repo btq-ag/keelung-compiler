@@ -1,24 +1,13 @@
-module Keelung.Compiler.Relations.Monad (RelM, runRelM, markChanged, Seniority (..)) where
+module Keelung.Compiler.Relations.Monad (RelM, Seniority (..)) where
 
 import Control.Monad.Except
-import Control.Monad.Writer
 import Data.Function (on)
 import Keelung.Compiler.Compile.Error (Error)
 import Keelung.Data.Reference
 
 --------------------------------------------------------------------------------
 
-type RelM n = WriterT [()] (Except (Error n))
-
-runRelM :: RelM n a -> Except (Error n) (Maybe a)
-runRelM xs = do
-  (x, changes) <- runWriterT xs
-  if null changes
-    then return Nothing
-    else return (Just x)
-
-markChanged :: RelM n ()
-markChanged = tell [()]
+type RelM n = Except (Error n)
 
 --------------------------------------------------------------------------------
 
@@ -37,6 +26,9 @@ instance Seniority RefF where
 
 instance Seniority Ref where
   compareSeniority = compare `on` hasLevel
+
+instance Seniority Int where
+  compareSeniority = compare
 
 --------------------------------------------------------------------------------
 

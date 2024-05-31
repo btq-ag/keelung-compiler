@@ -154,8 +154,9 @@ tests = describe "UInt" $ do
             x <- input Public :: Comp (UInt 8)
             y <- input Public
             return $ x * y
-      assertCountO0 (Prime 1031) program 55
-      assertCount (Prime 1031) program 50
+      -- debug (Prime 1031) program
+      assertCountO0 (Prime 1031) program 57
+      assertCount (Prime 1031) program 51
 
     it "variable / constant" $ do
       let program = do
@@ -168,7 +169,6 @@ tests = describe "UInt" $ do
     it "constant / constant" $ do
       let program = do
             return $ 2 * (4 :: UInt 4)
-      -- print $ linkConstraintModule cs'
       assertCountO0 gf181 program 5
       assertCount gf181 program 5
 
@@ -183,16 +183,14 @@ tests = describe "UInt" $ do
             x <- input Public :: Comp (UInt 8)
             y <- input Public :: Comp (UInt 8)
             return (x .*. y)
-      -- print $ linkConstraintModule cs'
-      assertCountO0 gf181 program 91
-      assertCount gf181 program 87
+      assertCountO0 gf181 program 87
+      assertCount gf181 program 79
 
   describe "Constants" $ do
     -- TODO: should be just 4
     it "`return 0`" $ do
       let program = do
             return (0 :: UInt 4)
-      -- print $ linkConstraintModule cs'
       assertCountO0 gf181 program 5
       assertCount gf181 program 5
 
@@ -378,7 +376,7 @@ tests = describe "UInt" $ do
             assert $ x `lte` (bound :: UInt 4)
       forM_
         [ (0, 5), -- special case: only 1 possible value
-          (1, 8), -- special case: only 2 possible value
+          (1, 6), -- special case: only 2 possible value
           (2, 6), -- special case: only 3 possible value
           (3, 6), -- trailing one: 1
           (4, 7),
