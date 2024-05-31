@@ -1,0 +1,378 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.36.0.
+--
+-- see: https://github.com/sol/hpack
+
+name:           keelung-compiler
+version:        0.24.0
+description:    Please see the README on GitHub at <https://github.com/btq-ag/keelung-compiler#readme>
+homepage:       https://github.com/btq-ag/keelung-compiler#readme
+bug-reports:    https://github.com/btq-ag/keelung-compiler/issues
+author:         BTQ AG
+maintainer:     BTQ AG
+copyright:      2022-2023 BTQ AG
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/btq-ag/keelung-compiler
+
+library
+  exposed-modules:
+      Keelung.Compiler
+      Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Boolean
+      Keelung.Compiler.Compile.Error
+      Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Conditional
+      Keelung.Compiler.Compile.Field.Exponentiation
+      Keelung.Compiler.Compile.Monad
+      Keelung.Compiler.Compile.UInt
+      Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.Binary
+      Keelung.Compiler.Compile.UInt.Addition.LimbColumn
+      Keelung.Compiler.Compile.UInt.AESMul
+      Keelung.Compiler.Compile.UInt.Bitwise
+      Keelung.Compiler.Compile.UInt.CLMul
+      Keelung.Compiler.Compile.UInt.Comparison
+      Keelung.Compiler.Compile.UInt.DivMod
+      Keelung.Compiler.Compile.UInt.Logical
+      Keelung.Compiler.Compile.UInt.Mul
+      Keelung.Compiler.Compile.UInt.Multiplication.Binary
+      Keelung.Compiler.Compile.Util
+      Keelung.Compiler.ConstraintModule
+      Keelung.Compiler.ConstraintSystem
+      Keelung.Compiler.Error
+      Keelung.Compiler.Linker
+      Keelung.Compiler.Linker.ReindexReport
+      Keelung.Compiler.Optimize
+      Keelung.Compiler.Optimize.ConstantPropagation
+      Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.OccurB
+      Keelung.Compiler.Optimize.OccurF
+      Keelung.Compiler.Optimize.OccurU
+      Keelung.Compiler.Options
+      Keelung.Compiler.R1CS
+      Keelung.Compiler.Relations
+      Keelung.Compiler.Relations.Monad
+      Keelung.Compiler.Relations.Reference
+      Keelung.Compiler.Relations.Slice
+      Keelung.Compiler.Syntax.Inputs
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
+      Keelung.Compiler.Util
+      Keelung.Data.Constraint
+      Keelung.Data.IntervalSet
+      Keelung.Data.IntervalTable
+      Keelung.Data.LC
+      Keelung.Data.Limb
+      Keelung.Data.PolyL
+      Keelung.Data.Reference
+      Keelung.Data.RefUSegments
+      Keelung.Data.Segment
+      Keelung.Data.Slice
+      Keelung.Data.SlicePolynomial
+      Keelung.Data.U
+      Keelung.Data.UnionFind.Boolean
+      Keelung.Data.UnionFind.Field
+      Keelung.Data.VarGroup
+      Keelung.Interpreter
+      Keelung.Interpreter.Monad
+      Keelung.Solver
+      Keelung.Solver.Binary
+      Keelung.Solver.BinRep
+      Keelung.Solver.Monad
+  other-modules:
+      Paths_keelung_compiler
+  hs-source-dirs:
+      src
+  default-extensions:
+      ImportQualifiedPost
+  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
+  build-depends:
+      array
+    , base >=4.7 && <5
+    , binary
+    , bytestring
+    , cereal
+    , containers
+    , deepseq
+    , equivalence
+    , galois-field
+    , keelung
+    , mtl
+    , optparse-applicative
+    , random
+    , semirings
+    , split
+    , validation
+    , vector
+  default-language: Haskell2010
+
+executable keelungc
+  main-is: Main.hs
+  other-modules:
+      Encode
+      Option
+      Keelung.Compiler
+      Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Boolean
+      Keelung.Compiler.Compile.Error
+      Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Conditional
+      Keelung.Compiler.Compile.Field.Exponentiation
+      Keelung.Compiler.Compile.Monad
+      Keelung.Compiler.Compile.UInt
+      Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.Binary
+      Keelung.Compiler.Compile.UInt.Addition.LimbColumn
+      Keelung.Compiler.Compile.UInt.AESMul
+      Keelung.Compiler.Compile.UInt.Bitwise
+      Keelung.Compiler.Compile.UInt.CLMul
+      Keelung.Compiler.Compile.UInt.Comparison
+      Keelung.Compiler.Compile.UInt.DivMod
+      Keelung.Compiler.Compile.UInt.Logical
+      Keelung.Compiler.Compile.UInt.Mul
+      Keelung.Compiler.Compile.UInt.Multiplication.Binary
+      Keelung.Compiler.Compile.Util
+      Keelung.Compiler.ConstraintModule
+      Keelung.Compiler.ConstraintSystem
+      Keelung.Compiler.Error
+      Keelung.Compiler.Linker
+      Keelung.Compiler.Linker.ReindexReport
+      Keelung.Compiler.Optimize
+      Keelung.Compiler.Optimize.ConstantPropagation
+      Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.OccurB
+      Keelung.Compiler.Optimize.OccurF
+      Keelung.Compiler.Optimize.OccurU
+      Keelung.Compiler.Options
+      Keelung.Compiler.R1CS
+      Keelung.Compiler.Relations
+      Keelung.Compiler.Relations.Monad
+      Keelung.Compiler.Relations.Reference
+      Keelung.Compiler.Relations.Slice
+      Keelung.Compiler.Syntax.Inputs
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
+      Keelung.Compiler.Util
+      Keelung.Data.Constraint
+      Keelung.Data.IntervalSet
+      Keelung.Data.IntervalTable
+      Keelung.Data.LC
+      Keelung.Data.Limb
+      Keelung.Data.PolyL
+      Keelung.Data.Reference
+      Keelung.Data.RefUSegments
+      Keelung.Data.Segment
+      Keelung.Data.Slice
+      Keelung.Data.SlicePolynomial
+      Keelung.Data.U
+      Keelung.Data.UnionFind.Boolean
+      Keelung.Data.UnionFind.Field
+      Keelung.Data.VarGroup
+      Keelung.Interpreter
+      Keelung.Interpreter.Monad
+      Keelung.Solver
+      Keelung.Solver.Binary
+      Keelung.Solver.BinRep
+      Keelung.Solver.Monad
+      Basic
+      Hash.Poseidon
+      Hash.Poseidon.Constant
+      Paths_keelung_compiler
+  hs-source-dirs:
+      app/
+      src/
+      examples/
+  default-extensions:
+      ImportQualifiedPost
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror=incomplete-patterns -fno-warn-orphans
+  build-depends:
+      aeson
+    , array
+    , base >=4.7 && <5
+    , binary
+    , bytestring
+    , cereal
+    , containers
+    , deepseq
+    , equivalence
+    , galois-field
+    , keelung
+    , keelung-compiler
+    , mtl
+    , optparse-applicative
+    , random
+    , semirings
+    , split
+    , validation
+    , vector
+    , with-utf8
+  default-language: Haskell2010
+
+test-suite keelung-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Test.Arbitrary
+      Test.Compilation
+      Test.Compilation.Boolean
+      Test.Compilation.Boolean.Conditional
+      Test.Compilation.Boolean.Equality
+      Test.Compilation.Boolean.Inequality
+      Test.Compilation.Boolean.Logical
+      Test.Compilation.Field
+      Test.Compilation.Field.Arithmetics
+      Test.Compilation.Field.Conditional
+      Test.Compilation.Field.Equality
+      Test.Compilation.Field.Exponentiation
+      Test.Compilation.Field.Inequality
+      Test.Compilation.Misc
+      Test.Compilation.Statement
+      Test.Compilation.UInt
+      Test.Compilation.UInt.Addition
+      Test.Compilation.UInt.Addition.LimbBound
+      Test.Compilation.UInt.AESMul
+      Test.Compilation.UInt.Bitwise
+      Test.Compilation.UInt.CLDivMod
+      Test.Compilation.UInt.CLMul
+      Test.Compilation.UInt.Comparison
+      Test.Compilation.UInt.Conditional
+      Test.Compilation.UInt.DivMod
+      Test.Compilation.UInt.Equality
+      Test.Compilation.UInt.Experiment
+      Test.Compilation.UInt.Inequality
+      Test.Compilation.UInt.Logical
+      Test.Compilation.UInt.ModInv
+      Test.Compilation.UInt.Multiplication
+      Test.Data.IntervalSet
+      Test.Data.IntervalTable
+      Test.Data.LC
+      Test.Data.PolyRS
+      Test.Data.RefUSegments
+      Test.Data.UnionFind.Boolean
+      Test.Data.UnionFind.Field
+      Test.Experiment
+      Test.Intergration
+      Test.Optimization
+      Test.Optimization.Boolean
+      Test.Optimization.Field
+      Test.Optimization.UInt
+      Test.Optimization.UInt.AESMul
+      Test.Optimization.UInt.Bitwise
+      Test.Optimization.UInt.CLDivMod
+      Test.Optimization.UInt.Misc
+      Test.Optimization.UInt.Statement
+      Test.Relations
+      Test.Relations.Reference
+      Test.Relations.Slice
+      Test.Solver
+      Test.Solver.Binary
+      Test.Solver.BinRep
+      Test.Util
+      Keelung.Compiler
+      Keelung.Compiler.Compile
+      Keelung.Compiler.Compile.Boolean
+      Keelung.Compiler.Compile.Error
+      Keelung.Compiler.Compile.Field
+      Keelung.Compiler.Compile.Field.Conditional
+      Keelung.Compiler.Compile.Field.Exponentiation
+      Keelung.Compiler.Compile.Monad
+      Keelung.Compiler.Compile.UInt
+      Keelung.Compiler.Compile.UInt.Addition
+      Keelung.Compiler.Compile.UInt.Addition.Binary
+      Keelung.Compiler.Compile.UInt.Addition.LimbColumn
+      Keelung.Compiler.Compile.UInt.AESMul
+      Keelung.Compiler.Compile.UInt.Bitwise
+      Keelung.Compiler.Compile.UInt.CLMul
+      Keelung.Compiler.Compile.UInt.Comparison
+      Keelung.Compiler.Compile.UInt.DivMod
+      Keelung.Compiler.Compile.UInt.Logical
+      Keelung.Compiler.Compile.UInt.Mul
+      Keelung.Compiler.Compile.UInt.Multiplication.Binary
+      Keelung.Compiler.Compile.Util
+      Keelung.Compiler.ConstraintModule
+      Keelung.Compiler.ConstraintSystem
+      Keelung.Compiler.Error
+      Keelung.Compiler.Linker
+      Keelung.Compiler.Linker.ReindexReport
+      Keelung.Compiler.Optimize
+      Keelung.Compiler.Optimize.ConstantPropagation
+      Keelung.Compiler.Optimize.MinimizeConstraints
+      Keelung.Compiler.Optimize.OccurB
+      Keelung.Compiler.Optimize.OccurF
+      Keelung.Compiler.Optimize.OccurU
+      Keelung.Compiler.Options
+      Keelung.Compiler.R1CS
+      Keelung.Compiler.Relations
+      Keelung.Compiler.Relations.Monad
+      Keelung.Compiler.Relations.Reference
+      Keelung.Compiler.Relations.Slice
+      Keelung.Compiler.Syntax.Inputs
+      Keelung.Compiler.Syntax.Internal
+      Keelung.Compiler.Syntax.ToInternal
+      Keelung.Compiler.Util
+      Keelung.Data.Constraint
+      Keelung.Data.IntervalSet
+      Keelung.Data.IntervalTable
+      Keelung.Data.LC
+      Keelung.Data.Limb
+      Keelung.Data.PolyL
+      Keelung.Data.Reference
+      Keelung.Data.RefUSegments
+      Keelung.Data.Segment
+      Keelung.Data.Slice
+      Keelung.Data.SlicePolynomial
+      Keelung.Data.U
+      Keelung.Data.UnionFind.Boolean
+      Keelung.Data.UnionFind.Field
+      Keelung.Data.VarGroup
+      Keelung.Interpreter
+      Keelung.Interpreter.Monad
+      Keelung.Solver
+      Keelung.Solver.Binary
+      Keelung.Solver.BinRep
+      Keelung.Solver.Monad
+      Basic
+      Hash.Poseidon
+      Hash.Poseidon.Constant
+      Paths_keelung_compiler
+  hs-source-dirs:
+      test/
+      src/
+      examples/
+  default-extensions:
+      ImportQualifiedPost
+  ghc-options: -Wall -Werror=incomplete-patterns -fno-warn-orphans
+  build-depends:
+      HUnit
+    , QuickCheck
+    , array
+    , base >=4.7 && <5
+    , binary
+    , bytestring
+    , cereal
+    , containers
+    , deepseq
+    , equivalence
+    , galois-field
+    , hspec
+    , hspec-expectations-lifted
+    , keelung
+    , keelung-compiler
+    , mtl
+    , optparse-applicative
+    , quickcheck-transformer
+    , random
+    , semirings
+    , split
+    , validation
+    , vector
+  default-language: Haskell2010
