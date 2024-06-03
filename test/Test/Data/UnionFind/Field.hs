@@ -1,13 +1,17 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module Test.Data.UnionFind.Field (run, tests) where
 
+import Control.Monad (forM_)
 import Data.Field.Galois (GaloisField, Prime)
+import Data.IntMap qualified as IntMap
 import Data.Maybe qualified as Maybe
 import Keelung (GF181, N (N), Var)
 import Keelung.Data.UnionFind.Field (UnionFind)
 import Keelung.Data.UnionFind.Field qualified as UnionFind
+import Test.HUnit
 import Test.Hspec
 import Test.QuickCheck
 
@@ -26,16 +30,36 @@ tests = describe "Field UnionFind" $ do
   --   let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
   --   UnionFind.validate xs `shouldBe` []
 
-  it "relate" $ do
-    property $ \relates -> do
-      let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
-      UnionFind.validate xs `shouldBe` []
+  describe "operations" $ do
+    it "relate" $ do
+      property $ \relates -> do
+        let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
+        UnionFind.validate xs `shouldBe` []
 
-  it "relate and then assign once" $ do
-    property $ \(relates, assign) -> do
-      let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
-      let xs' = applyAssign xs assign
-      UnionFind.validate xs' `shouldBe` []
+    it "relate and then assign" $ do
+      property $ \(relates, assignments) -> do
+        let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
+        let xs' =
+              foldr
+                ( \(Assign target val) acc -> case UnionFind.lookup target acc of
+                    UnionFind.Constant _ -> acc
+                    _ -> applyAssign acc (Assign target val)
+                )
+                xs
+                (assignments :: [Assign (Prime 17)])
+
+        UnionFind.validate xs' `shouldBe` []
+
+  describe "symmetricity" $ do
+    it "relate and then assign" $ do
+      property $ \xs -> do
+        let (_assignments, families) = UnionFind.export (xs :: UnionFind GF181)
+        forM_ (IntMap.toList families) $ \(root, family) -> do
+          UnionFind.lookup root xs `shouldBe` UnionFind.Root
+          forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
+            UnionFind.lookup child xs `shouldBe` UnionFind.ChildOf slope root intercept
+
+------------------------------------------------------------
 
 data Relate n = Relate Var n Var n -- var1 = slope * var2 + intercept
 
@@ -55,6 +79,24 @@ data Assign n = Assign Var n
 
 instance (GaloisField n, Integral n) => Arbitrary (Assign n) where
   arbitrary = Assign <$> chooseInt (0, 100) <*> arbitrary
+
+------------------------------------------------------------
+
+instance (GaloisField n, Integral n) => Arbitrary (UnionFind n) where
+  arbitrary = do
+    relates <- arbitrary :: Gen [Relate n]
+    assignments <- arbitrary :: Gen [Assign n]
+    let xs = foldl applyRelate UnionFind.new relates
+    return $
+      foldr
+        ( \(Assign target val) acc -> case UnionFind.lookup target acc of
+            UnionFind.Constant _ -> acc
+            _ -> applyAssign acc (Assign target val)
+        )
+        xs
+        assignments
+
+------------------------------------------------------------
 
 applyRelate :: (GaloisField n, Integral n) => UnionFind n -> Relate n -> UnionFind n
 applyRelate xs (Relate var1 slope var2 intercept) = Maybe.fromMaybe xs (UnionFind.relate var1 slope var2 intercept xs)
