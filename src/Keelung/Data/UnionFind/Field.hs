@@ -24,6 +24,11 @@ module Keelung.Data.UnionFind.Field
     relationBetween,
     size,
 
+    -- * Linear Relations
+    LinRel (..),
+    invertLinRel,
+    execLinRel,
+
     -- * Testing
     Error (..),
     validate,

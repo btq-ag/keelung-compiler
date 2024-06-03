@@ -5,7 +5,7 @@
 module Test.Data.UnionFind.Field (run, tests) where
 
 import Control.Monad (forM_)
-import Data.Field.Galois (GaloisField, Prime, Binary)
+import Data.Field.Galois (Binary, GaloisField, Prime)
 import Data.IntMap qualified as IntMap
 import Data.Maybe qualified as Maybe
 import Keelung (GF181, N (N), Var)
@@ -31,20 +31,19 @@ tests = describe "Field UnionFind" $ do
   --   UnionFind.validate xs `shouldBe` []
 
   describe "operations" $ do
-
     it "others 1" $ do
-        let xs = foldl applyRelate UnionFind.new (
-                    [ 
-                      Relate 4 1 51 0
-                    , 
-                    Relate 5 1 52 1
-                    , 
-                    Relate 4 2 5 1
-
-
-                    ] :: [Relate (Binary 7)])
-        print xs
-        UnionFind.validate xs `shouldBe` []
+      let xs =
+            foldl
+              applyRelate
+              UnionFind.new
+              ( [ Relate 4 1 51 0,
+                  Relate 5 1 52 1,
+                  Relate 4 2 5 1
+                ] ::
+                  [Relate (Binary 7)]
+              )
+      print xs
+      UnionFind.validate xs `shouldBe` []
 
   --   it "relate" $ do
   --     property $ \relates -> do
@@ -74,6 +73,29 @@ tests = describe "Field UnionFind" $ do
   --         forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
   --           UnionFind.lookup child xs `shouldBe` UnionFind.ChildOf slope root intercept
 
+  describe "LinRel" $ do
+    describe "invertLinRel . invertLinRel = id" $ do
+      it "GF181" $ do
+        property $ \rel -> do
+          (UnionFind.invertLinRel . UnionFind.invertLinRel) rel `shouldBe` (rel :: UnionFind.LinRel GF181)
+      it "Prime 17" $ do
+        property $ \rel -> do
+          (UnionFind.invertLinRel . UnionFind.invertLinRel) rel `shouldBe` (rel :: UnionFind.LinRel (Prime 17))
+      it "Binary 7" $ do
+        property $ \rel -> do
+          (UnionFind.invertLinRel . UnionFind.invertLinRel) rel `shouldBe` (rel :: UnionFind.LinRel (Binary 7))
+
+    describe "execLinRel invertLinRel rel . execLinRel rel = id" $ do
+      it "GF181" $ do
+        property $ \(rel, points) -> do
+          map (UnionFind.execLinRel (UnionFind.invertLinRel rel) . UnionFind.execLinRel rel) points `shouldBe` (points :: [GF181])
+      it "Prime 17" $ do
+        property $ \(rel, points) -> do
+          map (UnionFind.execLinRel (UnionFind.invertLinRel rel) . UnionFind.execLinRel rel) points `shouldBe` (points :: [Prime 17])
+      it "Binary 7" $ do
+        property $ \(rel, points) -> do
+          map (UnionFind.execLinRel (UnionFind.invertLinRel rel) . UnionFind.execLinRel rel) points `shouldBe` (points :: [Binary 7])
+
 ------------------------------------------------------------
 
 data Relate n = Relate Var n Var n -- var1 = slope * var2 + intercept
@@ -94,6 +116,9 @@ data Assign n = Assign Var n
 
 instance (GaloisField n, Integral n) => Arbitrary (Assign n) where
   arbitrary = Assign <$> chooseInt (0, 100) <*> arbitrary
+
+instance (GaloisField n, Integral n) => Arbitrary (UnionFind.LinRel n) where
+  arbitrary = UnionFind.LinRel <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary
 
 ------------------------------------------------------------
 
