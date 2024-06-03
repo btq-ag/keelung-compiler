@@ -39,9 +39,9 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
-import Keelung (N (N), Var)
+import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (compareSeniority))
-import Keelung.Data.N qualified as N
+import Keelung.Compiler.Util
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -74,40 +74,41 @@ new = UnionFind mempty
 
 -- | Assigns a value to a variable, O(lg n)
 assign :: (GaloisField n, Integral n) => Var -> n -> UnionFind n -> Maybe (UnionFind n)
-assign var value (UnionFind relations) = case IntMap.lookup var relations of
-  -- The variable is not in the map, so we add it as a constant
-  Nothing -> Just $ UnionFind $ IntMap.insert var (IsConstant value) relations
-  -- The variable is already a constant, so we check if the value is the same
-  Just (IsConstant oldValue) ->
-    if oldValue == value
-      then Nothing
-      else error $ "[ panic ] Solver: trying to assign a different value to a constant variable: " <> show var
-  -- The variable is already a root, so we:
-  --    1. Make its children constants
-  --    2. Make the root itself a constant
-  Just (IsRoot toChildren) ->
-    Just $
-      UnionFind $
-        foldl
-          ( \rels (child, relationToChild) ->
-              -- child = relationToChild var
-              -- var = value
-              --    =>
-              -- child = relationToChild value
-              IntMap.insert
-                child
-                (IsConstant (execLinRel relationToChild value))
-                rels
-          )
-          (IntMap.insert var (IsConstant value) relations)
-          (IntMap.toList toChildren)
-  -- The variable is already a child of another variable, so we:
-  --    1. Make the parent a constant (by calling `assign` recursively)
-  -- child = relation parent
-  -- =>
-  -- parent = relation^-1 child
-  Just (IsChildOf parent relationToChild) ->
-    assign parent (execLinRel (invertLinRel relationToChild) value) (UnionFind relations)
+assign var value (UnionFind relations) =
+  case IntMap.lookup var relations of
+    -- The variable is not in the map, so we add it as a constant
+    Nothing -> Just $ UnionFind $ IntMap.insert var (IsConstant value) relations
+    -- The variable is already a constant, so we check if the value is the same
+    Just (IsConstant oldValue) ->
+      if oldValue == value
+        then Nothing
+        else error $ "[ panic ] Solver: trying to assign a different value to a constant variable: " <> show var
+    -- The variable is already a root, so we:
+    --    1. Make its children constants
+    --    2. Make the root itself a constant
+    Just (IsRoot toChildren) ->
+      Just $
+        UnionFind $
+          foldl
+            ( \rels (child, relationToChild) ->
+                -- child = relationToChild var
+                -- var = value
+                --    =>
+                -- child = relationToChild value
+                IntMap.insert
+                  child
+                  (IsConstant (execLinRel relationToChild value))
+                  rels
+            )
+            (IntMap.insert var (IsConstant value) relations)
+            (IntMap.toList toChildren)
+    -- The variable is already a child of another variable, so we:
+    --    1. Make the parent a constant (by calling `assign` recursively)
+    -- child = relation parent
+    -- =>
+    -- parent = relation^-1 child
+    Just (IsChildOf parent relationToChild) ->
+      assign parent (execLinRel (invertLinRel relationToChild) value) (UnionFind relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relate :: (GaloisField n, Integral n) => Var -> n -> Var -> n -> UnionFind n -> Maybe (UnionFind n)
@@ -146,17 +147,29 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
     --    * for the child: point the child to the parent and add the relation
     --    * for the grandchildren: point them to the new parent
     IsRoot toGrandChildren ->
-      let newSiblings = IntMap.insert child relationToChild $ IntMap.map (relationToChild <>) toGrandChildren
-       in Just $
-            UnionFind $
-              IntMap.insert parent (IsRoot (children <> newSiblings)) $
-                IntMap.insert child (IsChildOf parent relationToChild) $ -- add the child and its grandchildren to the parent
-                -- add the child and its grandchildren to the parent
-                  IntMap.foldlWithKey' -- point the child to the parent
-                  -- point the grandchildren to the new parent
-                    (\rels grandchild relationToGrandChild -> IntMap.insert grandchild (IsChildOf parent (relationToChild <> relationToGrandChild)) rels)
-                    (unUnionFind relations)
-                    toGrandChildren
+      let -- point the grandchildren to the new parent
+          grandChildren =
+            IntMap.foldlWithKey'
+              (\rels grandchild relationToGrandChild -> IntMap.insert grandchild (IsChildOf parent (relationToChild <> relationToGrandChild)) rels)
+              (unUnionFind relations)
+              toGrandChildren
+          grandChildren2 =
+            map
+              (\(grandchild, relationToGrandChild) -> (grandchild, IsChildOf parent (relationToChild <> relationToGrandChild)))
+              (IntMap.toList toGrandChildren)
+          newSiblings = IntMap.insert child relationToChild $ IntMap.map (relationToChild <>) toGrandChildren
+       in traceWhen (child == 5) ("    initial state    = " <> show (unUnionFind relations)) $
+           traceWhen (child == 5) ("\n    grandChildren    = " <> show grandChildren2 <> "\n    " <> show (relationToChild, toGrandChildren)) $
+            traceWhen (child == 5) ("    new child        = " <> show child <> " " <> show relationToChild) $
+            traceWhen (child == 5) ("    newSiblings      = " <> show newSiblings <> "\n") $
+              traceShowWhen (child == 5) (child, parent, relationToChild) $
+                Just $
+                  UnionFind $
+                    IntMap.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
+                      IntMap.insert
+                        child
+                        (IsChildOf parent relationToChild) -- add the child and its grandchildren to the parent
+                        grandChildren
     -- The child is a constant, so we make the parent a constant, too:
     --  * for the parent: assign it the value of the child with the inverted relation applied
     --  * for the child: do nothing
@@ -333,7 +346,7 @@ execLinRel (LinRel a b) value = a * value + b
 
 -- | Render LinRel to some child as a string
 renderLinRel :: (GaloisField n, Integral n) => (Int, LinRel n) -> String
-renderLinRel (var, rel) = go rel
+renderLinRel (var, rel) = go (invertLinRel rel)
   where
     var' = "$" <> show var
 
@@ -342,14 +355,14 @@ renderLinRel (var, rel) = go rel
       let slope = case a of
             1 -> var'
             (-1) -> "-" <> var'
-            _ -> show (N a) <> var'
+            _ -> show a <> var'
           intercept = case b of
             0 -> ""
-            _ ->
-              if N.isPositive b
-                then " + " <> show (N b)
-                else " - " <> show (N (-b))
-       in slope <> intercept
+            _ -> " + " <> show b
+       in -- if N.isPositive b
+          --   then " + " <> show (N b)
+          --   else " - " <> show (N (-b))
+          slope <> intercept
 
 --------------------------------------------------------------------------------
 

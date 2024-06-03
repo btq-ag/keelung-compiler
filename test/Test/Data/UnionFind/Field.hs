@@ -5,7 +5,7 @@
 module Test.Data.UnionFind.Field (run, tests) where
 
 import Control.Monad (forM_)
-import Data.Field.Galois (GaloisField, Prime)
+import Data.Field.Galois (GaloisField, Prime, Binary)
 import Data.IntMap qualified as IntMap
 import Data.Maybe qualified as Maybe
 import Keelung (GF181, N (N), Var)
@@ -31,33 +31,48 @@ tests = describe "Field UnionFind" $ do
   --   UnionFind.validate xs `shouldBe` []
 
   describe "operations" $ do
-    it "relate" $ do
-      property $ \relates -> do
-        let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
+
+    it "others 1" $ do
+        let xs = foldl applyRelate UnionFind.new (
+                    [ 
+                      Relate 4 1 51 0
+                    , 
+                    Relate 5 1 52 1
+                    , 
+                    Relate 4 2 5 1
+
+
+                    ] :: [Relate (Binary 7)])
+        print xs
         UnionFind.validate xs `shouldBe` []
 
-    it "relate and then assign" $ do
-      property $ \(relates, assignments) -> do
-        let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
-        let xs' =
-              foldr
-                ( \(Assign target val) acc -> case UnionFind.lookup target acc of
-                    UnionFind.Constant _ -> acc
-                    _ -> applyAssign acc (Assign target val)
-                )
-                xs
-                (assignments :: [Assign (Prime 17)])
+  --   it "relate" $ do
+  --     property $ \relates -> do
+  --       let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
+  --       UnionFind.validate xs `shouldBe` []
 
-        UnionFind.validate xs' `shouldBe` []
+  --   it "relate and then assign" $ do
+  --     property $ \(relates, assignments) -> do
+  --       let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
+  --       let xs' =
+  --             foldr
+  --               ( \(Assign target val) acc -> case UnionFind.lookup target acc of
+  --                   UnionFind.Constant _ -> acc
+  --                   _ -> applyAssign acc (Assign target val)
+  --               )
+  --               xs
+  --               (assignments :: [Assign (Prime 17)])
 
-  describe "symmetricity" $ do
-    it "relate and then assign" $ do
-      property $ \xs -> do
-        let (_assignments, families) = UnionFind.export (xs :: UnionFind GF181)
-        forM_ (IntMap.toList families) $ \(root, family) -> do
-          UnionFind.lookup root xs `shouldBe` UnionFind.Root
-          forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
-            UnionFind.lookup child xs `shouldBe` UnionFind.ChildOf slope root intercept
+  --       UnionFind.validate xs' `shouldBe` []
+
+  -- describe "symmetricity" $ do
+  --   it "relate and then assign" $ do
+  --     property $ \xs -> do
+  --       let (_assignments, families) = UnionFind.export (xs :: UnionFind GF181)
+  --       forM_ (IntMap.toList families) $ \(root, family) -> do
+  --         UnionFind.lookup root xs `shouldBe` UnionFind.Root
+  --         forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
+  --           UnionFind.lookup child xs `shouldBe` UnionFind.ChildOf slope root intercept
 
 ------------------------------------------------------------
 

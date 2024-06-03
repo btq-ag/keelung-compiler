@@ -32,10 +32,10 @@ tests = describe "Experiment" $ do
             dividend <- input Public :: Comp (UInt 8)
             performDivMod dividend divisor
       let (dividend, divisor) = (44, 2)
-      let expected = [dividend `div` divisor, dividend `mod` divisor]
+      let _expected = [dividend `div` divisor, dividend `mod` divisor]
       -- check gf181 (program (fromIntegral divisor)) [dividend] [] expected
       -- check (Prime 17) (program (fromIntegral divisor)) [dividend] [] expected
-      check (Binary 7) (program (fromIntegral divisor)) [dividend] [] expected
+      check (Binary 7) (program (fromIntegral divisor)) [dividend] [] _expected
       -- debugSolver (Binary 7) (program (fromIntegral divisor)) [dividend] []
 
 
