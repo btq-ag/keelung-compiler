@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.36.0.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
@@ -79,8 +79,11 @@ library
       Keelung.Data.Slice
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
+      Keelung.Data.UnionFind
       Keelung.Data.UnionFind.Boolean
       Keelung.Data.UnionFind.Field
+      Keelung.Data.UnionFind.Field2
+      Keelung.Data.UnionFind.Type
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
@@ -174,8 +177,11 @@ executable keelungc
       Keelung.Data.Slice
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
+      Keelung.Data.UnionFind
       Keelung.Data.UnionFind.Boolean
       Keelung.Data.UnionFind.Field
+      Keelung.Data.UnionFind.Field2
+      Keelung.Data.UnionFind.Type
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad
@@ -331,8 +337,11 @@ test-suite keelung-test
       Keelung.Data.Slice
       Keelung.Data.SlicePolynomial
       Keelung.Data.U
+      Keelung.Data.UnionFind
       Keelung.Data.UnionFind.Boolean
       Keelung.Data.UnionFind.Field
+      Keelung.Data.UnionFind.Field2
+      Keelung.Data.UnionFind.Type
       Keelung.Data.VarGroup
       Keelung.Interpreter
       Keelung.Interpreter.Monad

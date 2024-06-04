@@ -27,16 +27,16 @@ tests :: SpecWith ()
 tests = describe "Experiment" $ do
 
 
-  it "variable dividend / constant divisor" $ do
-      let program divisor = do
-            dividend <- input Public :: Comp (UInt 8)
-            performDivMod dividend divisor
-      let (dividend, divisor) = (44, 2)
-      let _expected = [dividend `div` divisor, dividend `mod` divisor]
-      -- check gf181 (program (fromIntegral divisor)) [dividend] [] expected
-      -- check (Prime 17) (program (fromIntegral divisor)) [dividend] [] expected
-      check (Binary 7) (program (fromIntegral divisor)) [dividend] [] _expected
-      -- debugSolver (Binary 7) (program (fromIntegral divisor)) [dividend] []
+  -- it "variable dividend / constant divisor" $ do
+  --     let program divisor = do
+  --           dividend <- input Public :: Comp (UInt 8)
+  --           performDivMod dividend divisor
+  --     let (dividend, divisor) = (44, 2)
+  --     let _expected = [dividend `div` divisor, dividend `mod` divisor]
+  --     -- check gf181 (program (fromIntegral divisor)) [dividend] [] expected
+  --     -- check (Prime 17) (program (fromIntegral divisor)) [dividend] [] expected
+  --     check (Binary 7) (program (fromIntegral divisor)) [dividend] [] _expected
+  --     -- debugSolver (Binary 7) (program (fromIntegral divisor)) [dividend] []
 
 
   -- it "Homemade div/mod" $ do
@@ -60,8 +60,8 @@ tests = describe "Experiment" $ do
   -- debug gf181 program
 
   -- check gf181 program [10, 3] [] [3]
-  -- it "PK inverse" $ do
-  --   testInversePK 0x00 0x00
+  it "PK inverse" $ do
+    testInversePK 0x00 0x00
 
 testInversePK :: Integer -> Integer -> IO ()
 testInversePK inputs expected = do

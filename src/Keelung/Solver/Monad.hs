@@ -101,7 +101,7 @@ relate ::
 relate msg var1 slope var2 intercept = do
   tryLog $ LogRelate msg var1 slope var2 intercept
   context <- get
-  forM_ (UnionFind.relate var1 slope var2 intercept context) put
+  forM_ (UnionFind.relate var1 var2 (UnionFind.LinRel slope intercept) context) put
 
 -- | See if a variable is a Boolean variable
 isBooleanVar :: Var -> M n Bool
