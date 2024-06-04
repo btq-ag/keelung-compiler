@@ -20,18 +20,27 @@ run = hspec tests
 
 tests :: SpecWith ()
 tests = describe "Field UnionFind" $ do
-  -- it "test" $ do
-  --   --
-  --   -- $300 = 2 * $200 + 8  <=> 9 * $300 + 13 = $200
-  --   --                          3 * $300 + 4 = $100
-  --   -- $200 = 3 * $100 + 1  <=> 6 * $200 + 11 = $100
-  --   --
-  --   let relates = [Relate 200 2 300 8, Relate 100 3 200 1]
-  --   let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
-  --   UnionFind.validate xs `shouldBe` []
-
   describe "operations" $ do
-    it "others 1" $ do
+    it "relate" $ do
+      property $ \relates -> do
+        let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
+        UnionFind.validate xs `shouldBe` []
+
+    it "relate and then assign" $ do
+      property $ \(relates, assignments) -> do
+        let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
+        let xs' =
+              foldr
+                ( \(Assign target val) acc -> case UnionFind.lookup target acc of
+                    UnionFind.Constant _ -> acc
+                    _ -> applyAssign acc (Assign target val)
+                )
+                xs
+                (assignments :: [Assign (Prime 17)])
+
+        UnionFind.validate xs' `shouldBe` []
+
+    it "concrete case 1" $ do
       let xs =
             foldl
               applyRelate
@@ -42,36 +51,17 @@ tests = describe "Field UnionFind" $ do
                 ] ::
                   [Relate (Binary 7)]
               )
-      print xs
       UnionFind.validate xs `shouldBe` []
+      UnionFind.lookup 52 xs `shouldBe` UnionFind.ChildOf 3 4 2
 
-  --   it "relate" $ do
-  --     property $ \relates -> do
-  --       let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
-  --       UnionFind.validate xs `shouldBe` []
-
-  --   it "relate and then assign" $ do
-  --     property $ \(relates, assignments) -> do
-  --       let xs = foldl applyRelate UnionFind.new (relates :: [Relate (Prime 17)])
-  --       let xs' =
-  --             foldr
-  --               ( \(Assign target val) acc -> case UnionFind.lookup target acc of
-  --                   UnionFind.Constant _ -> acc
-  --                   _ -> applyAssign acc (Assign target val)
-  --               )
-  --               xs
-  --               (assignments :: [Assign (Prime 17)])
-
-  --       UnionFind.validate xs' `shouldBe` []
-
-  -- describe "symmetricity" $ do
-  --   it "relate and then assign" $ do
-  --     property $ \xs -> do
-  --       let (_assignments, families) = UnionFind.export (xs :: UnionFind GF181)
-  --       forM_ (IntMap.toList families) $ \(root, family) -> do
-  --         UnionFind.lookup root xs `shouldBe` UnionFind.Root
-  --         forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
-  --           UnionFind.lookup child xs `shouldBe` UnionFind.ChildOf slope root intercept
+  describe "symmetricity" $ do
+    it "relate and then assign" $ do
+      property $ \xs -> do
+        let (_assignments, families) = UnionFind.export (xs :: UnionFind GF181)
+        forM_ (IntMap.toList families) $ \(root, family) -> do
+          UnionFind.lookup root xs `shouldBe` UnionFind.Root
+          forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
+            UnionFind.lookup child xs `shouldBe` UnionFind.ChildOf slope root intercept
 
   describe "LinRel" $ do
     describe "invertLinRel . invertLinRel = id" $ do

@@ -1,9 +1,9 @@
+{-# HLINT ignore "Use list comprehension" #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use list comprehension" #-}
 
 module Keelung.Data.UnionFind.Field
   ( -- * Construction
@@ -46,7 +46,6 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (compareSeniority))
-import Keelung.Compiler.Util
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -155,26 +154,17 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
       let -- point the grandchildren to the new parent
           grandChildren =
             IntMap.foldlWithKey'
-              (\rels grandchild relationToGrandChild -> IntMap.insert grandchild (IsChildOf parent (relationToChild <> relationToGrandChild)) rels)
+              (\rels grandchild relationToGrandChild -> IntMap.insert grandchild (IsChildOf parent (relationToGrandChild <> relationToChild)) rels)
               (unUnionFind relations)
               toGrandChildren
-          grandChildren2 =
-            map
-              (\(grandchild, relationToGrandChild) -> (grandchild, IsChildOf parent (relationToChild <> relationToGrandChild)))
-              (IntMap.toList toGrandChildren)
-          newSiblings = IntMap.insert child relationToChild $ IntMap.map (relationToChild <>) toGrandChildren
-       in traceWhen (child == 5) ("    initial state    = " <> show (unUnionFind relations)) $
-           traceWhen (child == 5) ("\n    grandChildren    = " <> show grandChildren2 <> "\n    " <> show (relationToChild, toGrandChildren)) $
-            traceWhen (child == 5) ("    new child        = " <> show child <> " " <> show relationToChild) $
-            traceWhen (child == 5) ("    newSiblings      = " <> show newSiblings <> "\n") $
-              traceShowWhen (child == 5) (child, parent, relationToChild) $
-                Just $
-                  UnionFind $
-                    IntMap.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
-                      IntMap.insert
-                        child
-                        (IsChildOf parent relationToChild) -- add the child and its grandchildren to the parent
-                        grandChildren
+          newSiblings = IntMap.insert child relationToChild $ IntMap.map (<> relationToChild) toGrandChildren
+       in Just $
+            UnionFind $
+              IntMap.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
+                IntMap.insert
+                  child
+                  (IsChildOf parent relationToChild) -- add the child and its grandchildren to the parent
+                  grandChildren
     -- The child is a constant, so we make the parent a constant, too:
     --  * for the parent: assign it the value of the child with the inverted relation applied
     --  * for the child: do nothing
@@ -321,6 +311,7 @@ data LinRel n
       n -- intercept
   deriving (Show, Eq, NFData, Generic, Functor)
 
+-- | x ~a~ y & y ~b~ z => x ~a<>b~ z
 instance (Num n) => Semigroup (LinRel n) where
   -- x = a1 * y + b1
   -- y = a2 * z + b2
