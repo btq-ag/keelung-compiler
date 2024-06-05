@@ -68,6 +68,7 @@ library
       Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.Constraint
+      Keelung.Data.Dict
       Keelung.Data.IntervalSet
       Keelung.Data.IntervalTable
       Keelung.Data.LC
@@ -166,6 +167,7 @@ executable keelungc
       Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.Constraint
+      Keelung.Data.Dict
       Keelung.Data.IntervalSet
       Keelung.Data.IntervalTable
       Keelung.Data.LC
@@ -326,6 +328,7 @@ test-suite keelung-test
       Keelung.Compiler.Syntax.ToInternal
       Keelung.Compiler.Util
       Keelung.Data.Constraint
+      Keelung.Data.Dict
       Keelung.Data.IntervalSet
       Keelung.Data.IntervalTable
       Keelung.Data.LC

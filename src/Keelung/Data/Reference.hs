@@ -13,6 +13,7 @@ module Keelung.Data.Reference
 where
 
 import Control.DeepSeq (NFData)
+import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Compiler.Util
 import Keelung.Syntax
@@ -24,6 +25,8 @@ data Ref
   | -- | Boolean variable
     B RefB
   deriving (Eq, Ord, Generic, NFData)
+
+instance Serialize Ref
 
 instance Show Ref where
   show (F x) = show x
@@ -42,6 +45,8 @@ data RefB
   | -- | UInt bit variable
     RefUBit RefU Int
   deriving (Eq, Ord, Generic, NFData)
+
+instance Serialize RefB
 
 instance Show RefB where
   show (RefBO x) = "BO" ++ show x
@@ -68,6 +73,8 @@ instance Show RefF where
   show (RefFP x) = "FP" ++ show x
   show (RefFX x) = "F" ++ show x
 
+instance Serialize RefF
+
 -- | For representing UInt variables in constraints
 data RefU
   = -- | UInt output variable
@@ -86,6 +93,8 @@ instance Show RefU where
     RefUI w x -> "UI" ++ toSubscript w ++ show x
     RefUP w x -> "UP" ++ toSubscript w ++ show x
     RefUX w x -> "U" ++ toSubscript w ++ show x
+
+instance Serialize RefU
 
 instance HasWidth RefU where
   widthOf (RefUO width _) = width
