@@ -8,3 +8,4 @@ data Lookup var val rel
     Root
   | -- | The variable is a child of another variable. `parent = rel child`
     ChildOf var rel
+  deriving (Show, Eq)

@@ -22,6 +22,7 @@ class DictKey k where
   lookup :: k -> Dict k v -> Maybe v
   insert :: k -> v -> Dict k v -> Dict k v
   toList :: Dict k v -> [(k, v)]
+  fromList :: [(k, v)] -> Dict k v
   mapMaybe :: (v -> Maybe w) -> Dict k v -> Dict k w
   size :: Dict k v -> Int
   foldlWithKey :: (a -> k -> v -> a) -> a -> Dict k v -> a
@@ -36,6 +37,7 @@ instance DictKey Int where
   lookup k (IntDict m) = IntMap.lookup k m
   insert k v (IntDict m) = IntDict (IntMap.insert k v m)
   toList (IntDict m) = IntMap.toList m
+  fromList = IntDict . IntMap.fromList
   mapMaybe f (IntDict m) = IntDict (IntMap.mapMaybe f m)
   size (IntDict m) = IntMap.size m
   foldlWithKey f a (IntDict m) = IntMap.foldlWithKey' f a m
@@ -58,6 +60,7 @@ instance DictKey Ref where
   lookup k (RefDict m) = Map.lookup k m
   insert k v (RefDict m) = RefDict (Map.insert k v m)
   toList (RefDict m) = Map.toList m
+  fromList = RefDict . Map.fromList
   mapMaybe f (RefDict m) = RefDict (Map.mapMaybe f m)
   size (RefDict m) = Map.size m
   foldlWithKey f a (RefDict m) = Map.foldlWithKey' f a m
