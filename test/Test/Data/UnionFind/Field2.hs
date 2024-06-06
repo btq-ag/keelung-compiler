@@ -12,13 +12,14 @@ import Data.Field.Galois (Binary, GaloisField, Prime)
 import Data.IntMap qualified as IntMap
 import Data.Maybe qualified as Maybe
 import Keelung (GF181, N (N), Var)
+import Keelung.Data.Dict qualified as Dict
 import Keelung.Data.UnionFind (UnionFind)
 import Keelung.Data.UnionFind qualified as UnionFind
 import Keelung.Data.UnionFind.Field2 qualified as Field
 import Test.HUnit
 import Test.Hspec
 import Test.QuickCheck
-import qualified Keelung.Data.Dict as Dict
+-- import qualified Keelung.Data.UnionFind.Boolean2 as Boolean
 
 run :: IO ()
 run = hspec tests
@@ -89,7 +90,7 @@ tests = describe "Field UnionFind" $ do
           (Field.invertLinRel . Field.invertLinRel) rel `shouldBe` (rel :: UnionFind.Rel GF181)
       it "Prime 17" $ do
         property $ \rel -> do
-          (Field.invertLinRel . Field.invertLinRel) rel `shouldBe` (rel ::UnionFind.Rel (Prime 17))
+          (Field.invertLinRel . Field.invertLinRel) rel `shouldBe` (rel :: UnionFind.Rel (Prime 17))
       it "Binary 7" $ do
         property $ \rel -> do
           (Field.invertLinRel . Field.invertLinRel) rel `shouldBe` (rel :: UnionFind.Rel (Binary 7))
@@ -105,7 +106,7 @@ tests = describe "Field UnionFind" $ do
         property $ \(rel, points) -> do
           map (Field.execLinRel (Field.invertLinRel rel) . Field.execLinRel rel) points `shouldBe` (points :: [Binary 7])
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 data Relate var val = Relate var var (UnionFind.Rel val) -- var1 = slope * var2 + intercept
 
@@ -119,6 +120,25 @@ instance (GaloisField val, Integral val) => Arbitrary (Relate Var val) where
       <*> chooseInt (0, 100) -- var2
       <*> arbitrary
 
+-- --------------------------------------------------------------------------------
+
+-- data RelateBool var = RelateBool var var Boolean.REL -- var1 = slope * var2 + intercept
+
+-- instance (Show var) => Show (RelateBool var) where
+--   show (RelateBool var1 var2 relation) = "$" <> show var1 <> " = " <> show relation <> "  $" <> show var2
+
+-- instance Arbitrary (RelateBool Var) where
+--   arbitrary =
+--     RelateBool
+--       <$> chooseInt (0, 100) -- var1
+--       <*> chooseInt (0, 100) -- var2
+--       <*> arbitrary
+
+
+-- instance Arbitrary (UnionFind.Rel Bool) where
+
+--------------------------------------------------------------------------------
+
 data Assign var val = Assign var val
   deriving (Show)
 
@@ -131,7 +151,7 @@ instance (GaloisField val, Integral val) => Arbitrary (Assign Var val) where
 instance (GaloisField val, Integral val) => Arbitrary (UnionFind.Rel val) where
   arbitrary = Field.LinRel <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 instance (GaloisField val, Integral val, UnionFind var val, Arbitrary (Relate var val), Arbitrary (Assign var val)) => Arbitrary (UnionFind.Map var val) where
   arbitrary = do
@@ -147,7 +167,7 @@ instance (GaloisField val, Integral val, UnionFind var val, Arbitrary (Relate va
         xs
         assignments
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 applyRelate :: (GaloisField val, Integral val, UnionFind var val) => UnionFind.Map var val -> Relate var val -> UnionFind.Map var val
 applyRelate xs (Relate var1 var2 relation) = Maybe.fromMaybe xs (UnionFind.relate var1 var2 relation xs)

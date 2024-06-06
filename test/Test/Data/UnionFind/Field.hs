@@ -106,7 +106,7 @@ tests = describe "Field UnionFind" $ do
 --   --       property $ \(rel, points) -> do
 --   --         map (Field.execLinRel (Field.invertLinRel rel) . Field.execLinRel rel) points `shouldBe` (points :: [Binary 7])
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 data Relate var val = Relate var var (UnionFind.Rel val) -- var1 = slope * var2 + intercept
 
@@ -141,7 +141,7 @@ instance (GaloisField val, Integral val) => Arbitrary (Assign Var val) where
 instance (GaloisField val, Integral val) => Arbitrary (Field.LinRel val) where
   arbitrary = Field.LinRel <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 instance (GaloisField val, Integral val, UnionFind var val, Arbitrary var, Arbitrary (UnionFind.Rel val), Arbitrary (Relate var val), Arbitrary (Assign var val)) => Arbitrary (UnionFind.Map var val) where
   arbitrary = do
@@ -157,7 +157,7 @@ instance (GaloisField val, Integral val, UnionFind var val, Arbitrary var, Arbit
         xs
         assignments
 
-------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 applyRelate :: (GaloisField val, Integral val, UnionFind var val) => UnionFind.Map var val -> Relate var val -> UnionFind.Map var val
 applyRelate xs (Relate var1 var2 relation) = Maybe.fromMaybe xs (UnionFind.relate var1 var2 relation xs)

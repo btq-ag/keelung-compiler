@@ -18,6 +18,7 @@ module Keelung.Data.UnionFind.Boolean2
     -- Lookup (..),
     -- lookup,
     -- export,
+    REL,
 
     -- * Testing
     VarStatus (..),
@@ -40,6 +41,8 @@ import Keelung.Data.UnionFind.Type
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
+
+type REL = UnionFind.Rel Bool
 
 instance UnionFind Var Bool where
   data Map Var Bool = BoolIntMap (IntMap VarStatus) -- relation of each variable
