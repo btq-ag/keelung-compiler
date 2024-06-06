@@ -53,8 +53,8 @@ import Keelung.Data.UnionFind.Type
 
 --------------------------------------------------------------------------------
 
-newtype UnionFind n = UnionFind {unUnionFind :: IntMap (VarStatus n)} -- relation to the parent
-  deriving (Eq, Generic, Functor)
+newtype UnionFind n = UnionFind {unUnionFind :: IntMap (Status n (LinRel n))} -- relation to the parent
+  deriving (Eq, Generic)
 
 instance (Serialize n) => Serialize (UnionFind n)
 
@@ -132,7 +132,7 @@ relate :: (GaloisField n, Integral n) => Var -> Var -> LinRel n -> UnionFind n -
 relate a b relation relations = relateWithLookup (a, lookupInternal a relations) relation (b, lookupInternal b relations) relations
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relateWithLookup :: (GaloisField n, Integral n) => (Var, VarStatus n) -> LinRel n -> (Var, VarStatus n) -> UnionFind n -> Maybe (UnionFind n)
+relateWithLookup :: (GaloisField n, Integral n) => (Var, Status n (LinRel n)) -> LinRel n -> (Var, Status n (LinRel n)) -> UnionFind n -> Maybe (UnionFind n)
 relateWithLookup (a, aLookup) relation (b, bLookup) relations =
   if a == b -- if the variables are the same, do nothing and return the original relations
     then Nothing
@@ -144,14 +144,14 @@ relateWithLookup (a, aLookup) relation (b, bLookup) relations =
         GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
         EQ -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
         where
-          childrenSizeOf :: VarStatus n -> Int
+          childrenSizeOf :: Status n (LinRel n) -> Int
           childrenSizeOf (IsRoot children) = IntMap.size children
           childrenSizeOf (IsConstant _) = 0
           childrenSizeOf (IsChildOf parent _) = childrenSizeOf (lookupInternal parent relations)
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
-relateChildToParent :: (GaloisField n, Integral n) => (Var, VarStatus n) -> LinRel n -> (Var, VarStatus n) -> UnionFind n -> Maybe (UnionFind n)
+relateChildToParent :: (GaloisField n, Integral n) => (Var, Status n (LinRel n)) -> LinRel n -> (Var, Status n (LinRel n)) -> UnionFind n -> Maybe (UnionFind n)
 relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) relations = case parentLookup of
   -- The parent is a constant, so we make the child a constant:
   --    * for the parent: do nothing
@@ -283,21 +283,12 @@ size = IntMap.size . unUnionFind
 
 --------------------------------------------------------------------------------
 
-data VarStatus n
-  = IsConstant n
-  | IsRoot
-      (IntMap (LinRel n)) -- mappping from the child to the relation
-  | IsChildOf
-      Var -- parent
-      (LinRel n) -- relation such that `child = relation parent`
-  deriving (Show, Eq, Generic, Functor)
+instance (NFData n) => NFData (Status n (LinRel n))
 
-instance (NFData n) => NFData (VarStatus n)
-
-instance (Serialize n) => Serialize (VarStatus n)
+instance (Serialize n) => Serialize (Status n (LinRel n))
 
 -- | Returns the result of looking up a variable, O(lg n)
-lookupInternal :: Var -> UnionFind n -> VarStatus n
+lookupInternal :: Var -> UnionFind n -> Status n (LinRel n)
 lookupInternal var (UnionFind relations) = case IntMap.lookup var relations of
   Nothing -> IsRoot mempty
   Just result -> result
@@ -412,7 +403,7 @@ allChildrenRecognizeTheirParent relations =
 rootsAreSenior :: UnionFind n -> [Error]
 rootsAreSenior = IntMap.foldlWithKey' go [] . unUnionFind
   where
-    go :: [Error] -> Var -> VarStatus n -> [Error]
+    go :: [Error] -> Var -> Status n (LinRel n) -> [Error]
     go acc _ (IsConstant _) = acc
     go acc var (IsRoot children) =
       let badChildren = IntSet.filter (\child -> compareSeniority var child == LT) (IntMap.keysSet children)

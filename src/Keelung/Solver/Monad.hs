@@ -231,7 +231,7 @@ data Error n
   | DividendIsZeroError Segments
   | DivisorIsZeroError Segments
   | QuotientIsZeroError Segments
-  deriving (Eq, Generic, NFData, Functor)
+  deriving (Eq, Generic, NFData)
 
 instance (Serialize n) => Serialize (Error n)
 

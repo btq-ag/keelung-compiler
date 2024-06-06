@@ -55,7 +55,7 @@ import Keelung.Data.Dict (Dict)
 import Keelung.Data.Dict qualified as Dict
 import Keelung.Data.UnionFind (UnionFind)
 import Keelung.Data.UnionFind qualified as UnionFind
-import Keelung.Data.UnionFind.Type
+import Keelung.Data.UnionFind.Type (Lookup (..)) 
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------

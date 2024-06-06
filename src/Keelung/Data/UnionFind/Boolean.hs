@@ -29,6 +29,7 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Keelung (Var)
+import Keelung.Compiler.Relations.Monad (Seniority (..))
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -44,7 +45,7 @@ data VarStatus
       Bool -- the same sign as the root
   deriving (Show, Eq)
 
-newtype UnionFind = UnionFind (IntMap VarStatus) deriving (Show, Eq)
+newtype UnionFind = UnionFind {unUnionFind :: IntMap VarStatus} deriving (Show, Eq)
 
 -- | Create an empty UnionFind data structure.
 new :: UnionFind
@@ -55,7 +56,13 @@ new = UnionFind mempty
 data Lookup = Constant Bool | Root | ChildOf Var Bool
   deriving (Show, Eq)
 
--- | Status lookup
+-- | Internal status lookup
+lookupStatus :: Var -> UnionFind -> VarStatus
+lookupStatus var (UnionFind relations) = case IntMap.lookup var relations of
+  Nothing -> IsRoot mempty mempty
+  Just result -> result
+
+-- | External status lookup
 lookup :: UnionFind -> Var -> Maybe Lookup
 lookup (UnionFind xs) var = case IntMap.lookup var xs of
   Nothing -> Nothing
@@ -91,10 +98,10 @@ assign' (UnionFind xs) var value varStatus = case varStatus of
 -- | Relate two variables.
 relate :: UnionFind -> Var -> Var -> Bool -> UnionFind
 relate (UnionFind xs) var1 var2 sign =
-  case var1 `compare` var2 of
-    LT -> compose (UnionFind xs) (var1, IntMap.lookup var1 xs) (var2, IntMap.lookup var2 xs) sign
+  case var1 `compareSeniority` var2 of
+    GT -> compose (UnionFind xs) (var1, IntMap.lookup var1 xs) (var2, IntMap.lookup var2 xs) sign
     EQ -> UnionFind xs
-    GT -> compose (UnionFind xs) (var2, IntMap.lookup var2 xs) (var1, IntMap.lookup var1 xs) sign
+    LT -> compose (UnionFind xs) (var2, IntMap.lookup var2 xs) (var1, IntMap.lookup var1 xs) sign
 
 compose :: UnionFind -> (Var, Maybe VarStatus) -> (Var, Maybe VarStatus) -> Bool -> UnionFind
 compose (UnionFind xs) (root, status1) (child, status2) sign =
@@ -115,10 +122,10 @@ compose (UnionFind xs) (root, status1) (child, status2) sign =
                 <> grandchildrenOpposite
                 <> IntMap.insert root (if sign then IsRoot (IntSet.insert child same) opposite else IsRoot opposite (IntSet.insert child same)) (IntMap.insert child (IsChildOf root sign) xs)
       (Nothing, Just (IsChildOf anotherRoot sign')) ->
-        case root `compare` anotherRoot of
-          LT -> compose (UnionFind xs) (root, Nothing) (anotherRoot, IntMap.lookup anotherRoot xs) (sign == sign')
+        case root `compareSeniority` anotherRoot of
+          GT -> compose (UnionFind xs) (root, Nothing) (anotherRoot, IntMap.lookup anotherRoot xs) (sign == sign')
           EQ -> error "[ panic ] Solver: compose"
-          GT -> compose (UnionFind xs) (anotherRoot, IntMap.lookup anotherRoot xs) (root, Nothing) (sign == sign')
+          LT -> compose (UnionFind xs) (anotherRoot, IntMap.lookup anotherRoot xs) (root, Nothing) (sign == sign')
       (Just (IsRoot same opposite), Nothing) ->
         UnionFind $
           IntMap.insert root (if sign then IsRoot (IntSet.insert child same) opposite else IsRoot same (IntSet.insert child opposite)) $
@@ -136,90 +143,65 @@ compose (UnionFind xs) (root, status1) (child, status2) sign =
                 )
               $ IntMap.insert child (IsChildOf root sign) childrenOfChildUpdated
       (Just (IsRoot same1 opposite1), Just (IsChildOf anotherRoot2 sign2)) ->
-        case child `compare` anotherRoot2 of
-          LT -> compose (UnionFind xs) (root, Just (IsRoot same1 opposite1)) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (sign == sign2)
+        case root `compareSeniority` anotherRoot2 of
+          GT -> compose (UnionFind xs) (root, Just (IsRoot same1 opposite1)) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (sign == sign2)
           EQ -> UnionFind xs
-          GT -> compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (root, Just (IsRoot same1 opposite1)) (sign == sign2)
+          LT -> compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (root, Just (IsRoot same1 opposite1)) (sign == sign2)
       (Just (IsChildOf anotherRoot1 sign1), Just (IsRoot same2 opposite2)) ->
-        case child `compare` anotherRoot1 of
-          LT -> compose (UnionFind xs) (child, Just (IsRoot same2 opposite2)) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (sign == sign1)
+        case child `compareSeniority` anotherRoot1 of
+          GT -> compose (UnionFind xs) (child, Just (IsRoot same2 opposite2)) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (sign == sign1)
           EQ -> UnionFind xs
-          GT -> compose (UnionFind xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (child, Just (IsRoot same2 opposite2)) (sign == sign1)
+          LT -> compose (UnionFind xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (child, Just (IsRoot same2 opposite2)) (sign == sign1)
       (Just (IsChildOf anotherRoot1 sign1), Just (IsChildOf anotherRoot2 sign2)) ->
-        if anotherRoot1 < anotherRoot2
+        if anotherRoot1 `compareSeniority` anotherRoot2 /= LT
           then compose (UnionFind xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) ((sign1 == sign2) == sign)
           else compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) ((sign1 == sign2) == sign)
 
 --------------------------------------------------------------------------------
 
+-- | For testing the validity of the data structure
 data Error
-  = InconsistentRelation
-      Var -- root
-      Lookup -- of root
-      Var -- child
-      Lookup -- of child
-  | MissingRoot
-      Var -- child
-  | MissingChild
-      Var -- root
-      Var -- child
-  | IsNotRoot
-      Var -- root
-  | ChildrenMixedTogether
-      Var -- root
-      IntSet -- children
-  | RootAsItsOwnChild
-      Var -- root
-  deriving (Eq)
+  = RootNotSenior Var IntSet
+  | ChildrenNotRecognizingParent Var IntSet
+  deriving (Show, Eq)
 
-instance Show Error where
-  show (InconsistentRelation root rootLookup child childLookup) = "Inconsistent relation: root $" <> show root <> " = " <> show rootLookup <> " and child $" <> show child <> " = " <> show childLookup
-  show (MissingRoot child) = "Missing root: root of child $" <> show child <> " does not exist"
-  show (MissingChild root child) = "Missing child: child $" <> show child <> " of root " <> show root <> " does not exist"
-  show (IsNotRoot root) = "Not a root: $" <> show root <> " is not a root"
-  show (ChildrenMixedTogether root children) = "Children mixed together: root $" <> show root <> " has children with both signs: " <> show children
-  show (RootAsItsOwnChild root) = "Root as its own child: root $" <> show root <> " is its own child"
+-- | The data structure is valid if:
+--    1. all children of a parent recognize the parent as their parent
+--    2. the seniority of the root of a family is greater than equal the seniority of all its children
+validate :: UnionFind -> [Error]
+validate relations = allChildrenRecognizeTheirParent relations <> rootsAreSenior relations
 
+-- | Derived from `validate`
 isValid :: UnionFind -> Bool
 isValid = null . validate
 
-validate :: UnionFind -> [Error]
-validate (UnionFind xs) = go xs
-  where
-    go xs' =
-      let (xs'', errors) = destructUnionFind xs'
-       in if xs' == xs'' then errors else go xs''
+-- | A Reference is valid if all children of a parent recognize the parent as their parent
+allChildrenRecognizeTheirParent :: UnionFind -> [Error]
+allChildrenRecognizeTheirParent relations =
+  let families = IntMap.mapMaybe isParent (unUnionFind relations)
 
--- | Try to remove a variable from the UnionFind data structure
-destructUnionFind :: IntMap VarStatus -> (IntMap VarStatus, [Error])
-destructUnionFind xs = case IntMap.maxViewWithKey xs of
-  Nothing -> (mempty, [])
-  Just ((var, status), xs') -> case status of
-    IsConstant _ -> (xs', [])
-    IsRoot same opposite ->
-      let validateChild expectedSign (child, childStatus) = case childStatus of
-            IsConstant value -> [InconsistentRelation var Root child (Constant value)]
-            IsRoot _ _ -> [InconsistentRelation var Root child Root]
-            IsChildOf root sign -> if root == var && sign == expectedSign then [] else [InconsistentRelation var Root child (ChildOf root sign)]
-          errorsFromChildrenOfTheSameSign = IntMap.toList (IntMap.restrictKeys xs same) >>= validateChild True
-          errorsFromChildrenOfTheOppositeSign = IntMap.toList (IntMap.restrictKeys xs opposite) >>= validateChild False
-       in if IntSet.null (same `IntSet.intersection` opposite)
-            then
-              if var `IntSet.member` (same <> opposite)
-                then (xs', [RootAsItsOwnChild var])
-                else (IntMap.withoutKeys xs' (same <> opposite), errorsFromChildrenOfTheSameSign <> errorsFromChildrenOfTheOppositeSign)
-            else (xs', [ChildrenMixedTogether var (same `IntSet.intersection` opposite)])
-    IsChildOf root sign -> case IntMap.lookup root xs' of
-      Nothing -> (xs', [MissingRoot var])
-      Just (IsConstant value) -> (xs', [InconsistentRelation root Root var (Constant value)])
-      Just (IsRoot same opposite) ->
-        if sign
-          then
-            if IntSet.member var same
-              then (IntMap.insert root (IsRoot (IntSet.delete var same) opposite) xs', [])
-              else (xs', [MissingChild root var])
-          else
-            if IntSet.member var opposite
-              then (IntMap.insert root (IsRoot same (IntSet.delete var opposite)) xs', [])
-              else (xs', [MissingChild root var])
-      Just (IsChildOf _ _) -> (xs', [IsNotRoot root])
+      isParent (IsRoot same opposite) = Just $ IntMap.fromList $ map (,True) (IntSet.toList same) <> map (,False) (IntSet.toList opposite)
+      isParent _ = Nothing
+
+      recognizeParent parent child relation = case lookupStatus child relations of
+        IsChildOf parent' relation' -> parent == parent' && relation == relation'
+        _ -> False
+      childrenNotRecognizeParent parent = IntMap.filterWithKey (\child status -> not $ recognizeParent parent child status)
+   in --  . IntMap.elems . IntMap.mapWithKey (recognizeParent parent)
+      concatMap
+        ( \(parent, children) ->
+            let badChildren = childrenNotRecognizeParent parent children
+             in if null badChildren then [] else [ChildrenNotRecognizingParent parent (IntMap.keysSet badChildren)]
+        )
+        $ IntMap.toList families
+
+-- | A Reference is valid if the seniority of the root of a family is greater than equal the seniority of all its children
+rootsAreSenior :: UnionFind -> [Error]
+rootsAreSenior = IntMap.foldlWithKey' go [] . unUnionFind
+  where
+    go :: [Error] -> Var -> VarStatus -> [Error]
+    go acc _ (IsConstant _) = acc
+    go acc var (IsRoot same opposite) =
+      let badChildren = IntSet.filter (\child -> compareSeniority var child == LT) (same <> opposite)
+       in if IntSet.null badChildren then acc else RootNotSenior var badChildren : acc
+    go acc var (IsChildOf parent _) = if compareSeniority parent var /= LT then acc else RootNotSenior parent (IntSet.singleton var) : acc
