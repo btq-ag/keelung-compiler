@@ -84,6 +84,44 @@ lookupStatus var (UnionFind relations) = case IntMap.lookup var relations of
   Nothing -> IsRoot mempty
   Just result -> result
 
+-- | Assigns a value to a variable, O(lg n)
+assign :: (Relation rel val, Eq val) => Var -> val -> UnionFind val rel -> Maybe (UnionFind val rel)
+assign var value (UnionFind relations) =
+  case IntMap.lookup var relations of
+    -- The variable is not in the map, so we add it as a constant
+    Nothing -> Just $ UnionFind $ IntMap.insert var (IsConstant value) relations
+    -- The variable is already a constant, so we check if the value is the same
+    Just (IsConstant oldValue) ->
+      if oldValue == value
+        then Nothing
+        else error $ "[ panic ] Solver: trying to assign a different value to a constant variable: " <> show var
+    -- The variable is already a root, so we:
+    --    1. Make its children constants
+    --    2. Make the root itself a constant
+    Just (IsRoot toChildren) ->
+      Just $
+        UnionFind $
+          foldl
+            ( \rels (child, relationToChild) ->
+                -- child = relationToChild var
+                -- var = value
+                --    =>
+                -- child = relationToChild value
+                IntMap.insert
+                  child
+                  (IsConstant (Relation.execute relationToChild value))
+                  rels
+            )
+            (IntMap.insert var (IsConstant value) relations)
+            (IntMap.toList toChildren)
+    -- The variable is already a child of another variable, so we:
+    --    1. Make the parent a constant (by calling `assign` recursively)
+    -- child = relation parent
+    -- =>
+    -- parent = relation^-1 child
+    Just (IsChildOf parent relationToChild) ->
+      assign parent (Relation.execute (Relation.invert relationToChild) value) (UnionFind relations)
+
 --------------------------------------------------------------------------------
 
 -- | For testing the validity of the data structure

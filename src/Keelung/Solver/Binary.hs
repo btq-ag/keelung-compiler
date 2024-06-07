@@ -216,8 +216,8 @@ toAction (PolyB vars parity) =
 updateUnionFind :: UnionFind Bool Bool -> [Action] -> UnionFind Bool Bool
 updateUnionFind = foldr step
   where
-    step (Assign var val) xs = UnionFind.assign xs var val
-    step (Relate var1 var2 sameSign) xs = UnionFind.relate xs var1 var2 sameSign
+    step (Assign var val) xs = Maybe.fromMaybe xs (UnionFind.assign var val xs)
+    step (Relate var1 var2 sameSign) xs = Maybe.fromMaybe xs (UnionFind.relate xs var1 var2 sameSign)
     step NoOp xs = xs
 
 -- | Given a pool of relations, derive actions from them.
@@ -240,14 +240,14 @@ relate var1 var2 sameSign (State uf pool) =
     else -- decide which variable to be the root
 
       let (root, child) = (var1 `min` var2, var1 `max` var2)
-          uf' = UnionFind.relate uf root child sameSign
+          uf' = Maybe.fromMaybe uf (UnionFind.relate uf root child sameSign)
           poolResult = Either.partitionEithers $ map (substPolyB uf') $ Set.toList pool
        in applyActionsUntilThereIsNone uf' poolResult
 
 -- | Assign a variable to a value in the state
 assign :: Var -> Bool -> State -> State
 assign var val (State uf pool) =
-  let uf' = UnionFind.assign uf var val
+  let uf' = Maybe.fromMaybe uf (UnionFind.assign var val uf)
       poolResult = Either.partitionEithers $ map (substPolyB uf') $ Set.toList pool
    in applyActionsUntilThereIsNone uf' poolResult
 

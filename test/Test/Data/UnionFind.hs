@@ -234,7 +234,7 @@ instance Arbitrary (Relate (Boolean.UnionFind Bool Bool) Var Bool) where
 
 applyRelate :: a -> Relate a var val -> a
 applyRelate xs (RelateVarField var1 var2 (slope, intercept)) = Maybe.fromMaybe xs (Field.relate var1 var2 (Field.LinRel slope intercept) xs)
-applyRelate xs (RelateVarBool var1 var2 relation) = Boolean.relate xs var1 var2 relation
+applyRelate xs (RelateVarBool var1 var2 relation) = Maybe.fromMaybe xs (Boolean.relate xs var1 var2 relation)
 applyRelate xs (RelateRefField var1 var2 (slope, intercept)) = case runExcept (FieldRef.relateR var1 slope var2 intercept xs) of
   Left err -> error (show err)
   Right (Just xs') -> xs'
@@ -286,7 +286,7 @@ applyAssign xs (AssignVarField target val) = case Field.lookup target xs of
   _ -> Maybe.fromMaybe xs (Field.assign target val xs)
 applyAssign xs (AssignVarBool target val) = case UnionFind.lookup target xs of
   UnionFind.Constant _ -> xs -- no-op
-  _ -> Boolean.assign xs target val
+  _ -> Maybe.fromMaybe xs (Boolean.assign target val xs)
 
 --------------------------------------------------------------------------------
 
