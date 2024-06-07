@@ -43,7 +43,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Data.UnionFind.Relation (Relation (..))
 import Keelung.Data.UnionFind.Relation qualified as Relation
-import Keelung.Data.UnionFind.Type
+import Keelung.Data.UnionFind
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------

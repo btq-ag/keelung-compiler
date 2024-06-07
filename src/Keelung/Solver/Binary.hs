@@ -19,7 +19,7 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.UnionFind.Boolean (UnionFind)
 import Keelung.Data.UnionFind.Boolean qualified as Boolean
 import Keelung.Data.UnionFind.Boolean qualified as UnionFind
-import Keelung.Data.UnionFind.Type qualified as UnionFind
+import Keelung.Data.UnionFind qualified as UnionFind
 
 -- | What this solver does:
 --      Assume that all variables are Boolean:

@@ -22,7 +22,7 @@ import Keelung.Data.Reference (Ref (..), RefF (..))
 import Keelung.Data.UnionFind.Boolean qualified as Boolean
 import Keelung.Data.UnionFind.Field qualified as Field
 import Keelung.Data.UnionFind.Relation qualified as UnionFind.Relation
-import Keelung.Data.UnionFind.Type qualified as UnionFind
+import Keelung.Data.UnionFind qualified as UnionFind
 import Test.Arbitrary ()
 import Test.Hspec
 import Test.QuickCheck
