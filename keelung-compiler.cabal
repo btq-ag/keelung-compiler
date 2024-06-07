@@ -260,6 +260,7 @@ test-suite keelung-test
       Test.Data.UnionFind.Boolean
       Test.Data.UnionFind.Field
       Test.Experiment
+      Test.Generic
       Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
