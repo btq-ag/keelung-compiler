@@ -85,6 +85,7 @@ library
       Keelung.Data.UnionFind.Boolean2
       Keelung.Data.UnionFind.Field
       Keelung.Data.UnionFind.Field2
+      Keelung.Data.UnionFind.Relation
       Keelung.Data.UnionFind.Type
       Keelung.Data.VarGroup
       Keelung.Interpreter
@@ -185,6 +186,7 @@ executable keelungc
       Keelung.Data.UnionFind.Boolean2
       Keelung.Data.UnionFind.Field
       Keelung.Data.UnionFind.Field2
+      Keelung.Data.UnionFind.Relation
       Keelung.Data.UnionFind.Type
       Keelung.Data.VarGroup
       Keelung.Interpreter
@@ -346,6 +348,7 @@ test-suite keelung-test
       Keelung.Data.UnionFind.Boolean2
       Keelung.Data.UnionFind.Field
       Keelung.Data.UnionFind.Field2
+      Keelung.Data.UnionFind.Relation
       Keelung.Data.UnionFind.Type
       Keelung.Data.VarGroup
       Keelung.Interpreter

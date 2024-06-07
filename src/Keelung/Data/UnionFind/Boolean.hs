@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# HLINT ignore "Use list comprehension" #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -27,6 +28,7 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (..))
+import Keelung.Data.UnionFind.Relation (Relation (..))
 import Keelung.Data.UnionFind.Type
 import Prelude hiding (lookup)
 
@@ -115,3 +117,11 @@ compose (UnionFind xs) (root, status1) (child, status2) sign =
         if anotherRoot1 `compareSeniority` anotherRoot2 /= LT
           then compose (UnionFind xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) ((sign1 == sign2) == sign)
           else compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) ((sign1 == sign2) == sign)
+
+--------------------------------------------------------------------------------
+
+instance Relation Bool Bool where
+  invert = not
+  execute = (==) -- XOR on Bool
+  renderWithVar child False = "¬$" <> show child
+  renderWithVar child True = "$" <> show child

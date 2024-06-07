@@ -21,6 +21,7 @@ import Keelung.Compiler.Relations.Reference qualified as FieldRef
 import Keelung.Data.Reference (Ref (..), RefF (..))
 import Keelung.Data.UnionFind.Boolean qualified as Boolean
 import Keelung.Data.UnionFind.Field qualified as Field
+import Keelung.Data.UnionFind.Relation qualified as UnionFind.Relation
 import Keelung.Data.UnionFind.Type qualified as UnionFind
 import Test.Arbitrary ()
 import Test.Hspec
@@ -103,24 +104,24 @@ tests = describe "UnionFind" $ do
     describe "invertLinRel . invertLinRel = id" $ do
       it "GF181" $ do
         property $ \rel -> do
-          (Field.invertLinRel . Field.invertLinRel) rel `shouldBe` (rel :: Field.LinRel GF181)
+          (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel GF181)
       it "Prime 17" $ do
         property $ \rel -> do
-          (Field.invertLinRel . Field.invertLinRel) rel `shouldBe` (rel :: Field.LinRel (Prime 17))
+          (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel (Prime 17))
       it "Binary 7" $ do
         property $ \rel -> do
-          (Field.invertLinRel . Field.invertLinRel) rel `shouldBe` (rel :: Field.LinRel (Binary 7))
+          (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel (Binary 7))
 
     describe "execLinRel invertLinRel rel . execLinRel rel = id" $ do
       it "GF181" $ do
         property $ \(rel, points) -> do
-          map (Field.execLinRel (Field.invertLinRel rel) . Field.execLinRel rel) points `shouldBe` (points :: [GF181])
+          map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel GF181)) points `shouldBe` points
       it "Prime 17" $ do
         property $ \(rel, points) -> do
-          map (Field.execLinRel (Field.invertLinRel rel) . Field.execLinRel rel) points `shouldBe` (points :: [Prime 17])
+          map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Prime 17))) points `shouldBe` points
       it "Binary 7" $ do
         property $ \(rel, points) -> do
-          map (Field.execLinRel (Field.invertLinRel rel) . Field.execLinRel rel) points `shouldBe` (points :: [Binary 7])
+          map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Binary 7))) points `shouldBe` points
 
   describe "concrete cases" $ do
     describe "Var / Field" $ do

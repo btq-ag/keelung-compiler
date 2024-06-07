@@ -14,6 +14,8 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (..))
+import Keelung.Data.UnionFind.Relation (Relation)
+import Keelung.Data.UnionFind.Relation qualified as Relation
 
 --------------------------------------------------------------------------------
 
@@ -51,22 +53,22 @@ instance (Serialize val, Serialize rel) => Serialize (Status val rel)
 
 --------------------------------------------------------------------------------
 
-newtype UnionFind val rel = UnionFind {unUnionFind :: IntMap (Status val rel)} deriving (Show, Eq, Generic)
+newtype UnionFind val rel = UnionFind {unUnionFind :: IntMap (Status val rel)} deriving (Eq, Generic)
 
 instance (Serialize val, Serialize rel) => Serialize (UnionFind val rel)
 
--- instance Show (UnionFind val rel) where
---   show (UnionFind relations) =
---     "UnionFind\n"
---       <> mconcat (map (<> "\n") (concatMap toString (IntMap.toList relations)))
---     where
---       showVar var = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
+instance (Show val, Relation rel val) => Show (UnionFind val rel) where
+  show (UnionFind relations) =
+    "UnionFind\n"
+      <> mconcat (map (<> "\n") (concatMap toString (IntMap.toList relations)))
+    where
+      showVar var = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
 
---       toString (var, IsConstant value) = [showVar var <> " = " <> show value]
---       toString (var, IsRoot toChildren) = case map renderLinRel (IntMap.toList toChildren) of
---         [] -> [showVar var <> " = []"] -- should never happen
---         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
---       toString (_var, IsChildOf _parent _relation) = []
+      toString (var, IsConstant value) = [showVar var <> " = " <> show value]
+      toString (var, IsRoot toChildren) = case map (uncurry Relation.renderWithVar) (IntMap.toList toChildren) of
+        [] -> [showVar var <> " = []"] -- should never happen
+        (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
+      toString (_var, IsChildOf _parent _relation) = []
 
 -- | Create an empty UnionFind data structure.
 new :: UnionFind val rel
@@ -130,5 +132,3 @@ rootsAreSenior = IntMap.foldlWithKey' go [] . unUnionFind
       let badChildren = IntSet.filter (\child -> compareSeniority var child == LT) (IntMap.keysSet children)
        in if IntSet.null badChildren then acc else RootNotSenior var badChildren : acc
     go acc var (IsChildOf parent _) = if compareSeniority parent var /= LT then acc else RootNotSenior parent (IntSet.singleton var) : acc
-
---------------------------------------------------------------------------------

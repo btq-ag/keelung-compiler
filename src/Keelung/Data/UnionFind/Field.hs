@@ -28,8 +28,6 @@ module Keelung.Data.UnionFind.Field
 
     -- * Linear Relations
     LinRel (..),
-    invertLinRel,
-    execLinRel,
 
     -- * Testing
     Error (..),
@@ -46,6 +44,8 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (compareSeniority))
+import Keelung.Data.UnionFind.Relation (Relation (..))
+import Keelung.Data.UnionFind.Relation qualified as Relation
 import Keelung.Data.UnionFind.Type
 import Prelude hiding (lookup)
 
@@ -76,7 +76,7 @@ assign var value (UnionFind relations) =
                 -- child = relationToChild value
                 IntMap.insert
                   child
-                  (IsConstant (execLinRel relationToChild value))
+                  (IsConstant (Relation.execute relationToChild value))
                   rels
             )
             (IntMap.insert var (IsConstant value) relations)
@@ -87,7 +87,7 @@ assign var value (UnionFind relations) =
     -- =>
     -- parent = relation^-1 child
     Just (IsChildOf parent relationToChild) ->
-      assign parent (execLinRel (invertLinRel relationToChild) value) (UnionFind relations)
+      assign parent (Relation.execute (Relation.invert relationToChild) value) (UnionFind relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relate :: (GaloisField n, Integral n) => Var -> Var -> LinRel n -> UnionFind n (LinRel n) -> Maybe (UnionFind n (LinRel n))
@@ -100,10 +100,10 @@ relateWithLookup (a, aLookup) relation (b, bLookup) relations =
     then Nothing
     else case compareSeniority a b of
       LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
-      GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
+      GT -> relateChildToParent (b, bLookup) (Relation.invert relation) (a, aLookup) relations
       EQ -> case compare (childrenSizeOf aLookup) (childrenSizeOf bLookup) of
         LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
-        GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
+        GT -> relateChildToParent (b, bLookup) (Relation.invert relation) (a, aLookup) relations
         EQ -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
         where
           childrenSizeOf :: Status n (LinRel n) -> Int
@@ -118,7 +118,7 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
   -- The parent is a constant, so we make the child a constant:
   --    * for the parent: do nothing
   --    * for the child: assign it the value of the parent with `relationToChild` applied
-  IsConstant value -> assign child (execLinRel relationToChild value) relations
+  IsConstant value -> assign child (Relation.execute relationToChild value) relations
   -- The parent has other children
   IsRoot children -> case childLookup of
     -- The child also has its grandchildren, so we relate all these grandchildren to the parent, too:
@@ -143,9 +143,9 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
     -- The child is a constant, so we make the parent a constant, too:
     --  * for the parent: assign it the value of the child with the inverted relation applied
     --  * for the child: do nothing
-    IsConstant value -> assign parent (execLinRel (invertLinRel relationToChild) value) relations
+    IsConstant value -> assign parent (Relation.execute (Relation.invert relationToChild) value) relations
     -- The child is already a child of another variable `parent2`:
-    --    * for the another variable `parent2`: point `parent2` to `parent` with `invertLinRel parent2ToChild <> relationToChild`
+    --    * for the another variable `parent2`: point `parent2` to `parent` with `Relation.invert parent2ToChild <> relationToChild`
     --    * for the parent: add the child and `parent2` to the children map
     --    * for the child: point it to the `parent` with `relationToParent`
     IsChildOf parent2 parent2ToChild ->
@@ -153,15 +153,15 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
         then --
         -- child = relationToChild parent
         -- child = parent2ToChild parent2
-        --    => parent = (invertLinRel relationToChild <> parent2ToChild) parent2
-        --    or parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
-          relateWithLookup (parent, parentLookup) (invertLinRel relationToChild <> parent2ToChild) (parent2, lookupStatus parent2 relations) relations
+        --    => parent = (Relation.invert relationToChild <> parent2ToChild) parent2
+        --    or parent2 = (Relation.invert parent2ToChild <> relationToChild) parent
+          relateWithLookup (parent, parentLookup) (Relation.invert relationToChild <> parent2ToChild) (parent2, lookupStatus parent2 relations) relations
         else do
           -- child = relationToChild parent
           -- child = parent2ToChild parent2
-          --    => parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
-          --    or parent = (invertLinRel relationToChild <> parent2ToChild) parent2
-          relateWithLookup (parent2, lookupStatus parent2 relations) (invertLinRel parent2ToChild <> relationToChild) (parent, parentLookup) $
+          --    => parent2 = (Relation.invert parent2ToChild <> relationToChild) parent
+          --    or parent = (Relation.invert relationToChild <> parent2ToChild) parent2
+          relateWithLookup (parent2, lookupStatus parent2 relations) (Relation.invert parent2ToChild <> relationToChild) (parent, parentLookup) $
             UnionFind $
               IntMap.insert child (IsChildOf parent relationToChild) $
                 unUnionFind relations
@@ -195,7 +195,7 @@ renderFamilies :: (GaloisField n, Integral n) => IntMap (IntMap (n, n)) -> Strin
 renderFamilies families = mconcat (map (<> "\n") (concatMap toString (IntMap.toList families)))
   where
     showVar var = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
-    toString (root, toChildren) = case map renderLinRel (IntMap.toList (fmap (uncurry LinRel) toChildren)) of
+    toString (root, toChildren) = case map (uncurry Relation.renderWithVar) (IntMap.toList (fmap (uncurry LinRel) toChildren)) of
       [] -> [showVar root <> " = []"] -- should never happen
       (x : xs) -> showVar root <> " = " <> x : map ("           = " <>) xs
 
@@ -217,7 +217,7 @@ relationBetween var1 var2 xs =
         -- var1 = parent2
         -- =>
         -- var2 = relationWithParent2 var1
-          Just $ invertLinRel relationWithParent2
+          Just $ Relation.invert relationWithParent2
         else Nothing
     (IsChildOf parent1 relationWithParent1, IsRoot _) ->
       if parent1 == var2
@@ -235,10 +235,9 @@ relationBetween var1 var2 xs =
         --   =>
         -- var1 = relationWithParent1 parent2
         -- var2 = relationWithParent2 parent2
-          Just $ relationWithParent1 <> invertLinRel relationWithParent2
-        else -- Just $ relationWithParent1 <> invertLinRel relationWithParent2
+          Just $ relationWithParent1 <> Relation.invert relationWithParent2
+        else -- Just $ relationWithParent1 <> Relation.invert relationWithParent2
           Nothing
-
 
 --------------------------------------------------------------------------------
 
@@ -269,33 +268,30 @@ instance (NFData n) => NFData (Status n (LinRel n))
 fromLinRel :: LinRel n -> (n, n)
 fromLinRel (LinRel a b) = (a, b)
 
--- | Computes the inverse of a relation
---      x = ay + b
---        =>
---      y = (1/a) x + (-b/a)
-invertLinRel :: (GaloisField n, Integral n) => LinRel n -> LinRel n
-invertLinRel (LinRel a b) = LinRel (recip a) ((-b) / a)
+instance (GaloisField n, Integral n) => Relation (LinRel n) n where
+  -- Computes the inverse of a relation
+  --      x = ay + b
+  --        =>
+  --      y = (1/a) x + (-b/a)
+  invert (LinRel a b) = LinRel (recip a) ((-b) / a)
 
--- | `execLinRel relation parent = child`
-execLinRel :: (GaloisField n, Integral n) => LinRel n -> n -> n
-execLinRel (LinRel a b) value = a * value + b
+  -- `execute relation parent = child`
+  execute (LinRel a b) value = a * value + b
 
--- | Render LinRel to some child as a string
-renderLinRel :: (GaloisField n, Integral n) => (Int, LinRel n) -> String
-renderLinRel (var, rel) = go (invertLinRel rel)
-  where
-    var' = "$" <> show var
+  renderWithVar var rel = go (Relation.invert rel)
+    where
+      var' = "$" <> show var
 
-    go (LinRel (-1) 1) = "¬" <> var'
-    go (LinRel a b) =
-      let slope = case a of
-            1 -> var'
-            (-1) -> "-" <> var'
-            _ -> show a <> var'
-          intercept = case b of
-            0 -> ""
-            _ -> " + " <> show b
-       in -- if N.isPositive b
-          --   then " + " <> show (N b)
-          --   else " - " <> show (N (-b))
-          slope <> intercept
+      go (LinRel (-1) 1) = "¬" <> var'
+      go (LinRel a b) =
+        let slope = case a of
+              1 -> var'
+              (-1) -> "-" <> var'
+              _ -> show a <> var'
+            intercept = case b of
+              0 -> ""
+              _ -> " + " <> show b
+         in -- if N.isPositive b
+            --   then " + " <> show (N b)
+            --   else " - " <> show (N (-b))
+            slope <> intercept
