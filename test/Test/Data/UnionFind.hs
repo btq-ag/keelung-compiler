@@ -31,7 +31,7 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "UnionFind" $ do
   -- it "error" $ do 
-  --   let relates = [RelateVarBool 4 57 False,RelateVarBool 71 15 False,RelateVarBool 71 35 False,RelateVarBool 35 4 True]
+  --   let relates = [RelateVarBool 20 10 True,RelateVarBool 0 20 False]
   --   let xs = foldl applyRelate Boolean.new (relates :: [Relate Boolean.UnionFind Var Bool]) :: Boolean.UnionFind
   --   print xs
   --   Boolean.validate xs `shouldBe` []
