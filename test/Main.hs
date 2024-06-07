@@ -14,6 +14,7 @@ import Test.Intergration qualified as Intergration
 import Test.Optimization qualified as Optimization
 import Test.Relations qualified as Relations
 import Test.Solver qualified as Solver
+import Test.Generic qualified as Generic
 
 main :: IO ()
 main = hspec $ do
@@ -28,3 +29,4 @@ main = hspec $ do
   Data.IntervalSet.tests
   Data.RefUSegments.tests
   Test.Data.UnionFind.tests
+  Generic.tests

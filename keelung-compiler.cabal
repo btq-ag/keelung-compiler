@@ -271,6 +271,7 @@ test-suite keelung-test
       Test.Data.RefUSegments
       Test.Data.UnionFind
       Test.Experiment
+      Test.Generic
       Test.Intergration
       Test.Optimization
       Test.Optimization.Boolean
