@@ -1,9 +1,10 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Data.UnionFind.Type (Lookup (..), Status (..)) where
+module Keelung.Data.UnionFind.Type (Lookup (..), Status (..), Error (..)) where
 
 import Data.IntMap.Strict (IntMap)
+import Data.IntSet (IntSet)
 import GHC.Generics (Generic)
 import Keelung (Var)
 
@@ -26,3 +27,11 @@ data Status n rel
       Var -- parent
       rel -- relation such that `child = relation parent`
   deriving (Show, Eq, Generic, Functor)
+
+--------------------------------------------------------------------------------
+
+-- | For testing the validity of the data structure
+data Error
+  = RootNotSenior Var IntSet
+  | ChildrenNotRecognizingParent Var IntSet
+  deriving (Show, Eq)

@@ -30,6 +30,7 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (..))
+import Keelung.Data.UnionFind.Type (Error (..))
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -158,12 +159,6 @@ compose (UnionFind xs) (root, status1) (child, status2) sign =
           else compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) ((sign1 == sign2) == sign)
 
 --------------------------------------------------------------------------------
-
--- | For testing the validity of the data structure
-data Error
-  = RootNotSenior Var IntSet
-  | ChildrenNotRecognizingParent Var IntSet
-  deriving (Show, Eq)
 
 -- | The data structure is valid if:
 --    1. all children of a parent recognize the parent as their parent

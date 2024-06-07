@@ -42,14 +42,13 @@ import Control.DeepSeq (NFData)
 import Data.Field.Galois (GaloisField)
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
-import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (compareSeniority))
-import Prelude hiding (lookup)
 import Keelung.Data.UnionFind.Type
+import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
 
@@ -72,7 +71,6 @@ instance (GaloisField n, Integral n) => Show (UnionFind n) where
       toString (_var, IsChildOf _parent _relation) = []
 
 instance (NFData n) => NFData (UnionFind n)
-
 
 -- instance UnionFind Var n where
 --   data UF Var n = VarUF (Field.UnionFind n)
@@ -362,12 +360,6 @@ renderLinRel (var, rel) = go (invertLinRel rel)
           slope <> intercept
 
 --------------------------------------------------------------------------------
-
--- | For testing the validity of the data structure
-data Error
-  = RootNotSenior Var IntSet
-  | ChildrenNotRecognizingParent Var IntSet
-  deriving (Show, Eq)
 
 -- | The data structure is valid if:
 --    1. all children of a parent recognize the parent as their parent
