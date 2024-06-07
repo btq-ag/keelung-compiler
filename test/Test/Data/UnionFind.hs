@@ -41,7 +41,7 @@ tests = describe "UnionFind" $ do
     describe "relate" $ do
       it "Var / Boolean" $ do
         property $ \relates -> do
-          let xs = foldl applyRelate Boolean.new (relates :: [Relate Boolean.UnionFind Var Bool]) :: Boolean.UnionFind
+          let xs = foldl applyRelate Boolean.new (relates :: [Relate (Boolean.UnionFind Bool Bool) Var Bool]) :: Boolean.UnionFind Bool Bool
           Boolean.validate xs `shouldBe` []
       it "Var / Field / GF181" $ do
         property $ \relates -> do
@@ -71,8 +71,8 @@ tests = describe "UnionFind" $ do
     describe "relate and then assign" $ do
       it "Boolean" $ do
         property $ \(relates, assignments) -> do
-          let xs = foldl applyRelate Boolean.new (relates :: [Relate Boolean.UnionFind Var Bool])
-          let xs' = foldl applyAssign xs (assignments :: [Assign Boolean.UnionFind Var Bool])
+          let xs = foldl applyRelate Boolean.new (relates :: [Relate (Boolean.UnionFind Bool Bool) Var Bool])
+          let xs' = foldl applyAssign xs (assignments :: [Assign (Boolean.UnionFind Bool Bool) Var Bool])
           Boolean.validate xs' `shouldBe` []
       it "Field / GF181" $ do
         property $ \(relates, assignments) -> do
@@ -198,13 +198,13 @@ tests = describe "UnionFind" $ do
 
 data Relate :: Type -> Type -> Type -> Type where
   RelateVarField :: (GaloisField n, Integral n) => Var -> Var -> (n, n) -> Relate (Field.UnionFind n) Var n
-  RelateVarBool :: Var -> Var -> Bool -> Relate Boolean.UnionFind Var Bool
+  RelateVarBool :: Var -> Var -> Bool -> Relate (Boolean.UnionFind Bool Bool) Var Bool
   RelateRefField :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (FieldRef.RefRelations n) Ref n
 
 instance (GaloisField n, Integral n, Show var) => Show (Relate (Field.UnionFind n) var n) where
   show (RelateVarField var1 var2 (slope, intercept)) = "RelateField " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
 
-instance (Show var) => Show (Relate Boolean.UnionFind var Bool) where
+instance (Show var) => Show (Relate (Boolean.UnionFind Bool Bool) var Bool) where
   show (RelateVarBool var1 var2 relation) = "RelateVarBool " <> show var1 <> " " <> show var2 <> " " <> show relation
 
 instance (GaloisField n, Integral n, Show var) => Show (Relate (FieldRef.RefRelations n) var n) where
@@ -224,7 +224,7 @@ instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (FieldRef
       <*> arbitrary
       <*> ((,) <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary)
 
-instance Arbitrary (Relate Boolean.UnionFind Var Bool) where
+instance Arbitrary (Relate (Boolean.UnionFind Bool Bool) Var Bool) where
   arbitrary =
     RelateVarBool
       <$> chooseInt (0, 100)
@@ -243,13 +243,13 @@ applyRelate xs (RelateRefField var1 var2 (slope, intercept)) = case runExcept (F
 
 data Assign :: Type -> Type -> Type -> Type where
   AssignVarField :: (GaloisField n, Integral n) => var -> n -> Assign (Field.UnionFind n) var n
-  AssignVarBool :: var -> Bool -> Assign Boolean.UnionFind var Bool
+  AssignVarBool :: var -> Bool -> Assign (Boolean.UnionFind Bool Bool) var Bool
   AssignRefField :: (GaloisField n, Integral n) => Ref -> n -> Assign (FieldRef.RefRelations n) Ref n
 
 instance (GaloisField n, Integral n, Show var) => Show (Assign (Field.UnionFind n) var n) where
   show (AssignVarField var val) = "AssignVarField " <> show var <> " " <> show val
 
-instance Show (Assign Boolean.UnionFind Var Bool) where
+instance Show (Assign (Boolean.UnionFind Bool Bool) Var Bool) where
   show (AssignVarBool var val) = "AssignVarBool " <> show var <> " " <> show val
 
 instance (GaloisField n, Integral n, Show var) => Show (Assign (FieldRef.RefRelations n) var n) where
@@ -273,7 +273,7 @@ instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Assign (FieldRef
       <$> arbitrary
       <*> arbitrary
 
-instance Arbitrary (Assign Boolean.UnionFind Var Bool) where
+instance Arbitrary (Assign (Boolean.UnionFind Bool Bool) Var Bool) where
   arbitrary =
     AssignVarBool
       <$> chooseInt (0, 100)

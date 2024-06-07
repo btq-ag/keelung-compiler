@@ -1,7 +1,14 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Keelung.Data.UnionFind.Type (Lookup (..), Status (..), Error (..)) where
+module Keelung.Data.UnionFind.Type
+  ( Lookup (..),
+    Status (..),
+    UnionFind (..),
+    new,
+    Error (..),
+  )
+where
 
 import Data.IntMap.Strict (IntMap)
 import Data.IntSet (IntSet)
@@ -19,8 +26,8 @@ data Lookup var val rel
   deriving (Show, Eq, Generic, Functor)
 
 -- | Status of a variable in a union-find data structure.
-data Status n rel
-  = IsConstant n
+data Status val rel
+  = IsConstant val
   | IsRoot
       (IntMap rel) -- mappping from the child to the relation
   | IsChildOf
@@ -30,8 +37,18 @@ data Status n rel
 
 --------------------------------------------------------------------------------
 
+newtype UnionFind val rel = UnionFind {unUnionFind :: IntMap (Status val rel)} deriving (Show, Eq)
+
+-- | Create an empty UnionFind data structure.
+new :: UnionFind val rel
+new = UnionFind mempty
+
+--------------------------------------------------------------------------------
+
 -- | For testing the validity of the data structure
 data Error
   = RootNotSenior Var IntSet
   | ChildrenNotRecognizingParent Var IntSet
   deriving (Show, Eq)
+
+--------------------------------------------------------------------------------

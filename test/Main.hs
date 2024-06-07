@@ -8,7 +8,7 @@ import Test.Data.IntervalTable qualified as Data.IntervalTable
 import Test.Data.LC qualified as Data.LC
 import Test.Data.PolyRS qualified as Data.PolyL
 import Test.Data.RefUSegments qualified as Data.RefUSegments
-import Test.Data.UnionFind.Boolean qualified as Data.UnionFind.Boolean
+import Test.Data.UnionFind qualified
 import Test.Hspec (hspec)
 import Test.Intergration qualified as Intergration
 import Test.Optimization qualified as Optimization
@@ -27,4 +27,4 @@ main = hspec $ do
   Data.PolyL.tests
   Data.IntervalSet.tests
   Data.RefUSegments.tests
-  Data.UnionFind.Boolean.tests
+  Test.Data.UnionFind.tests

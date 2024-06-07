@@ -28,16 +28,8 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (..))
-import Keelung.Data.UnionFind.Type (Error (..), Status (..))
+import Keelung.Data.UnionFind.Type (Error (..), Status (..), UnionFind (..), new)
 import Prelude hiding (lookup)
-
---------------------------------------------------------------------------------
-
-newtype UnionFind = UnionFind {unUnionFind :: IntMap (Status Bool Bool)} deriving (Show, Eq)
-
--- | Create an empty UnionFind data structure.
-new :: UnionFind
-new = UnionFind mempty
 
 --------------------------------------------------------------------------------
 
@@ -45,13 +37,13 @@ data Lookup = Constant Bool | Root | ChildOf Var Bool
   deriving (Show, Eq)
 
 -- | Internal status lookup
-lookupStatus :: Var -> UnionFind -> Status Bool Bool
+lookupStatus :: Var -> UnionFind Bool Bool -> Status Bool Bool
 lookupStatus var (UnionFind relations) = case IntMap.lookup var relations of
   Nothing -> IsRoot mempty
   Just result -> result
 
 -- | External status lookup
-lookup :: UnionFind -> Var -> Maybe Lookup
+lookup :: UnionFind Bool Bool -> Var -> Maybe Lookup
 lookup (UnionFind xs) var = case IntMap.lookup var xs of
   Nothing -> Nothing
   Just (IsConstant b) -> Just (Constant b)
@@ -59,7 +51,7 @@ lookup (UnionFind xs) var = case IntMap.lookup var xs of
   Just (IsChildOf root sign) -> Just (ChildOf root sign)
 
 -- | Export the UnionFind data structure to assignements and relations.
-export :: UnionFind -> (IntMap Bool, [(IntSet, IntSet)])
+export :: UnionFind Bool Bool -> (IntMap Bool, [(IntSet, IntSet)])
 export (UnionFind xs) = (IntMap.mapMaybe f xs, map (\(k, (ys, zs)) -> (IntSet.insert k ys, zs)) (IntMap.toList (IntMap.mapMaybe g xs)))
   where
     f (IsConstant b) = Just b
@@ -68,10 +60,10 @@ export (UnionFind xs) = (IntMap.mapMaybe f xs, map (\(k, (ys, zs)) -> (IntSet.in
     g _ = Nothing
 
 -- | Assign a value to a variable.
-assign :: UnionFind -> Var -> Bool -> UnionFind
+assign :: UnionFind Bool Bool -> Var -> Bool -> UnionFind Bool Bool
 assign (UnionFind xs) var value = assign' (UnionFind xs) var value (IntMap.lookup var xs)
 
-assign' :: UnionFind -> Var -> Bool -> Maybe (Status Bool Bool) -> UnionFind
+assign' :: UnionFind Bool Bool -> Var -> Bool -> Maybe (Status Bool Bool) -> UnionFind Bool Bool
 assign' (UnionFind xs) var value varStatus = case varStatus of
   Nothing -> UnionFind $ IntMap.insert var (IsConstant value) xs
   Just (IsConstant v) -> if value == v then UnionFind xs else error "[ panic ] Solver: already assigned with different value"
@@ -83,14 +75,14 @@ assign' (UnionFind xs) var value varStatus = case varStatus of
   Just (IsChildOf root sign) -> assign (UnionFind xs) root (sign == value)
 
 -- | Relate two variables.
-relate :: UnionFind -> Var -> Var -> Bool -> UnionFind
+relate :: UnionFind Bool Bool -> Var -> Var -> Bool -> UnionFind Bool Bool
 relate (UnionFind xs) var1 var2 sign =
   case var1 `compareSeniority` var2 of
     GT -> compose (UnionFind xs) (var1, IntMap.lookup var1 xs) (var2, IntMap.lookup var2 xs) sign
     EQ -> UnionFind xs
     LT -> compose (UnionFind xs) (var2, IntMap.lookup var2 xs) (var1, IntMap.lookup var1 xs) sign
 
-compose :: UnionFind -> (Var, Maybe (Status Bool Bool)) -> (Var, Maybe (Status Bool Bool)) -> Bool -> UnionFind
+compose :: UnionFind Bool Bool -> (Var, Maybe (Status Bool Bool)) -> (Var, Maybe (Status Bool Bool)) -> Bool -> UnionFind Bool Bool
 compose (UnionFind xs) (root, status1) (child, status2) sign =
   if root == child
     then UnionFind xs
@@ -147,15 +139,15 @@ compose (UnionFind xs) (root, status1) (child, status2) sign =
 -- | The data structure is valid if:
 --    1. all children of a parent recognize the parent as their parent
 --    2. the seniority of the root of a family is greater than equal the seniority of all its children
-validate :: UnionFind -> [Error]
+validate :: UnionFind Bool Bool -> [Error]
 validate relations = allChildrenRecognizeTheirParent relations <> rootsAreSenior relations
 
 -- | Derived from `validate`
-isValid :: UnionFind -> Bool
+isValid :: UnionFind Bool Bool -> Bool
 isValid = null . validate
 
 -- | A Reference is valid if all children of a parent recognize the parent as their parent
-allChildrenRecognizeTheirParent :: UnionFind -> [Error]
+allChildrenRecognizeTheirParent :: UnionFind Bool Bool -> [Error]
 allChildrenRecognizeTheirParent relations =
   let families = IntMap.mapMaybe isParent (unUnionFind relations)
 
@@ -176,7 +168,7 @@ allChildrenRecognizeTheirParent relations =
         $ IntMap.toList families
 
 -- | A Reference is valid if the seniority of the root of a family is greater than equal the seniority of all its children
-rootsAreSenior :: UnionFind -> [Error]
+rootsAreSenior :: UnionFind Bool Bool -> [Error]
 rootsAreSenior = IntMap.foldlWithKey' go [] . unUnionFind
   where
     go :: [Error] -> Var -> Status Bool Bool -> [Error]

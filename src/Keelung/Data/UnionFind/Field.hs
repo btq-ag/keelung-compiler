@@ -47,7 +47,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (compareSeniority))
-import Keelung.Data.UnionFind.Type
+import Keelung.Data.UnionFind.Type (Error (..), Lookup (..), Status (..))
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------

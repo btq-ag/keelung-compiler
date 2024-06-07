@@ -5,7 +5,7 @@
 module Keelung.Data.UnionFind (UnionFind (..), Lookup (..)) where
 
 import Data.Kind (Type)
-import Keelung.Data.UnionFind.Type
+import Keelung.Data.UnionFind.Type hiding (UnionFind(..))
 import Keelung.Data.Dict (Dict)
 
 -- | Interface for a union-find data structure.
