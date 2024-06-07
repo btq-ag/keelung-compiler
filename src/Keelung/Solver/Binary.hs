@@ -17,6 +17,7 @@ import Keelung (Var)
 import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.UnionFind.Boolean (UnionFind)
+import Keelung.Data.UnionFind.Boolean qualified as Boolean
 import Keelung.Data.UnionFind.Boolean qualified as UnionFind
 import Keelung.Data.UnionFind.Type qualified as UnionFind
 
@@ -144,7 +145,7 @@ solve (Solving constant coeffs state) =
 
 data State
   = State
-      (UnionFind Bool Bool) -- UnionFind: for unary relation (variable assignment) and binary relation (variable equivalence)
+      (UnionFind Bool Boolean.Rel) -- UnionFind: for unary relation (variable assignment) and binary relation (variable equivalence)
       Pool -- other relations: for relations with more than 2 variables, summed to 0 or 1
   deriving (Eq, Show)
 
@@ -171,7 +172,7 @@ instance Show PolyB where
 polyBSize :: PolyB -> Int
 polyBSize (PolyB vars _) = IntSet.size vars
 
-substPolyB :: UnionFind Bool Bool -> PolyB -> Either Action PolyB
+substPolyB :: UnionFind Bool Boolean.Rel -> PolyB -> Either Action PolyB
 substPolyB uf (PolyB e b) =
   -- trace (show uf) $
   -- trace (show (PolyB e b) <> " ==> " <> show (IntSet.fold step (PolyB mempty b) e)) $
@@ -188,7 +189,7 @@ substPolyB uf (PolyB e b) =
           if var `IntSet.member` vars
             then PolyB (IntSet.delete var vars) parity
             else PolyB (IntSet.insert var vars) parity
-        UnionFind.ChildOf root sameSign ->
+        UnionFind.ChildOf root (Boolean.Rel sameSign) ->
           if root `IntSet.member` vars
             then PolyB (IntSet.delete root vars) (if sameSign then parity else not parity)
             else PolyB (IntSet.insert root vars) (if sameSign then parity else not parity)
@@ -213,20 +214,20 @@ toAction (PolyB vars parity) =
     _ -> Right (PolyB vars parity)
 
 -- | Given a list of actions, update the UnionFind
-updateUnionFind :: UnionFind Bool Bool -> [Action] -> UnionFind Bool Bool
+updateUnionFind :: UnionFind Bool Boolean.Rel -> [Action] -> UnionFind Bool Boolean.Rel
 updateUnionFind = foldr step
   where
     step (Assign var val) xs = Maybe.fromMaybe xs (UnionFind.assign var val xs)
-    step (Relate var1 var2 sameSign) xs = Maybe.fromMaybe xs (UnionFind.relate xs var1 var2 sameSign)
+    step (Relate var1 var2 sameSign) xs = Maybe.fromMaybe xs (UnionFind.relate var1 var2 (Boolean.Rel sameSign) xs)
     step NoOp xs = xs
 
 -- | Given a pool of relations, derive actions from them.
-updatePool :: UnionFind Bool Bool -> [PolyB] -> ([Action], [PolyB])
+updatePool :: UnionFind Bool Boolean.Rel -> [PolyB] -> ([Action], [PolyB])
 updatePool uf = Either.partitionEithers . map (substPolyB uf)
 
 -- | Apply actions on the relation pool until there is no more actions to apply.
 --   Finds the fixed point of `updatePool . updateUnionFind`
-applyActionsUntilThereIsNone :: UnionFind Bool Bool -> ([Action], [PolyB]) -> State
+applyActionsUntilThereIsNone :: UnionFind Bool Boolean.Rel -> ([Action], [PolyB]) -> State
 applyActionsUntilThereIsNone uf ([], pool) = State uf (Set.fromList pool)
 applyActionsUntilThereIsNone uf (actions, pool) =
   let uf' = updateUnionFind uf actions
@@ -240,7 +241,7 @@ relate var1 var2 sameSign (State uf pool) =
     else -- decide which variable to be the root
 
       let (root, child) = (var1 `min` var2, var1 `max` var2)
-          uf' = Maybe.fromMaybe uf (UnionFind.relate uf root child sameSign)
+          uf' = Maybe.fromMaybe uf (UnionFind.relate root child (Boolean.Rel sameSign) uf)
           poolResult = Either.partitionEithers $ map (substPolyB uf') $ Set.toList pool
        in applyActionsUntilThereIsNone uf' poolResult
 

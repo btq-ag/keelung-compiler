@@ -124,6 +124,127 @@ assign var value (UnionFind relations) =
 
 --------------------------------------------------------------------------------
 
+-- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
+relate :: (Relation rel val, Eq val) => Var -> Var -> rel -> UnionFind val rel -> Maybe (UnionFind val rel)
+relate a b relation relations = relateWithLookup (a, lookupStatus a relations) relation (b, lookupStatus b relations) relations
+
+-- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
+relateWithLookup :: (Relation rel var, Eq var) => (Var, Status var rel) -> rel -> (Var, Status var rel) -> UnionFind var rel -> Maybe (UnionFind var rel)
+relateWithLookup (a, aLookup) relation (b, bLookup) relations =
+  if a == b -- if the variables are the same, do nothing and return the original relations
+    then Nothing
+    else case compareSeniority a b of
+      LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+      GT -> relateChildToParent (b, bLookup) (Relation.invert relation) (a, aLookup) relations
+      EQ -> case compare (childrenSizeOf aLookup) (childrenSizeOf bLookup) of
+        LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+        GT -> relateChildToParent (b, bLookup) (Relation.invert relation) (a, aLookup) relations
+        EQ -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+        where
+          childrenSizeOf :: Status val rel -> Int
+          childrenSizeOf (IsRoot children) = IntMap.size children
+          childrenSizeOf (IsConstant _) = 0
+          childrenSizeOf (IsChildOf parent _) = childrenSizeOf (lookupStatus parent relations)
+
+-- | Relates a child to a parent, O(lg n)
+--   child = relation parent
+relateChildToParent :: (Relation rel val, Eq val) => (Var, Status val rel) -> rel -> (Var, Status val rel) -> UnionFind val rel -> Maybe (UnionFind val rel)
+relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) relations = case parentLookup of
+  -- The parent is a constant, so we make the child a constant:
+  --    * for the parent: do nothing
+  --    * for the child: assign it the value of the parent with `relationToChild` applied
+  IsConstant value -> assign child (Relation.execute relationToChild value) relations
+  -- The parent has other children
+  IsRoot children -> case childLookup of
+    -- The child also has its grandchildren, so we relate all these grandchildren to the parent, too:
+    --    * for the parent: add the child and its grandchildren to the children map
+    --    * for the child: point the child to the parent and add the relation
+    --    * for the grandchildren: point them to the new parent
+    IsRoot toGrandChildren ->
+      let -- point the grandchildren to the new parent
+          grandChildren =
+            IntMap.foldlWithKey'
+              (\rels grandchild relationToGrandChild -> IntMap.insert grandchild (IsChildOf parent (relationToGrandChild <> relationToChild)) rels)
+              (unUnionFind relations)
+              toGrandChildren
+          newSiblings = IntMap.insert child relationToChild $ IntMap.map (<> relationToChild) toGrandChildren
+       in Just $
+            UnionFind $
+              IntMap.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
+                IntMap.insert
+                  child
+                  (IsChildOf parent relationToChild) -- add the child and its grandchildren to the parent
+                  grandChildren
+    -- The child is a constant, so we make the parent a constant, too:
+    --  * for the parent: assign it the value of the child with the inverted relation applied
+    --  * for the child: do nothing
+    IsConstant value -> assign parent (Relation.execute (Relation.invert relationToChild) value) relations
+    -- The child is already a child of another variable `parent2`:
+    --    * for the another variable `parent2`: point `parent2` to `parent` with `Relation.invert parent2ToChild <> relationToChild`
+    --    * for the parent: add the child and `parent2` to the children map
+    --    * for the child: point it to the `parent` with `relationToParent`
+    IsChildOf parent2 parent2ToChild ->
+      if parent2 `compareSeniority` parent == GT
+        then --
+        -- child = relationToChild parent
+        -- child = parent2ToChild parent2
+        --    => parent = (Relation.invert relationToChild <> parent2ToChild) parent2
+        --    or parent2 = (Relation.invert parent2ToChild <> relationToChild) parent
+          relateWithLookup (parent, parentLookup) (Relation.invert relationToChild <> parent2ToChild) (parent2, lookupStatus parent2 relations) relations
+        else do
+          -- child = relationToChild parent
+          -- child = parent2ToChild parent2
+          --    => parent2 = (Relation.invert parent2ToChild <> relationToChild) parent
+          --    or parent = (Relation.invert relationToChild <> parent2ToChild) parent2
+          relateWithLookup (parent2, lookupStatus parent2 relations) (Relation.invert parent2ToChild <> relationToChild) (parent, parentLookup) $
+            UnionFind $
+              IntMap.insert child (IsChildOf parent relationToChild) $
+                unUnionFind relations
+
+  -- The parent is a child of another variable, so we relate the child to the grandparent instead
+  IsChildOf grandparent relationFromGrandparent -> relateWithLookup (child, childLookup) (relationToChild <> relationFromGrandparent) (grandparent, lookupStatus grandparent relations) relations
+
+--------------------------------------------------------------------------------
+
+-- | Calculates the relation between two variables, O(lg n)
+relationBetween :: (Relation rel val) => Var -> Var -> UnionFind val rel -> Maybe rel
+relationBetween var1 var2 xs = case (lookupStatus var1 xs, lookupStatus var2 xs) of
+  (IsConstant _, _) -> Nothing
+  (_, IsConstant _) -> Nothing
+  (IsRoot _, IsRoot _) ->
+    if var1 == var2
+      then Just mempty
+      else Nothing
+  (IsRoot _, IsChildOf parent2 relationWithParent2) ->
+    if var1 == parent2
+      then -- var2 = relationWithParent2 parent2
+      -- var1 = parent2
+      -- =>
+      -- var2 = relationWithParent2 var1
+        Just $ Relation.invert relationWithParent2
+      else Nothing
+  (IsChildOf parent1 relationWithParent1, IsRoot _) ->
+    if parent1 == var2
+      then -- var1 = relationWithParent1 parent1
+      -- parent1 = var2
+      -- =>
+      -- var1 = relationWithParent1 var2
+        Just relationWithParent1
+      else Nothing
+  (IsChildOf parent1 relationWithParent1, IsChildOf parent2 relationWithParent2) ->
+    if parent1 == parent2
+      then -- var1 = relationWithParent1 parent1
+      -- var2 = relationWithParent2 parent2
+      -- parent1 == parent2
+      --   =>
+      -- var1 = relationWithParent1 parent2
+      -- var2 = relationWithParent2 parent2
+        Just $ relationWithParent1 <> Relation.invert relationWithParent2
+      else -- Just $ relationWithParent1 <> Relation.invert relationWithParent2
+        Nothing
+
+--------------------------------------------------------------------------------
+
 -- | For testing the validity of the data structure
 data Error
   = RootNotSenior Var IntSet

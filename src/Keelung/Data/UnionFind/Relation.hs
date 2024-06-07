@@ -4,7 +4,9 @@ module Keelung.Data.UnionFind.Relation where
 
 import Keelung (Var)
 
-class Relation a val | a -> val where
+-- | Interface for a relation between variables.
+--   Semigroup for relation composition and Monoid for identity.
+class (Semigroup a, Monoid a) => Relation a val | a -> val where
   -- | Calculates the inverse of a relation.
   invert :: a -> a
 
