@@ -21,6 +21,7 @@ import Keelung.Compiler.Relations.Reference qualified as FieldRef
 import Keelung.Data.Reference (Ref (..), RefF (..))
 import Keelung.Data.UnionFind.Boolean qualified as Boolean
 import Keelung.Data.UnionFind.Field qualified as Field
+import Keelung.Data.UnionFind.Type qualified as UnionFind
 import Test.Arbitrary ()
 import Test.Hspec
 import Test.QuickCheck
@@ -282,8 +283,8 @@ applyAssign :: a -> Assign a Var val -> a
 applyAssign xs (AssignVarField target val) = case Field.lookup target xs of
   Field.Constant _ -> xs -- no-op
   _ -> Maybe.fromMaybe xs (Field.assign target val xs)
-applyAssign xs (AssignVarBool target val) = case Boolean.lookup xs target of
-  Just (Boolean.Constant _) -> xs -- no-op
+applyAssign xs (AssignVarBool target val) = case UnionFind.lookup target xs of
+  UnionFind.Constant _ -> xs -- no-op
   _ -> Boolean.assign xs target val
 
 --------------------------------------------------------------------------------

@@ -12,7 +12,6 @@ module Keelung.Data.UnionFind.Boolean
 
     -- * Lookup
     Lookup (..),
-    lookup,
     export,
 
     -- * Testing
@@ -28,27 +27,10 @@ import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (..))
-import Keelung.Data.UnionFind.Type (Error (..), Status (..), UnionFind (..), new)
+import Keelung.Data.UnionFind.Type
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
-
-data Lookup = Constant Bool | Root | ChildOf Var Bool
-  deriving (Show, Eq)
-
--- | Internal status lookup
-lookupStatus :: Var -> UnionFind Bool Bool -> Status Bool Bool
-lookupStatus var (UnionFind relations) = case IntMap.lookup var relations of
-  Nothing -> IsRoot mempty
-  Just result -> result
-
--- | External status lookup
-lookup :: UnionFind Bool Bool -> Var -> Maybe Lookup
-lookup (UnionFind xs) var = case IntMap.lookup var xs of
-  Nothing -> Nothing
-  Just (IsConstant b) -> Just (Constant b)
-  Just (IsRoot {}) -> Just Root
-  Just (IsChildOf root sign) -> Just (ChildOf root sign)
 
 -- | Export the UnionFind data structure to assignements and relations.
 export :: UnionFind Bool Bool -> (IntMap Bool, [(IntSet, IntSet)])
@@ -133,47 +115,3 @@ compose (UnionFind xs) (root, status1) (child, status2) sign =
         if anotherRoot1 `compareSeniority` anotherRoot2 /= LT
           then compose (UnionFind xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) ((sign1 == sign2) == sign)
           else compose (UnionFind xs) (anotherRoot2, IntMap.lookup anotherRoot2 xs) (anotherRoot1, IntMap.lookup anotherRoot1 xs) ((sign1 == sign2) == sign)
-
---------------------------------------------------------------------------------
-
--- | The data structure is valid if:
---    1. all children of a parent recognize the parent as their parent
---    2. the seniority of the root of a family is greater than equal the seniority of all its children
-validate :: UnionFind Bool Bool -> [Error]
-validate relations = allChildrenRecognizeTheirParent relations <> rootsAreSenior relations
-
--- | Derived from `validate`
-isValid :: UnionFind Bool Bool -> Bool
-isValid = null . validate
-
--- | A Reference is valid if all children of a parent recognize the parent as their parent
-allChildrenRecognizeTheirParent :: UnionFind Bool Bool -> [Error]
-allChildrenRecognizeTheirParent relations =
-  let families = IntMap.mapMaybe isParent (unUnionFind relations)
-
-      isParent (IsRoot children) = Just children
-      -- Just $ IntMap.fromList $ map (,True) (IntSet.toList same) <> map (,False) (IntSet.toList opposite)
-      isParent _ = Nothing
-
-      recognizeParent parent child relation = case lookupStatus child relations of
-        IsChildOf parent' relation' -> parent == parent' && relation == relation'
-        _ -> False
-      childrenNotRecognizeParent parent = IntMap.filterWithKey (\child status -> not $ recognizeParent parent child status)
-   in --  . IntMap.elems . IntMap.mapWithKey (recognizeParent parent)
-      concatMap
-        ( \(parent, children) ->
-            let badChildren = childrenNotRecognizeParent parent children
-             in if null badChildren then [] else [ChildrenNotRecognizingParent parent (IntMap.keysSet badChildren)]
-        )
-        $ IntMap.toList families
-
--- | A Reference is valid if the seniority of the root of a family is greater than equal the seniority of all its children
-rootsAreSenior :: UnionFind Bool Bool -> [Error]
-rootsAreSenior = IntMap.foldlWithKey' go [] . unUnionFind
-  where
-    go :: [Error] -> Var -> Status Bool Bool -> [Error]
-    go acc _ (IsConstant _) = acc
-    go acc var (IsRoot children) =
-      let badChildren = IntSet.filter (\child -> compareSeniority var child == LT) (IntMap.keysSet children)
-       in if IntSet.null badChildren then acc else RootNotSenior var badChildren : acc
-    go acc var (IsChildOf parent _) = if compareSeniority parent var /= LT then acc else RootNotSenior parent (IntSet.singleton var) : acc

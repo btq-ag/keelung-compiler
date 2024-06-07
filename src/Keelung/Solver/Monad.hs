@@ -234,6 +234,8 @@ data Error n
   | QuotientIsZeroError Segments
   deriving (Eq, Generic)
 
+instance (Serialize n) => Serialize (Error n)
+
 instance (GaloisField n, Integral n) => Show (Error n) where
   show (VarUnassignedError unboundVariables) =
     "these variables have no bindings:\n  "

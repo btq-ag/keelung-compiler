@@ -18,6 +18,7 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.UnionFind.Boolean (UnionFind)
 import Keelung.Data.UnionFind.Boolean qualified as UnionFind
+import Keelung.Data.UnionFind.Type qualified as UnionFind
 
 -- | What this solver does:
 --      Assume that all variables are Boolean:
@@ -180,14 +181,14 @@ substPolyB uf (PolyB e b) =
       -- trace (show uf) $
       -- trace ("$" <> show var <> " <> " <> show (PolyB vars parity) <> " --> " <> show (UnionFind.lookup uf var)) $
       -- traceShowId $
-      case UnionFind.lookup uf var of
-        Nothing -> PolyB (IntSet.insert var vars) parity
-        Just (UnionFind.Constant val) -> PolyB vars (if val then not parity else parity)
-        Just UnionFind.Root ->
+      case UnionFind.lookup var uf of
+        -- Nothing -> PolyB (IntSet.insert var vars) parity
+        UnionFind.Constant val -> PolyB vars (if val then not parity else parity)
+        UnionFind.Root ->
           if var `IntSet.member` vars
             then PolyB (IntSet.delete var vars) parity
             else PolyB (IntSet.insert var vars) parity
-        Just (UnionFind.ChildOf root sameSign) ->
+        UnionFind.ChildOf root sameSign ->
           if root `IntSet.member` vars
             then PolyB (IntSet.delete root vars) (if sameSign then parity else not parity)
             else PolyB (IntSet.insert root vars) (if sameSign then parity else not parity)

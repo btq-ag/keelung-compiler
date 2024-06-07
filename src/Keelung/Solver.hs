@@ -121,7 +121,7 @@ goThroughManyTimes constraints = do
 goThroughOnce :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n (Result (Seq (Constraint n)))
 goThroughOnce constraints = mconcat <$> mapM shrink (toList constraints)
 
-lookupVar :: GaloisField n => Var -> M n (Maybe n)
+lookupVar :: (GaloisField n) => Var -> M n (Maybe n)
 lookupVar var = do
   context <- get
   case UnionFind.lookup var context of
@@ -245,7 +245,7 @@ shrinkAddBySubst xs = do
         -- x = (-b / a) y + (-c / a)
         relate "add" x (-b / a) y (-c / a)
         return $ shrinkedOrStuck [changed] xs'
-      Nothing -> 
+      Nothing ->
         return $ shrinkedOrStuck [changed] xs'
 
 -- | Shrinking a multiplicative constraint by substitution
