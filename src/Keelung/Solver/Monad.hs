@@ -32,6 +32,7 @@ import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
 import Keelung.Data.UnionFind.Field (UnionFind)
+import Keelung.Data.UnionFind.Field qualified as Field
 import Keelung.Data.UnionFind.Field qualified as UnionFind
 import Keelung.Data.VarGroup
 import Keelung.Syntax
@@ -46,10 +47,10 @@ type M n =
     ( RWS
         Env
         (Seq (Log n)) -- for debugging
-        (UnionFind n) -- variable assignments
+        (UnionFind n (Field.LinRel n)) -- variable assignments
     )
 
-runM :: (GaloisField n, Integral n) => Bool -> Ranges -> FieldInfo -> Inputs n -> M n a -> (Either (Error n, UnionFind n) (Vector n), LogReport n)
+runM :: (GaloisField n, Integral n) => Bool -> Ranges -> FieldInfo -> Inputs n -> M n a -> (Either (Error n, UnionFind n (Field.LinRel n)) (Vector n), LogReport n)
 runM debug boolVarRanges fieldInfo inputs p =
   let counters = Inputs.inputCounters inputs
       -- initial assignments from inputs
@@ -226,14 +227,12 @@ data Error n
   | R1CInconsistentError (R1C n)
   | ConflictingValues String
   | BooleanConstraintError Var n
-  | StuckError (UnionFind n) [Constraint n]
+  | StuckError (UnionFind n (Field.LinRel n)) [Constraint n]
   | ModInvError Segments Integer
   | DividendIsZeroError Segments
   | DivisorIsZeroError Segments
   | QuotientIsZeroError Segments
-  deriving (Eq, Generic, NFData)
-
-instance (Serialize n) => Serialize (Error n)
+  deriving (Eq, Generic)
 
 instance (GaloisField n, Integral n) => Show (Error n) where
   show (VarUnassignedError unboundVariables) =
@@ -275,9 +274,9 @@ data Env = Env
 
 -- | Data structure for aggregating logging information
 data LogReport n = LogReport
-  { logReportInitState :: UnionFind n,
+  { logReportInitState :: UnionFind n (Field.LinRel n),
     logReportEntries :: Seq (Log n),
-    logReportFinalState :: UnionFind n
+    logReportFinalState :: UnionFind n (Field.LinRel n)
   }
 
 instance (Integral n, GaloisField n) => Show (LogReport n) where
@@ -350,7 +349,7 @@ shrinkedOrStuck :: [Bool] -> a -> Result a
 shrinkedOrStuck changes r1c = if or changes then Shrinked r1c else Stuck r1c
 
 -- | Substitute varaibles with values in a polynomial
-substAndView :: (Num n, Eq n) => UnionFind n -> Poly n -> PolyView n
+substAndView :: (Num n, Eq n) => UnionFind n (Field.LinRel n) -> Poly n -> PolyView n
 substAndView context xs =
   let (assignments, _roots) = UnionFind.export context
    in case Poly.substWithIntMap xs assignments of

@@ -39,6 +39,19 @@ data Status val rel
 
 newtype UnionFind val rel = UnionFind {unUnionFind :: IntMap (Status val rel)} deriving (Show, Eq)
 
+-- instance Show (UnionFind val rel) where
+--   show (UnionFind relations) =
+--     "UnionFind\n"
+--       <> mconcat (map (<> "\n") (concatMap toString (IntMap.toList relations)))
+--     where
+--       showVar var = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
+
+--       toString (var, IsConstant value) = [showVar var <> " = " <> show value]
+--       toString (var, IsRoot toChildren) = case map renderLinRel (IntMap.toList toChildren) of
+--         [] -> [showVar var <> " = []"] -- should never happen
+--         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
+--       toString (_var, IsChildOf _parent _relation) = []
+
 -- | Create an empty UnionFind data structure.
 new :: UnionFind val rel
 new = UnionFind mempty
