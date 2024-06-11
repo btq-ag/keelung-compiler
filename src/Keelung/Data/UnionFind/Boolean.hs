@@ -29,8 +29,8 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
-import Keelung.Data.UnionFind.Relation (Relation (..))
 import Keelung.Data.UnionFind
+import Keelung.Data.UnionFind.Relation (Relation (..))
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -41,7 +41,7 @@ export (UnionFind xs) = (IntMap.mapMaybe f xs, map (\(k, (ys, zs)) -> (IntSet.in
   where
     f (IsConstant b) = Just b
     f _ = Nothing
-    g (IsRoot children) = Just (IntMap.keysSet (IntMap.filter unRel children), IntMap.keysSet (IntMap.filter (not . unRel) children))
+    g (IsRoot _ children) = Just (IntMap.keysSet (IntMap.filter unRel children), IntMap.keysSet (IntMap.filter (not . unRel) children))
     g _ = Nothing
 
 --------------------------------------------------------------------------------
@@ -62,3 +62,9 @@ instance Relation Rel Bool where
   execute (Rel x) val = x == val -- NXOR
   renderWithVar child (Rel False) = "¬$" <> show child
   renderWithVar child (Rel True) = "$" <> show child
+
+--------------------------------------------------------------------------------
+
+-- | Ranges have no meaning for `Bool`.
+instance HasRange Bool where
+  isWithinRange _ _ = True

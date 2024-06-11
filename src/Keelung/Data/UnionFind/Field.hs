@@ -79,7 +79,7 @@ export (UnionFind.UnionFind relations) = (constants, roots)
     toConstant (UnionFind.IsConstant (Wrapper value)) = Just value
     toConstant _ = Nothing
 
-    toRoot (UnionFind.IsRoot children) = Just $ IntMap.map fromLinRel children
+    toRoot (UnionFind.IsRoot _ children) = Just $ IntMap.map fromLinRel children
     toRoot _ = Nothing
 
 -- | Helper function to render the families resulted from `export`
@@ -147,3 +147,10 @@ instance (GaloisField n, Integral n) => Relation (LinRel n) (Wrapper n) where
             --   then " + " <> show (N b)
             --   else " - " <> show (N (-b))
             slope <> intercept
+
+--------------------------------------------------------------------------------
+
+instance (Ord n, Num n) => UnionFind.HasRange (Wrapper n) where
+  isWithinRange (UnionFind.Range Nothing) _ = True
+  isWithinRange (UnionFind.Range (Just 0)) _ = True
+  isWithinRange (UnionFind.Range (Just n)) (Wrapper x) = x < fromIntegral n
