@@ -31,9 +31,7 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
-import Keelung.Data.UnionFind.Field (UnionFind)
 import Keelung.Data.UnionFind.Field qualified as Field
-import Keelung.Data.UnionFind.Field qualified as UnionFind
 import Keelung.Data.VarGroup
 import Keelung.Syntax
 import Keelung.Syntax.Counters
@@ -47,17 +45,17 @@ type M n =
     ( RWS
         Env
         (Seq (Log n)) -- for debugging
-        (UnionFind n (Field.LinRel n)) -- variable assignments
+        (Field.UnionFind n) -- variable assignments
     )
 
-runM :: (GaloisField n, Integral n) => Bool -> Ranges -> FieldInfo -> Inputs n -> M n a -> (Either (Error n, UnionFind n (Field.LinRel n)) (Vector n), LogReport n)
+runM :: (GaloisField n, Integral n) => Bool -> Ranges -> FieldInfo -> Inputs n -> M n a -> (Either (Error n, Field.UnionFind n) (Vector n), LogReport n)
 runM debug boolVarRanges fieldInfo inputs p =
   let counters = Inputs.inputCounters inputs
       -- initial assignments from inputs
-      initAssignmints = Inputs.toIntMap inputs
-      initContext = foldr (\(var, val) acc -> Maybe.fromMaybe acc $ UnionFind.assign var val acc) UnionFind.new (IntMap.toList initAssignmints)
+      initAssignmints = IntMap.toList $ fmap Field.Wrapper (Inputs.toIntMap inputs)
+      initContext = foldr (\(var, val) acc -> Maybe.fromMaybe acc $ Field.assign var val acc) Field.new initAssignmints
       (result, context, logs) = runRWS (runExceptT p) (Env debug boolVarRanges fieldInfo) initContext
-      (assignments, _roots) = UnionFind.export context
+      (assignments, _roots) = Field.export context
    in case result of
         Left err -> (Left (err, context), LogReport initContext logs context)
         Right _ -> case toEither $ toTotal' (getCount counters PublicInput + getCount counters PrivateInput, assignments) of
@@ -74,7 +72,7 @@ assign :: (GaloisField n, Integral n) => String -> Var -> n -> M n ()
 assign msg var val = do
   tryLog $ LogAssign msg var val
   context <- get
-  forM_ (UnionFind.assign var val context) put
+  forM_ (Field.assign var (Field.Wrapper val) context) put
 
 -- | Assign a value to a segment (a series of variables)
 assignSegment :: (GaloisField n, Integral n) => String -> Segments -> U -> M n ()
@@ -102,7 +100,7 @@ relate ::
 relate msg var1 slope var2 intercept = do
   tryLog $ LogRelate msg var1 slope var2 intercept
   context <- get
-  forM_ (UnionFind.relate var1 var2 (UnionFind.LinRel slope intercept) context) put
+  forM_ (Field.relate var1 var2 (Field.LinRel slope intercept) context) put
 
 -- | See if a variable is a Boolean variable
 isBooleanVar :: Var -> M n Bool
@@ -227,7 +225,7 @@ data Error n
   | R1CInconsistentError (R1C n)
   | ConflictingValues String
   | BooleanConstraintError Var n
-  | StuckError (UnionFind n (Field.LinRel n)) [Constraint n]
+  | StuckError (Field.UnionFind n) [Constraint n]
   | ModInvError Segments Integer
   | DividendIsZeroError Segments
   | DivisorIsZeroError Segments
@@ -246,14 +244,14 @@ instance (GaloisField n, Integral n) => Show (Error n) where
   show (BooleanConstraintError var val) =
     "expected the value of $" <> show var <> " to be either 0 or 1, but got `" <> show (N val) <> "`"
   show (StuckError context constraints) =
-    let (assignments, roots) = UnionFind.export context
+    let (assignments, roots) = Field.export context
      in "stuck when trying to solve these constraints: \n"
           <> concatMap (\c -> "  " <> show (fmap N c) <> "\n") constraints
           <> "while these variables have been solved: \n"
           <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList assignments)
           <> ( if IntMap.null roots
                  then ""
-                 else "and these equivalence classes have been formed: \n" <> UnionFind.renderFamilies roots
+                 else "and these equivalence classes have been formed: \n" <> Field.renderFamilies roots
              )
   show (ModInvError segments p) =
     "Unable to calculate '" <> show segments <> " `modInv` " <> show p <> "'"
@@ -276,15 +274,15 @@ data Env = Env
 
 -- | Data structure for aggregating logging information
 data LogReport n = LogReport
-  { logReportInitState :: UnionFind n (Field.LinRel n),
+  { logReportInitState :: Field.UnionFind n,
     logReportEntries :: Seq (Log n),
-    logReportFinalState :: UnionFind n (Field.LinRel n)
+    logReportFinalState :: Field.UnionFind n
   }
 
 instance (Integral n, GaloisField n) => Show (LogReport n) where
   show (LogReport initState entries finalState) =
-    let (initAssignments, _) = UnionFind.export initState
-        (finalAssignments, finalRoots) = UnionFind.export finalState
+    let (initAssignments, _) = Field.export initState
+        (finalAssignments, finalRoots) = Field.export finalState
      in "<Solver Log Report>\n"
           <> "Initial assignments:\n"
           <> concatMap (\(var, val) -> "  $" <> show var <> " = " <> show (N val) <> "\n") (IntMap.toList initAssignments)
@@ -296,7 +294,7 @@ instance (Integral n, GaloisField n) => Show (LogReport n) where
                  then ""
                  else
                    "Final equivalence classes:\n"
-                     <> UnionFind.renderFamilies finalRoots
+                     <> Field.renderFamilies finalRoots
              )
 
 -- | Data structure for log entries
@@ -351,9 +349,9 @@ shrinkedOrStuck :: [Bool] -> a -> Result a
 shrinkedOrStuck changes r1c = if or changes then Shrinked r1c else Stuck r1c
 
 -- | Substitute varaibles with values in a polynomial
-substAndView :: (Num n, Eq n) => UnionFind n (Field.LinRel n) -> Poly n -> PolyView n
+substAndView :: (Num n, Eq n) => Field.UnionFind n -> Poly n -> PolyView n
 substAndView context xs =
-  let (assignments, _roots) = UnionFind.export context
+  let (assignments, _roots) = Field.export context
    in case Poly.substWithIntMap xs assignments of
         (Left constant, _) -> Constant constant -- reduced to a constant
         (Right poly, changed) ->

@@ -3,35 +3,39 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Keelung.Data.UnionFind.Field
-  ( -- * Construction
+  ( -- * Wrapper
+    Wrapper (..),
+
+    -- * Construction
     UnionFind,
-    new,
+    UnionFind.new,
 
     -- * Operations
-    assign,
-    relate,
+    UnionFind.assign,
+    UnionFind.relate,
 
     -- * Conversions,
     export,
     renderFamilies,
 
     -- * Queries
-    Lookup (..),
-    lookup,
-    size,
+    UnionFind.Lookup (..),
+    UnionFind.lookup,
+    UnionFind.size,
 
     -- * Linear Relations
     LinRel (..),
 
     -- * Testing
-    Error (..),
-    validate,
-    isValid,
+    UnionFind.Error (..),
+    UnionFind.validate,
+    UnionFind.isValid,
   )
 where
 
@@ -41,10 +45,21 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung.Data.UnionFind qualified as UnionFind
 import Keelung.Data.UnionFind.Relation (Relation (..))
 import Keelung.Data.UnionFind.Relation qualified as Relation
-import Keelung.Data.UnionFind
 import Prelude hiding (lookup)
+
+--------------------------------------------------------------------------------
+
+-- | Type synonym for the specialized UnionFind on GaloisField n with linear relations
+type UnionFind n = UnionFind.UnionFind (Wrapper n) (LinRel n)
+
+-- | Wrapper for GaloisField elements
+newtype Wrapper n = Wrapper {unwrap :: n}
+  deriving (Show, Eq, NFData, Generic)
+
+instance (Serialize n) => Serialize (Wrapper n)
 
 --------------------------------------------------------------------------------
 
@@ -52,19 +67,19 @@ import Prelude hiding (lookup)
 --    1. a map from the constant variables to their values
 --    2. a map from the root variables to their children with the relation `(slope, intercept)`
 export ::
-  UnionFind n (LinRel n) ->
+  UnionFind n ->
   ( IntMap n, -- constants
     IntMap (IntMap (n, n)) -- families
   )
-export (UnionFind relations) = (constants, roots)
+export (UnionFind.UnionFind relations) = (constants, roots)
   where
     constants = IntMap.mapMaybe toConstant relations
     roots = IntMap.mapMaybe toRoot relations
 
-    toConstant (IsConstant value) = Just value
+    toConstant (UnionFind.IsConstant (Wrapper value)) = Just value
     toConstant _ = Nothing
 
-    toRoot (IsRoot children) = Just $ IntMap.map fromLinRel children
+    toRoot (UnionFind.IsRoot children) = Just $ IntMap.map fromLinRel children
     toRoot _ = Nothing
 
 -- | Helper function to render the families resulted from `export`
@@ -99,13 +114,13 @@ instance (Num n) => Monoid (LinRel n) where
 
 instance (Serialize n) => Serialize (LinRel n)
 
-instance (NFData n) => NFData (Status n (LinRel n))
+instance (NFData n) => NFData (UnionFind.Status n (LinRel n))
 
 -- | Extracts the coefficients from a LinRel
 fromLinRel :: LinRel n -> (n, n)
 fromLinRel (LinRel a b) = (a, b)
 
-instance (GaloisField n, Integral n) => Relation (LinRel n) n where
+instance (GaloisField n, Integral n) => Relation (LinRel n) (Wrapper n) where
   -- Computes the inverse of a relation
   --      x = ay + b
   --        =>
@@ -113,7 +128,7 @@ instance (GaloisField n, Integral n) => Relation (LinRel n) n where
   invert (LinRel a b) = LinRel (recip a) ((-b) / a)
 
   -- `execute relation parent = child`
-  execute (LinRel a b) value = a * value + b
+  execute (LinRel a b) (Wrapper value) = Wrapper (a * value + b)
 
   renderWithVar var rel = go (Relation.invert rel)
     where

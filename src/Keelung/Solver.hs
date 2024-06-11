@@ -34,6 +34,7 @@ import Keelung.Solver.BinRep qualified as BinRep
 import Keelung.Solver.Binary qualified as Binary
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
+import qualified Keelung.Data.UnionFind.Field as Field
 
 -- | Execute the R1CS solver
 run :: (GaloisField n, Integral n) => Options -> R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
@@ -125,7 +126,7 @@ lookupVar :: (GaloisField n) => Var -> M n (Maybe n)
 lookupVar var = do
   context <- get
   case UnionFind.lookup var context of
-    UnionFind.Constant val -> return $ Just val
+    UnionFind.Constant (Field.Wrapper val) -> return $ Just val
     _ -> return Nothing
 
 -- | If all segments are assigned values, then return the combined value of the segments
