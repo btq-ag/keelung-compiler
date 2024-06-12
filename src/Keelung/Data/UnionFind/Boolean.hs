@@ -68,3 +68,4 @@ instance Relation Rel Bool where
 -- | Ranges have no meaning for `Bool`.
 instance HasRange Bool where
   isWithinRange _ _ = True
+  execRelOnRange _ = id

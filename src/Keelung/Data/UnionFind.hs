@@ -31,7 +31,7 @@ data Lookup var val rel
   deriving (Show, Eq, Generic, Functor)
 
 -- | Result of looking up a variable in the Relations
-lookup :: Var -> UnionFind val rel -> Lookup Var val rel
+lookup :: (Ord val) => Var -> UnionFind val rel -> Lookup Var val rel
 lookup var relations =
   case lookupStatus var relations of
     IsConstant value -> Constant value
@@ -44,7 +44,7 @@ lookup var relations =
 data Status val rel
   = IsConstant val
   | IsRoot
-      Range -- range of values of this equivalence class
+      (Range val) -- range of values of this equivalence class
       (IntMap rel) -- mappping from the child to the relation
   | IsChildOf
       Var -- parent
@@ -59,21 +59,19 @@ newtype UnionFind val rel = UnionFind {unUnionFind :: IntMap (Status val rel)} d
 
 instance (Serialize val, Serialize rel) => Serialize (UnionFind val rel)
 
-instance (Show val, Relation rel val) => Show (UnionFind val rel) where
+instance (Show val, Relation rel val, Eq val) => Show (UnionFind val rel) where
   show (UnionFind relations) =
     "UnionFind\n"
       <> mconcat (map (<> "\n") (concatMap toString (IntMap.toList relations)))
     where
-      showVar var (Range Nothing) = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
-      showVar var (Range (Just 0)) = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
-      showVar var (Range (Just 1)) = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
-      showVar var (Range (Just 2)) = let varString = "$" <> show var <> "B" in "  " <> varString <> replicate (8 - length varString) ' '
-      showVar var (Range (Just n)) = let varString = "$" <> show var <> "{" <> show n <> "}" in "  " <> varString <> replicate (8 - length varString) ' '
+      showVarWithoutRange var = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
+      showVar (Range Nothing) var = showVarWithoutRange var
+      showVar range var = let varString = "$" <> show var <> show range in "  " <> varString <> replicate (8 - length varString) ' '
 
-      toString (var, IsConstant value) = [showVar var mempty <> " = " <> show value]
+      toString (var, IsConstant value) = [showVarWithoutRange var <> " = " <> show value]
       toString (var, IsRoot range toChildren) = case map (uncurry Relation.renderWithVar) (IntMap.toList toChildren) of
-        [] -> [showVar var range <> " = []"] -- should never happen
-        (x : xs) -> showVar var range <> " = " <> x : map ("           = " <>) xs
+        [] -> [showVar range var <> " = []"] -- should never happen
+        (x : xs) -> showVar range var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
 
 -- | Create an empty UnionFind data structure.
@@ -85,60 +83,71 @@ size :: UnionFind val rel -> Int
 size = IntMap.size . unUnionFind
 
 -- | Returns the result of looking up a variable, O(lg n)
-lookupStatus :: Var -> UnionFind val rel -> Status val rel
+lookupStatus :: (Ord val) => Var -> UnionFind val rel -> Status val rel
 lookupStatus var (UnionFind relations) = case IntMap.lookup var relations of
   Nothing -> IsRoot mempty mempty
   Just result -> result
 
 -- | Assigns a value to a variable, O(lg n)
 assign :: (Relation rel val, Eq val, HasRange val) => Var -> val -> UnionFind val rel -> Maybe (UnionFind val rel)
-assign var value (UnionFind relations) =
-  case IntMap.lookup var relations of
-    -- The variable is not in the map, so we add it as a constant
-    Nothing -> Just $ UnionFind $ IntMap.insert var (IsConstant value) relations
-    -- The variable is already a constant, so we check if the value is the same
-    Just (IsConstant oldValue) ->
-      if oldValue == value
-        then Nothing
-        else error $ "[ panic ] Solver: trying to assign a different value to a constant variable: " <> show var
-    -- The variable is already a root, so we:
-    --    1. Make its children constants
-    --    2. Make the root itself a constant
-    Just (IsRoot range toChildren) ->
-      if isWithinRange range value
-        then
-          Just $
-            UnionFind $
-              foldl
-                ( \rels (child, relationToChild) ->
-                    -- child = relationToChild var
-                    -- var = value
-                    --    =>
-                    -- child = relationToChild value
-                    IntMap.insert
-                      child
-                      (IsConstant (Relation.execute relationToChild value))
-                      rels
-                )
-                (IntMap.insert var (IsConstant value) relations)
-                (IntMap.toList toChildren)
-        else error $ "[ panic ] Solver: trying to assign a value outside the range of a variable: " <> show var
-    -- The variable is already a child of another variable, so we:
-    --    1. Make the parent a constant (by calling `assign` recursively)
-    -- child = relation parent
-    -- =>
-    -- parent = relation^-1 child
-    Just (IsChildOf parent relationToChild) ->
-      assign parent (Relation.execute (Relation.invert relationToChild) value) (UnionFind relations)
+assign var value (UnionFind relations) = case IntMap.lookup var relations of
+  -- The variable is not in the map, so we add it as a constant
+  Nothing -> Just $ UnionFind $ IntMap.insert var (IsConstant value) relations
+  -- The variable is already a constant, so we check if the value is the same
+  Just (IsConstant oldValue) ->
+    if oldValue == value
+      then Nothing
+      else error $ "[ panic ] Solver: trying to assign a different value to a constant variable: " <> show var
+  -- The variable is already a root, so we:
+  --    1. Make its children constants
+  --    2. Make the root itself a constant
+  Just (IsRoot range toChildren) ->
+    if isWithinRange range value
+      then
+        Just $
+          UnionFind $
+            foldl
+              ( \rels (child, relationToChild) ->
+                  -- child = relationToChild var
+                  -- var = value
+                  --    =>
+                  -- child = relationToChild value
+                  IntMap.insert
+                    child
+                    (IsConstant (Relation.execute relationToChild value))
+                    rels
+              )
+              (IntMap.insert var (IsConstant value) relations)
+              (IntMap.toList toChildren)
+      else error $ "[ panic ] Solver: trying to assign a value outside the range of a variable: " <> show var
+  -- The variable is already a child of another variable, so we:
+  --    1. Make the parent a constant (by calling `assign` recursively)
+  -- child = relation parent
+  -- =>
+  -- parent = relation^-1 child
+  Just (IsChildOf parent relationToChild) ->
+    assign parent (Relation.execute (Relation.invert relationToChild) value) (UnionFind relations)
+
+designateRange :: (Relation rel val, Eq val, HasRange val, Ord val) => Var -> Range val -> UnionFind val rel -> Maybe (UnionFind val rel)
+designateRange var newRange (UnionFind relations) = case IntMap.lookup var relations of
+  Nothing -> Nothing
+  Just (IsRoot oldRange children) ->
+    let range = oldRange <> newRange
+     in if range == oldRange
+          then Nothing -- no-op
+          else Just $ UnionFind $ IntMap.insert var (IsRoot range children) relations
+  Just (IsConstant _) -> Nothing
+  Just (IsChildOf parent relationToChild) ->
+    designateRange parent (execRelOnRange (Relation.invert relationToChild) newRange) (UnionFind relations)
 
 --------------------------------------------------------------------------------
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (Relation rel val, Eq val, HasRange val) => Var -> Var -> rel -> UnionFind val rel -> Maybe (UnionFind val rel)
+relate :: (Relation rel val, Eq val, HasRange val, Ord val) => Var -> Var -> rel -> UnionFind val rel -> Maybe (UnionFind val rel)
 relate a b relation relations = relateWithLookup (a, lookupStatus a relations) relation (b, lookupStatus b relations) relations
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relateWithLookup :: (Relation rel var, Eq var, HasRange var) => (Var, Status var rel) -> rel -> (Var, Status var rel) -> UnionFind var rel -> Maybe (UnionFind var rel)
+relateWithLookup :: (Relation rel val, HasRange val, Ord val) => (Var, Status val rel) -> rel -> (Var, Status val rel) -> UnionFind val rel -> Maybe (UnionFind val rel)
 relateWithLookup (a, aLookup) relation (b, bLookup) relations =
   if a == b -- if the variables are the same, do nothing and return the original relations
     then Nothing
@@ -157,7 +166,7 @@ relateWithLookup (a, aLookup) relation (b, bLookup) relations =
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
-relateChildToParent :: (Relation rel val, Eq val, HasRange val) => (Var, Status val rel) -> rel -> (Var, Status val rel) -> UnionFind val rel -> Maybe (UnionFind val rel)
+relateChildToParent :: (Relation rel val, Eq val, HasRange val, Ord val) => (Var, Status val rel) -> rel -> (Var, Status val rel) -> UnionFind val rel -> Maybe (UnionFind val rel)
 relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) relations = case parentLookup of
   -- The parent is a constant, so we make the child a constant:
   --    * for the parent: do nothing
@@ -216,7 +225,7 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
 --------------------------------------------------------------------------------
 
 -- | Calculates the relation between two variables, O(lg n)
-relationBetween :: (Relation rel val) => Var -> Var -> UnionFind val rel -> Maybe rel
+relationBetween :: (Relation rel val, Ord val) => Var -> Var -> UnionFind val rel -> Maybe rel
 relationBetween var1 var2 xs = case (lookupStatus var1 xs, lookupStatus var2 xs) of
   (IsConstant _, _) -> Nothing
   (_, IsConstant _) -> Nothing
@@ -263,15 +272,15 @@ data Error
 -- | The data structure is valid if:
 --    1. all children of a parent recognize the parent as their parent
 --    2. the seniority of the root of a family is greater than equal the seniority of all its children
-validate :: (Eq rel) => UnionFind val rel -> [Error]
+validate :: (Eq rel, Ord val) => UnionFind val rel -> [Error]
 validate relations = allChildrenRecognizeTheirParent relations <> rootsAreSenior relations
 
 -- | Derived from `validate`
-isValid :: (Eq rel) => UnionFind val rel -> Bool
+isValid :: (Eq rel, Ord val) => UnionFind val rel -> Bool
 isValid = null . validate
 
 -- | A Reference is valid if all children of a parent recognize the parent as their parent
-allChildrenRecognizeTheirParent :: (Eq rel) => UnionFind val rel -> [Error]
+allChildrenRecognizeTheirParent :: (Eq rel, Ord val) => UnionFind val rel -> [Error]
 allChildrenRecognizeTheirParent relations =
   let families = IntMap.mapMaybe isParent (unUnionFind relations)
 
@@ -304,24 +313,29 @@ rootsAreSenior = IntMap.foldlWithKey' go [] . unUnionFind
 --------------------------------------------------------------------------------
 
 -- | Range of values of a variable
---   For example, `Range (Just 3)` means that the variable can take values of 0, 1, 2
-newtype Range = Range {unRange :: Maybe Int}
-  deriving (Show, Eq, Generic)
+--   For example, `Range (Just (0, 3))` means that the variable can take values of 0, 1, 2
+newtype Range val = Range {unRange :: Maybe (val, val)}
+  deriving (Eq, Generic)
 
-instance NFData Range
+instance (Show val) => Show (Range val) where
+  show (Range Nothing) = "∞"
+  show (Range (Just (l, u))) = "[" <> show l <> ".." <> show u <> ")"
 
-instance Serialize Range
+instance (NFData val) => NFData (Range val)
+
+instance (Serialize val) => Serialize (Range val)
 
 -- | We can derive a new range from two ranges
-instance Semigroup Range where
-  Range (Just a) <> Range (Just b) = Range (Just (a `min` b)) -- smaller range = more restrictive = more information
+instance (Ord val) => Semigroup (Range val) where
+  Range (Just (al, au)) <> Range (Just (bl, bu)) = Range (Just (al `max` bl, au `min` bu)) -- smaller range = more restrictive = more information
   Range (Just a) <> Range Nothing = Range (Just a)
   Range Nothing <> Range (Just b) = Range (Just b)
   Range Nothing <> Range Nothing = Range Nothing
 
-instance Monoid Range where
+instance (Ord val) => Monoid (Range val) where
   mempty = Range Nothing
 
 -- | For checking if a value is within the range
 class HasRange val where
-  isWithinRange :: Range -> val -> Bool
+  isWithinRange :: Range val -> val -> Bool
+  execRelOnRange :: (Relation rel val) => rel -> Range val -> Range val

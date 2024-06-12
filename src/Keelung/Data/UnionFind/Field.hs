@@ -61,6 +61,9 @@ newtype Wrapper n = Wrapper {unwrap :: n}
 
 instance (Serialize n) => Serialize (Wrapper n)
 
+instance (Ord n) => Ord (Wrapper n) where
+  compare (Wrapper x) (Wrapper y) = compare x y
+
 --------------------------------------------------------------------------------
 
 -- | Exports the UnionFind as a pair of:
@@ -152,5 +155,8 @@ instance (GaloisField n, Integral n) => Relation (LinRel n) (Wrapper n) where
 
 instance (Ord n, Num n) => UnionFind.HasRange (Wrapper n) where
   isWithinRange (UnionFind.Range Nothing) _ = True
-  isWithinRange (UnionFind.Range (Just 0)) _ = True
-  isWithinRange (UnionFind.Range (Just n)) (Wrapper x) = x < fromIntegral n
+  isWithinRange (UnionFind.Range (Just (Wrapper l, Wrapper u))) (Wrapper x) =
+    (l >= u) || (l <= x && x < u)
+
+  execRelOnRange _ (UnionFind.Range Nothing) = UnionFind.Range Nothing
+  execRelOnRange relation (UnionFind.Range (Just (l, u))) = UnionFind.Range (Just (Relation.execute relation l, Relation.execute relation u))
