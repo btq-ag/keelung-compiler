@@ -25,18 +25,20 @@ data Lookup var val rel
   = -- | The variable is a constant.
     Constant val
   | -- | The variable is a root.
-    Root
+    Root (Range val)
   | -- | The variable is a child of another variable. `parent = rel child`
-    ChildOf var rel
+    ChildOf var rel (Range val)
   deriving (Show, Eq, Generic, Functor)
 
 -- | Result of looking up a variable in the Relations
-lookup :: (Ord val) => Var -> UnionFind val rel -> Lookup Var val rel
+lookup :: (Ord val, HasRange val, Relation rel val) => Var -> UnionFind val rel -> Lookup Var val rel
 lookup var relations =
   case lookupStatus var relations of
     IsConstant value -> Constant value
-    IsRoot _ _ -> Root
-    IsChildOf parent relation -> ChildOf parent relation
+    IsRoot range _ -> Root range
+    IsChildOf parent relation -> ChildOf parent relation $ case lookupStatus parent relations of
+      IsRoot range _ -> execRelOnRange relation range
+      _ -> error $ "[ panic ] Solver: parent of a child is not a root: " <> show parent
 
 --------------------------------------------------------------------------------
 

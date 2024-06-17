@@ -32,6 +32,9 @@ module Keelung.Data.UnionFind.Field
     -- * Linear Relations
     LinRel (..),
 
+    -- * Range
+    UnionFind.designateRange,
+
     -- * Testing
     UnionFind.Error (..),
     UnionFind.validate,

@@ -7,8 +7,6 @@
 module Test.Data.UnionFind (run, tests) where
 
 import Control.Monad.Except (runExcept)
--- import Keelung.Compiler.Relations.Reference qualified as RefRelations
-
 import Control.Monad.State
 import Data.Field.Galois (Binary, GaloisField, Prime)
 import Data.IntMap.Strict qualified as IntMap
@@ -96,9 +94,9 @@ tests = describe "UnionFind" $ do
       property $ \xs -> do
         let (_assignments, families) = Field.export (xs :: Field.UnionFind GF181)
         forM_ (IntMap.toList families) $ \(root, family) -> do
-          Field.lookup root xs `shouldBe` Field.Root
+          Field.lookup root xs `shouldBe` Field.Root mempty
           forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
-            Field.lookup child xs `shouldBe` Field.ChildOf root (Field.LinRel slope intercept)
+            Field.lookup child xs `shouldBe` Field.ChildOf root (Field.LinRel slope intercept) mempty
 
   describe "Field.LinRel" $ do
     describe "invertLinRel . invertLinRel = id" $ do
@@ -123,7 +121,40 @@ tests = describe "UnionFind" $ do
         property $ \(rel, points) -> do
           map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Binary 7))) points `shouldBe` points
 
-  describe "concrete cases" $ do
+  describe "Concrete cases: relate + desginate range" $ do
+    describe "Var / Field" $ do
+      it "GF181" $ do
+        let xs =
+              foldl
+                applyRelate
+                Field.new
+                ( [ RelateVarField 0 1 (1, 0),
+                    -- \$0 = $1
+                    RelateVarField 0 2 (1, -1),
+                    -- \$0 = $2 - 1
+                    RelateVarField 0 3 (1, 1),
+                    -- \$0 = $3 + 1
+                    RelateVarField 0 4 (2, 3)
+                  ] ::
+                    -- \$0 = 2$4 + 3
+
+                    [Relate (Field.UnionFind GF181) Var GF181]
+                )
+        let xs' =
+              foldl
+                applyDesignateRange
+                xs
+                ( [ DesignateRangeVarField 0 (UnionFind.Range (Just (Field.Wrapper 0, Field.Wrapper 2)))
+                  ] ::
+                    [DesignateRange (Field.UnionFind GF181) Var GF181]
+                )
+        Field.validate xs' `shouldBe` []
+        Field.lookup 1 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel 1 0) (UnionFind.Range (Just (Field.Wrapper 0, Field.Wrapper 2)))
+        Field.lookup 2 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel 1 1) (UnionFind.Range (Just (Field.Wrapper 1, Field.Wrapper 3)))
+        Field.lookup 3 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel 1 (-1)) (UnionFind.Range (Just (Field.Wrapper (-1), Field.Wrapper 1)))
+        Field.lookup 4 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel (1 / 2) (-3 / 2)) (UnionFind.Range (Just (Field.Wrapper (-3 / 2), Field.Wrapper (-1 / 2))))
+
+  describe "Concrete cases: assign + relate" $ do
     describe "Var / Field" $ do
       it "Binary 7" $ do
         let xs =
@@ -137,7 +168,7 @@ tests = describe "UnionFind" $ do
                     [Relate (Field.UnionFind (Binary 7)) Var (Binary 7)]
                 )
         Field.validate xs `shouldBe` []
-        Field.lookup 52 xs `shouldBe` Field.ChildOf 4 (Field.LinRel 3 2)
+        Field.lookup 52 xs `shouldBe` Field.ChildOf 4 (Field.LinRel 3 2) mempty
 
       it "Prime 7" $ do
         let xs =
@@ -151,7 +182,7 @@ tests = describe "UnionFind" $ do
                     [Relate (Field.UnionFind (Prime 7)) Var (Prime 7)]
                 )
         Field.validate xs `shouldBe` []
-        Field.lookup 52 xs `shouldBe` Field.ChildOf 4 (Field.LinRel 4 2)
+        Field.lookup 52 xs `shouldBe` Field.ChildOf 4 (Field.LinRel 4 2) mempty
 
     describe "Ref / Field / GF181" $ do
       it "$0 = 0" $
@@ -287,6 +318,17 @@ applyAssign xs (AssignVarField target val) = case Field.lookup target xs of
 applyAssign xs (AssignVarBool target val) = case UnionFind.lookup target xs of
   UnionFind.Constant _ -> xs -- no-op
   _ -> Maybe.fromMaybe xs (Boolean.assign target val xs)
+
+--------------------------------------------------------------------------------
+
+data DesignateRange :: Type -> Type -> Type -> Type where
+  DesignateRangeVarField :: (GaloisField n, Integral n) => Var -> UnionFind.Range (Field.Wrapper n) -> DesignateRange (Field.UnionFind n) Var n
+
+-- DesignateRangeRefField :: (GaloisField n, Integral n) => Ref -> UnionFind.Range n -> DesignateRange (Field.UnionFind n) Var n
+-- DesignateRangeRefField :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (FieldRef.RefRelations n) Ref n
+
+applyDesignateRange :: a -> DesignateRange a var val -> a
+applyDesignateRange xs (DesignateRangeVarField var range) = Maybe.fromMaybe xs (Field.designateRange var range xs)
 
 --------------------------------------------------------------------------------
 

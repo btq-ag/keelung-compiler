@@ -29,12 +29,12 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
+import Keelung.Data.UnionFind.Field qualified as Field
 import Keelung.Data.UnionFind.Field qualified as UnionFind
 import Keelung.Solver.BinRep qualified as BinRep
 import Keelung.Solver.Binary qualified as Binary
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
-import qualified Keelung.Data.UnionFind.Field as Field
 
 -- | Execute the R1CS solver
 run :: (GaloisField n, Integral n) => Options -> R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
@@ -122,7 +122,7 @@ goThroughManyTimes constraints = do
 goThroughOnce :: (GaloisField n, Integral n) => Seq (Constraint n) -> M n (Result (Seq (Constraint n)))
 goThroughOnce constraints = mconcat <$> mapM shrink (toList constraints)
 
-lookupVar :: (GaloisField n) => Var -> M n (Maybe n)
+lookupVar :: (GaloisField n, Integral n) => Var -> M n (Maybe n)
 lookupVar var = do
   context <- get
   case UnionFind.lookup var context of

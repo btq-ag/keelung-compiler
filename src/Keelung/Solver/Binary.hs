@@ -185,11 +185,11 @@ substPolyB uf (PolyB e b) =
       case UnionFind.lookup var uf of
         -- Nothing -> PolyB (IntSet.insert var vars) parity
         UnionFind.Constant val -> PolyB vars (if val then not parity else parity)
-        UnionFind.Root ->
+        UnionFind.Root _ ->
           if var `IntSet.member` vars
             then PolyB (IntSet.delete var vars) parity
             else PolyB (IntSet.insert var vars) parity
-        UnionFind.ChildOf root (Boolean.Rel sameSign) ->
+        UnionFind.ChildOf root (Boolean.Rel sameSign) _ ->
           if root `IntSet.member` vars
             then PolyB (IntSet.delete root vars) (if sameSign then parity else not parity)
             else PolyB (IntSet.insert root vars) (if sameSign then parity else not parity)
