@@ -66,16 +66,41 @@ tests = describe "Experiment" $ do
 testInversePK :: Integer -> Integer -> IO ()
 testInversePK inputs expected = do
   testSolver pkField (input Public >>= inversePK) [inputs] [] [expected]
+  debug pkField (input Public >>= inversePK)
   -- debugSolver pkField (input Public >>= inversePK) [inputs] []
 
 pkField :: FieldType
 pkField = Binary 340282366920938463463374607431768211457
 
 inversePK :: Field -> Comp Field
-inversePK x = do
-  out <- freshVarField
-  h <- (freshVarUInt :: Comp (UInt 8)) >>= toField
-  m <- (freshVarUInt :: Comp (UInt 1)) >>= toField
+inversePK x = do -- $1
+  out <- freshVarField -- $0
+  h <- (freshVarUInt :: Comp (UInt 8)) >>= toField -- $6 - $13 and $2
+  m <- (freshVarUInt :: Comp (UInt 1)) >>= toField -- $5 and $3
   assert $ 1 `eq` (x * out + 283 * h + m)
   assert $ 0 `eq` ((out + 256 * x + 65536 * h + 16777216 * (1 + m)) * m)
   return out
+
+-- Right R1CS {
+--   Constriant (14): 
+--     Ordinary constraints (5):
+
+--       1 + 283$2 + $3 + $4 = 0
+--       $2 + $6 + 2$7 + 4$8 + 8$9 + 16$10 + 32$11 + 64$12 + 128$13 = 0
+--       $3 + $5 = 0
+--       $1 * $0 = $4
+--       (16777216 + $0 + 256$1 + 65536$2 + 16777216$3) * $3 = 0
+
+--     Boolean constraints (9):
+
+--       $5 = $5 * $5
+--         ...
+--       $13 = $13 * $13
+
+--   Variables (14):
+
+--     Output variable:        $0
+--     Public input variable:  $1
+--     Other variables:        $2 ... $13
+
+-- }
