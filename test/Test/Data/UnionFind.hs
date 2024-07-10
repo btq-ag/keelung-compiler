@@ -93,7 +93,7 @@ tests = describe "UnionFind" $ do
     it "relate and then assign" $ do
       property $ \xs -> do
         let (_assignments, families) = Field.export (xs :: Field.UnionFind GF181)
-        forM_ (IntMap.toList families) $ \(root, family) -> do
+        forM_ (IntMap.toList families) $ \(root, (_range, family)) -> do
           Field.lookup root xs `shouldBe` Field.Root mempty
           forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
             Field.lookup child xs `shouldBe` Field.ChildOf root (Field.LinRel slope intercept) mempty

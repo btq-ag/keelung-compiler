@@ -66,7 +66,7 @@ tests = describe "Experiment" $ do
 testInversePK :: Integer -> Integer -> IO ()
 testInversePK inputs expected = do
   testSolver pkField (input Public >>= inversePK) [inputs] [] [expected]
-  debug pkField (input Public >>= inversePK)
+  -- debug pkField (input Public >>= inversePK)
   -- debugSolver pkField (input Public >>= inversePK) [inputs] []
 
 pkField :: FieldType

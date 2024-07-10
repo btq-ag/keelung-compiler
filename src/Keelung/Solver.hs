@@ -35,6 +35,7 @@ import Keelung.Solver.BinRep qualified as BinRep
 import Keelung.Solver.Binary qualified as Binary
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
+import Debug.Trace
 
 -- | Execute the R1CS solver
 run :: (GaloisField n, Integral n) => Options -> R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
@@ -213,7 +214,7 @@ shrinkAdd (Stuck (AddConstraint polynomial)) = do
             Prime _ -> False
             Binary _ -> True
       let allBoolean = all isBoolean (IntSet.toList (Poly.vars poly))
-      -- traceShowM $ zip (IntSet.toList (Poly.vars poly)) (map isBoolean (IntSet.toList (Poly.vars poly)))
+      traceShowM $ zip (IntSet.toList (Poly.vars poly)) (map isBoolean (IntSet.toList (Poly.vars poly)))
       if onBinaryField && allBoolean
         then case Binary.run poly of
           Nothing -> return (Stuck poly)
