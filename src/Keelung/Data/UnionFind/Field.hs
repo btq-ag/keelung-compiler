@@ -92,10 +92,16 @@ export (UnionFind.UnionFind relations) = (constants, roots)
 renderFamilies :: (GaloisField n, Integral n) => IntMap (UnionFind.Range (Wrapper n), IntMap (n, n)) -> String
 renderFamilies families = mconcat (map (<> "\n") (concatMap toString (IntMap.toList families)))
   where
-    showVar var = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
-    toString (root, (_range, toChildren)) = case map (uncurry Relation.renderWithVar) (IntMap.toList (fmap (uncurry LinRel) toChildren)) of
-      [] -> [showVar root <> " = []"] -- should never happen
-      (x : xs) -> showVar root <> " = " <> x : map ("           = " <>) xs
+    showVar range var =
+      let rangeString = case range of 
+            UnionFind.Range Nothing -> ""
+            UnionFind.Range (Just (Wrapper 0, Wrapper 2)) -> " Bool"
+            UnionFind.Range (Just (Wrapper l, Wrapper u)) -> "[" <> show l <> ", " <> show u <> ")"
+          varString = "$" <> show var <> rangeString
+       in "  " <> varString <> replicate (8 - length varString) ' '
+    toString (root, (range, toChildren)) = case map (uncurry Relation.renderWithVar) (IntMap.toList (fmap (uncurry LinRel) toChildren)) of
+      [] -> [showVar range root <> " = []"] -- should never happen
+      (x : xs) -> showVar range root <> " = " <> x : map ("           = " <>) xs
 
 --------------------------------------------------------------------------------
 
