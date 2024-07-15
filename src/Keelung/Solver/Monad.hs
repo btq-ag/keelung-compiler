@@ -98,8 +98,13 @@ relate ::
   n -> -- intercept
   M n ()
 relate msg var1 slope var2 intercept = do
-  tryLog $ LogRelate msg var1 slope var2 intercept
   context <- get
+  case Field.relate var1 var2 (Field.LinRel slope intercept) context of 
+    Nothing -> return ()
+    Just context' -> do 
+      tryLog $ LogRelate msg var1 slope var2 intercept
+      put context'
+
   forM_ (Field.relate var1 var2 (Field.LinRel slope intercept) context) put
 
 -- | See if a variable is a Boolean variable
