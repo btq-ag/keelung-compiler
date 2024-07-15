@@ -10,6 +10,7 @@ import Control.Monad.RWS.Strict
 import Data.Bits qualified
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (toList)
+import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
@@ -31,6 +32,7 @@ import Keelung.Data.Polynomial (Poly)
 import Keelung.Data.Polynomial qualified as Poly
 import Keelung.Data.U (U)
 import Keelung.Data.U qualified as U
+import Keelung.Data.UnionFind qualified as UnionFind
 import Keelung.Data.UnionFind.Field qualified as Field
 import Keelung.Data.VarGroup
 import Keelung.Syntax
@@ -99,9 +101,9 @@ relate ::
   M n ()
 relate msg var1 slope var2 intercept = do
   context <- get
-  case Field.relate var1 var2 (Field.LinRel slope intercept) context of 
+  case Field.relate var1 var2 (Field.LinRel slope intercept) context of
     Nothing -> return ()
-    Just context' -> do 
+    Just context' -> do
       tryLog $ LogRelate msg var1 slope var2 intercept
       put context'
 
@@ -353,9 +355,12 @@ instance Functor Result where
 shrinkedOrStuck :: [Bool] -> a -> Result a
 shrinkedOrStuck changes r1c = if or changes then Shrinked r1c else Stuck r1c
 
--- | Substitute varaibles with values in a polynomial
-substAndView :: (Num n, Eq n) => Field.UnionFind n -> Poly n -> PolyView n
-substAndView context xs =
+substAndView :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
+substAndView = substAndViewOld
+
+-- | Substitute varaibles with values or other variables in a polynomial
+substAndViewOld :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
+substAndViewOld context xs =
   let (assignments, _roots) = Field.export context
    in case Poly.substWithIntMap xs assignments of
         (Left constant, _) -> Constant constant -- reduced to a constant
@@ -367,6 +372,32 @@ substAndView context xs =
                   if IntMap.null xs''
                     then Uninomial changed poly constant (var, coeff)
                     else Polynomial changed poly
+
+substAndViewNew :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
+substAndViewNew context xs =
+  let (constant, variables, changed) = substPolyHelper context (Poly.view xs)
+   in case Poly.buildWithIntMap constant variables of
+        Left _ -> Constant constant -- reduced to a constant
+        Right afterSubst -> case IntMap.minViewWithKey variables of
+          Nothing -> Constant constant -- reduced to a constant
+          Just ((var, coeff), vars) ->
+            if IntMap.null vars
+              then Uninomial changed afterSubst constant (var, coeff)
+              else Polynomial changed afterSubst
+
+substPolyHelper :: (GaloisField n, Integral n) => Field.UnionFind n -> (n, IntMap n) -> (n, IntMap n, Bool)
+substPolyHelper context (constant, variables) =
+  IntMap.foldlWithKey'
+    ( \(c, xs, changed) var coeff ->
+        case UnionFind.lookup var context of
+          UnionFind.Constant (Field.Wrapper c') -> (c + c' * coeff, xs, True)
+          UnionFind.Root _ -> (c, IntMap.insert var coeff xs, changed)
+          UnionFind.ChildOf root (Field.LinRel slope intercept) _range ->
+            -- child = slope * root + intercept
+            (c + intercept * coeff, IntMap.insert root (slope * coeff) xs, True)
+    )
+    (constant, mempty, False)
+    variables
 
 -- | View of result after substituting a polynomial
 data PolyView n
