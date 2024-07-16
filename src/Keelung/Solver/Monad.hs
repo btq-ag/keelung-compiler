@@ -133,12 +133,12 @@ data Constraint n
 instance (Serialize n) => Serialize (Constraint n)
 
 instance (GaloisField n, Integral n) => Show (Constraint n) where
-  show (MulConstraint a b (Left c)) = "(Mul)       (" <> show a <> ") * (" <> show b <> ") = (" <> show c <> ")"
-  show (MulConstraint a b (Right c)) = "(Mul)       (" <> show a <> ") * (" <> show b <> ") = (" <> show c <> ")"
-  show (AddConstraint a) = "(Add)       " <> show a
-  show (BooleanConstraint var) = "(Boolean)   $" <> show var <> " = $" <> show var <> " * $" <> show var
+  show (MulConstraint a b (Left c)) = "(" <> show a <> ") * (" <> show b <> ") = " <> show c
+  show (MulConstraint a b (Right c)) = "(" <> show a <> ") * (" <> show b <> ") = (" <> show c <> ")"
+  show (AddConstraint a) = show a
+  show (BooleanConstraint var) = "$" <> show var <> " = $" <> show var <> " * $" <> show var
   show (DivModConstaint (dividend, divisor, quotient, remainder)) =
-    "(DivMod)    $"
+    "$"
       <> show dividend
       <> " = $"
       <> show divisor
@@ -147,7 +147,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
       <> " + $"
       <> show remainder
   show (CLDivModConstaint (dividend, divisor, quotient, remainder)) =
-    "(CLDivMod)    $"
+    "$"
       <> show dividend
       <> " = $"
       <> show divisor
@@ -155,7 +155,7 @@ instance (GaloisField n, Integral n) => Show (Constraint n) where
       <> show quotient
       <> " .^. $"
       <> show remainder
-  show (ModInvConstraint (var, _, _, p)) = "(ModInv)    $" <> show var <> "⁻¹ (mod " <> show p <> ")"
+  show (ModInvConstraint (var, _, _, p)) = "$" <> show var <> "⁻¹ (mod " <> show p <> ")"
 
 instance Functor Constraint where
   -- fmap f (R1CConstraint r1c) = R1CConstraint (fmap f r1c)
@@ -312,16 +312,44 @@ data Log n
   | LogShrinkConstraint (Constraint n) (Constraint n)
   | LogBinRepDetection (Poly n) [(Var, Bool)]
 
+data LogEntry
+  = LogSimple
+      String -- action
+      String -- label
+      String -- message
+  | LogTransition
+      String -- action
+      String -- label
+      String -- before
+      String -- after
+
+instance Show LogEntry where
+  show (LogSimple action label message) =
+    "  " -- left-padding
+      <> take 8 (action <> "        ")
+      <> "  "
+      <> take 8 (label <> "        ")
+      <> "  "
+      <> message
+  show (LogTransition action label before after) =
+    "  " -- left-padding
+      <> take 8 (action <> "        ")
+      <> "  "
+      <> take 8 (label <> "        ")
+      <> "  "
+      <> before
+      <> "\n                  ->  "
+      <> after
+
 instance (Integral n, GaloisField n) => Show (Log n) where
-  show (LogAssign msg var val) = "  ASGN  " <> take 10 (msg <> "          ") <> "  $" <> show var <> " = " <> show (N val)
-  show (LogRelate msg var1 slope var2 intercept) = "  RELT  " <> take 10 (msg <> "          ") <> "  $" <> show var1 <> " = " <> show (N slope) <> " * $" <> show var2 <> " + " <> show (N intercept)
-  show (LogEliminateConstraint c) = "  ELIM  " <> show (fmap N c)
-  show (LogShrinkConstraint c1 c2) = "  SHNK  " <> show (fmap N c1) <> "\n    ->  " <> show (fmap N c2)
-  show (LogBinRepDetection poly assignments) =
-    "  BREP  "
-      <> show (fmap N poly)
-      <> "\n"
-      <> concatMap (\(var, val) -> "    ->  $" <> show var <> " := " <> show (if val then 1 else 0 :: Int) <> "\n") assignments
+  show = show . toLogEntry
+    where
+      toLogEntry (LogAssign msg var val) = LogSimple "assign" msg ("$" <> show var <> " = " <> show (N val))
+      toLogEntry (LogRelate msg var1 slope var2 intercept) = LogSimple "relate" msg ("$" <> show var1 <> " = " <> show (N slope) <> " * $" <> show var2 <> " + " <> show (N intercept))
+      toLogEntry (LogEliminateConstraint c) = LogSimple "remove" "" (show (fmap N c))
+      toLogEntry (LogShrinkConstraint c1 c2) = LogTransition "shrink" "" (show (fmap N c1)) (show (fmap N c2))
+      toLogEntry (LogBinRepDetection poly assignments) =
+        LogSimple "BinRep" "" (show (fmap N poly) <> "\n" <> concatMap (\(var, val) -> "  -> $" <> show var <> " := " <> show (if val then 1 else 0 :: Int) <> "\n") assignments)
 
 --------------------------------------------------------------------------------
 
@@ -358,6 +386,13 @@ shrinkedOrStuck changes r1c = if or changes then Shrinked r1c else Stuck r1c
 substAndView :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
 substAndView = substAndViewOld
 
+-- substAndView context xs =
+--   let old = substAndViewOld context xs
+--       new = substAndViewNew context xs
+--    in if old == new
+--         then new
+--         else trace ("\n  " <> show xs <> "\n    old => " <> show old <> "\n    new => " <> show new <> "\n    context =>\n" <> show context) new
+
 -- | Substitute varaibles with values or other variables in a polynomial
 substAndViewOld :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
 substAndViewOld context xs =
@@ -388,13 +423,19 @@ substAndViewNew context xs =
 substPolyHelper :: (GaloisField n, Integral n) => Field.UnionFind n -> (n, IntMap n) -> (n, IntMap n, Bool)
 substPolyHelper context (constant, variables) =
   IntMap.foldlWithKey'
-    ( \(c, xs, changed) var coeff ->
-        case UnionFind.lookup var context of
-          UnionFind.Constant (Field.Wrapper c') -> (c + c' * coeff, xs, True)
-          UnionFind.Root _ -> (c, IntMap.insert var coeff xs, changed)
-          UnionFind.ChildOf root (Field.LinRel slope intercept) _range ->
-            -- child = slope * root + intercept
-            (c + intercept * coeff, IntMap.insert root (slope * coeff) xs, True)
+    ( \(c, xs, changed) var coeff -> case UnionFind.lookup var context of
+        UnionFind.Constant (Field.Wrapper c') -> (c + c' * coeff, xs, True)
+        UnionFind.Root _ -> (c, IntMap.insert var coeff xs, changed)
+        UnionFind.ChildOf root (Field.LinRel slope intercept) _range ->
+          --    child = slope * root + intercept
+          -- now that we've learned that the variable to be inserted is a child of a root
+          -- before inserting the root, we need to check if it already exists in the polynomial
+          case IntMap.lookup root xs of
+            Nothing -> (c + intercept * coeff, IntMap.insert root (slope * coeff) xs, True)
+            Just coeffOld ->
+              if slope * coeff + coeffOld == 0
+                then (c + intercept * coeff, IntMap.delete root xs, True) -- root is cancelled out
+                else (c + intercept * coeff, IntMap.insert root (slope * coeff + coeffOld) xs, True) -- root is updated
     )
     (constant, mempty, False)
     variables

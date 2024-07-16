@@ -237,14 +237,14 @@ shrinkAddBySubst xs = do
     Constant c -> eliminateIfHold c 0
     Uninomial _ _ c (var, coeff) -> do
       -- c + coeff var = 0
-      assign "add" var (-c / coeff)
+      assign "add uni" var (-c / coeff)
       return Eliminated
     Polynomial changed xs' -> case viewBinomial changed xs' of
       Just (Binomial _ _ c (x, a) (y, b)) -> do
         -- c + a x + b y = 0
         --    =>
         -- x = (-b / a) y + (-c / a)
-        relate "add" x (-b / a) y (-c / a)
+        relate "add poly" x (-b / a) y (-c / a)
         return $ shrinkedOrStuck [changed] xs'
       Nothing ->
         return $ shrinkedOrStuck [changed] xs'
