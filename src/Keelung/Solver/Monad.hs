@@ -384,7 +384,7 @@ shrinkedOrStuck :: [Bool] -> a -> Result a
 shrinkedOrStuck changes r1c = if or changes then Shrinked r1c else Stuck r1c
 
 substAndView :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
-substAndView = substAndViewOld
+substAndView = substAndViewNew
 
 -- substAndView context xs =
 --   let old = substAndViewOld context xs

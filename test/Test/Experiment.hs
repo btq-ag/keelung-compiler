@@ -42,7 +42,7 @@ tests = describe "Experiment" $ do
     let set (i, b) x' = if b then Data.Bits.setBit x' i else x'
         expected = foldr set (0 :: Word) $ [(i, Data.Bits.testBit x i) | i <- [0 .. 1]]
     debugSolver (Prime 5) program [fromIntegral (x `mod` 4)] []
-    debug (Prime 5) program
+    -- debug (Prime 5) program
 
 -- debugSolver (Prime 5) program [fromIntegral (x `mod` 4)] []
 -- check (Binary 7) program [fromIntegral (x `mod` 4)] [] [fromIntegral expected]
