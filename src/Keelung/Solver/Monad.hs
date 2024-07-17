@@ -35,6 +35,7 @@ import Keelung.Data.U qualified as U
 import Keelung.Data.UnionFind qualified as UnionFind
 import Keelung.Data.UnionFind.Field qualified as Field
 import Keelung.Data.VarGroup
+import Keelung.Solver.BoolBinomial qualified as BoolBinomial
 import Keelung.Syntax
 import Keelung.Syntax.Counters
 
@@ -91,6 +92,7 @@ assignSegment msg (Segments xs) val = foldM_ bindSegment 0 xs
       return (offset + w)
 
 -- | Relate a variable to another variable: var1 = slope * var2 + intercept
+--   If both var1 and var2 are boolean variables, then we'll try to solve them out right with the BoolBinomial solver
 relate ::
   (GaloisField n, Integral n) =>
   String -> -- message for debugging
@@ -101,13 +103,23 @@ relate ::
   M n ()
 relate msg var1 slope var2 intercept = do
   context <- get
-  case Field.relate var1 var2 (Field.LinRel slope intercept) context of
-    Nothing -> return ()
-    Just context' -> do
-      tryLog $ LogRelate msg var1 slope var2 intercept
-      put context'
+  var1IsBoolean <- isBooleanVar var1
+  var2IsBoolean <- isBooleanVar var2
 
-  forM_ (Field.relate var1 var2 (Field.LinRel slope intercept) context) put
+  let solvedByBoolBinomial =
+        if var1IsBoolean && var2IsBoolean
+          then BoolBinomial.run (-1) slope intercept
+          else Nothing
+
+  case solvedByBoolBinomial of
+    Just (val1, val2) -> do
+      assign msg var1 (if val1 then 1 else 0)
+      assign msg var2 (if val2 then 1 else 0)
+    Nothing -> case Field.relate var1 var2 (Field.LinRel slope intercept) context of
+      Nothing -> return ()
+      Just context' -> do
+        tryLog $ LogRelate msg var1 slope var2 intercept
+        put context'
 
 -- | See if a variable is a Boolean variable
 isBooleanVar :: Var -> M n Bool
@@ -383,33 +395,9 @@ instance Functor Result where
 shrinkedOrStuck :: [Bool] -> a -> Result a
 shrinkedOrStuck changes r1c = if or changes then Shrinked r1c else Stuck r1c
 
-substAndView :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
-substAndView = substAndViewNew
-
--- substAndView context xs =
---   let old = substAndViewOld context xs
---       new = substAndViewNew context xs
---    in if old == new
---         then new
---         else trace ("\n  " <> show xs <> "\n    old => " <> show old <> "\n    new => " <> show new <> "\n    context =>\n" <> show context) new
-
 -- | Substitute varaibles with values or other variables in a polynomial
-substAndViewOld :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
-substAndViewOld context xs =
-  let (assignments, _roots) = Field.export context
-   in case Poly.substWithIntMap xs assignments of
-        (Left constant, _) -> Constant constant -- reduced to a constant
-        (Right poly, changed) ->
-          let (constant, xs') = Poly.view poly
-           in case IntMap.minViewWithKey xs' of
-                Nothing -> Constant constant -- reduced to a constant
-                Just ((var, coeff), xs'') ->
-                  if IntMap.null xs''
-                    then Uninomial changed poly constant (var, coeff)
-                    else Polynomial changed poly
-
-substAndViewNew :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
-substAndViewNew context xs =
+substAndView :: (GaloisField n, Integral n) => Field.UnionFind n -> Poly n -> PolyView n
+substAndView context xs =
   let (constant, variables, changed) = substPolyHelper context (Poly.view xs)
    in case Poly.buildWithIntMap constant variables of
         Left _ -> Constant constant -- reduced to a constant
