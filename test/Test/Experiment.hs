@@ -62,8 +62,27 @@ tests = describe "Experiment" $ do
 -- debug gf181 program
 
 -- check gf181 program [10, 3] [] [3]
-  it "PK inverse" $ do
-    testInversePK 0x00 0x00
+
+  describe "from (UInt 1) variable" $ do
+    let program = do
+          x <- input Public
+          -- h <- (freshVarUInt :: Comp (UInt 8)) >>= toField -- $6 - $13 and $2
+          m <- (freshVarUInt :: Comp (UInt 1)) >>= toField -- $5 and $3
+          assert $ 1 `eq` (x + m)
+          return x
+    it "GF181" $ do
+      -- check gf181 program [n] [] [(n + 1) `mod` 2]
+      debug gf181 program
+
+    -- it "Prime 2" $ do
+    --   forAll (chooseInteger (-10, 4)) $ \n -> do
+    --     check (Prime 2) program [n] [] [n `mod` 2]
+    -- it "Binary 7" $ do
+    --   forAll (chooseInteger (-10, 8)) $ \n -> do
+    --     check (Binary 7) program [n] [] [n `mod` 2]
+    
+  -- it "PK inverse" $ do
+  --   testInversePK 0x00 0x00
 
 testInversePK :: Integer -> Integer -> IO ()
 testInversePK inputs _expected = do
@@ -74,6 +93,8 @@ testInversePK inputs _expected = do
 pkField :: FieldType
 pkField = Binary 340282366920938463463374607431768211457
 
+-- | Inverse of a field element in PK
+--   Given a field element `x`, find `out` such that `x * out = 1`
 inversePK :: Field -> Comp Field
 inversePK x = do -- $1
   out <- freshVarField -- $0
