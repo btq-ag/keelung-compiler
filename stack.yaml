@@ -43,8 +43,9 @@ packages:
 extra-deps:
   - git: https://github.com/btq-ag/galois-field.git
     commit: d7d0da6b5df8045afdfb820ba8d08f34dc4c3e58
-  - git: https://github.com/btq-ag/keelung.git
-    commit: 87fcfd6596cece3406ee1339fa175335ca9f96cb
+  - ../keelung
+    #  - git: https://github.com/btq-ag/keelung.git
+    #    commit: 2cc69fcf6a982ae6dddda52db3ad15709b3e8f87
   - MonadRandom-0.5.3@sha256:bb553af2bac914362a54983e4ed2e0b6352c09b73a1e1e280ec4befe14c4270c,1456
   - mod-0.1.2.2@sha256:58bc3a1471bbbc55569bf61fd49b537c3e64b0a86dd79522ca1d7805400523ce,2248
   - poly-0.5.1.0@sha256:8c574f017913982fd70567545bec423823ff5bdf236c19d1443f3af47e0218ba,3418
