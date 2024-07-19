@@ -29,7 +29,7 @@ import Keelung.CircuitFormat hiding (WtnsBinHeader(..))
 import Keelung (FieldType(..))
 import Data.Int (Int64)
 import GHC.Num (integerLogBase)
-import Debug.Trace (traceShow)
+import Debug.Trace
 
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
@@ -63,13 +63,13 @@ serializeInputAndWitnessToBin p witnessVec =
       witnesses = toList witnessVec
       -- (_, witnesses) = splitAt outputAndPublicInputCount $ toList witnessVec
       -- Encode header (section 1) in little Endian style
-      primeBS = extendByteString primeLen $ integerToByteString p
+      primeBS = extendByteString (primeLen p) $ integerToByteString p
       header =
         toLazyByteString $
-          int32LE (fromIntegral primeLen)
+          int32LE (fromIntegral (primeLen p))
             <> lazyByteString primeBS
             <> int32LE (fromIntegral $ length witnesses)
-      wtnses = toLazyByteString $ mconcat (fitPrimeSize 1 : map (fitPrimeSize . mod p . fromIntegral) witnesses)
+      wtnses = toLazyByteString $ mconcat (fitPrimeSize p 1 : map (fitPrimeSize p . mod p . fromIntegral) witnesses)
    in meta
         <> BS.pack [0x01, 0x00, 0x00, 0x00]
         <> secLength header
@@ -147,15 +147,15 @@ serializeR1CS Snarkjs r1cs =
                 <> secLength labels
                 <> labels
   where
-    r1cConstraints = fmap (fmap toInteger . reindexR1C r1cs) (toR1Cs r1cs)
+    r1cConstraints = fmap (fmap toInteger) (toR1Cs r1cs)
     secLength = toLazyByteString . word64LE . fromIntegral . BS.length
+
+    genLabels :: Int -> Builder
+    genLabels n = mconcat $ map (word64LE . fromIntegral) [0 .. n]
 
     -- "r1cs, version 1, 3 sections"
     meta :: ByteString
     meta = pack [0x72, 0x31, 0x63, 0x73, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00]
-
-    genLabels :: Int -> Builder
-    genLabels n = mconcat $ map (word64LE . fromIntegral) [0 .. n]
 
 --------------------------------------------------------------------------------
 
@@ -166,7 +166,7 @@ serializeR1CS Snarkjs r1cs =
 --    2. then the negative indices (in decreasing order: -1, -2, ...)
 --    3. finally the positive indices (in increasing order)
 toAurora :: Seq (R1C Integer) -> [Encoding]
-toAurora r1cs = toList . (flip fmap) r1cs $ \(R1C a b c) ->
+toAurora r1cs = toList . flip fmap r1cs $ \(R1C a b c) ->
   pairs $
     pairStr "A" (encodeEitherConstPoly a)
       <> pairStr "B" (encodeEitherConstPoly b)
@@ -206,10 +206,10 @@ encodeHeader :: R1CSBinHeader -> (Int64, ByteString)
 encodeHeader (R1CSBinHeader p wires pubout pubin prvIn labels mcons) =
   -- FIX: Now assuming the length of prime is smaller than 32 bytes (e.g. bn128),
   --      should be calculated from the given prime (must be multiples of 8).
-  let primeBS = extendByteString primeLen $ integerToByteString p
-   in ( primeLen,
+  let primeBS = integerToByteString p
+   in ( primeLen p,
         toLazyByteString $
-          int32LE (fromIntegral primeLen)
+          int32LE (fromIntegral (primeLen p))
             <> lazyByteString primeBS
             <> word32LE (fromIntegral wires)
             <> word32LE (fromIntegral pubout)
@@ -227,7 +227,9 @@ toSnarkjsBin r1cs p =
     encodePoly (Left constant) =
       if constant == 0
         then word32LE 0
-        else word32LE 1 <> word32LE 0 <> fitPrimeSize constant
+        -- constant is 1? why? and length doesn't match?
+        else traceShow ("p: " <> show p <> ", constant: " <> show constant <> ", extended constant bytestring: " <> show (fitPrimeSize p constant)) $
+               word32LE 1 <> word32LE 0 <> fitPrimeSize p constant
     encodePoly (Right poly) =
       mconcat $
          -- Number of coefficients in this polynomial, adding one for the constant
@@ -236,35 +238,32 @@ toSnarkjsBin r1cs p =
            n ->
              [ word32LE (size + 1),
                word32LE 0,
-               fitPrimeSize n
+               fitPrimeSize p n
              ]
                <> body
       where size = fromIntegral $ IntMap.size (Poly.coeffs poly)
-            body = map coeffsToBuilder (IntMap.toAscList $ Poly.coeffs poly)
+            body = traceShowId $ traceShow ("poly: " <> show poly) $ map coeffsToBuilder (IntMap.toAscList $ Poly.coeffs poly)
 
     coeffsToBuilder :: (Int, Integer) -> Builder
-    coeffsToBuilder (k, c) = word32LE (fromIntegral (k + 1)) <> traceShow ("c :" <> show c <> ", p :" <> show p <> ", mod p c: " <> show (mod c p)) (fitPrimeSize (mod c p))
+    coeffsToBuilder (k, c) = word32LE (fromIntegral (k + 1)) <> fitPrimeSize p (mod c p)
 
-    toPrimeLE :: Integer -> Builder
-    toPrimeLE x = (lazyByteString . extendByteString primeLen) (BS.reverse $ integerToByteString x)
+primeLen :: Integer -> Int64
+primeLen x = BS.length $ integerToByteString x
 
-genLabels :: Int -> Builder
-genLabels n = mconcat $ map (word64LE . fromIntegral) [0 .. n]
+fitPrimeSize :: Integer -> Integer -> Builder
+fitPrimeSize p x = lazyByteString (extendByteString (primeLen p) (integerToByteString x))
 
 -- Make sure the coefficients are of the same length with the prime
 extendByteString :: Int64 -> ByteString -> ByteString
-extendByteString len bs = let diff = BS.length bs - len
-                           in bs <> BS.pack (replicate (fromIntegral diff) 0)
-
-fitPrimeSize :: Integer -> Builder
-fitPrimeSize x = (lazyByteString . extendByteString primeLen) (integerToByteString x)
-
-primeLen :: Int64
-primeLen = 32
+extendByteString len bs = let diff = len - BS.length bs
+                           in if diff > 0 then bs <> BS.pack (replicate (fromIntegral diff) 0)
+                                          else bs
 
 -- | Magic
 integerToByteString :: Integer -> ByteString
-integerToByteString p = BS.take (fromIntegral $ integerLogBase 256 p + 1) (B.encode p)
+integerToByteString i = let (d, r) = divMod i 256
+                         in if d == 0 then BS.singleton $ fromInteger r
+                            else BS.cons (fromInteger r) (integerToByteString d)
 
 --------------------------------------------------------------------------------
 
