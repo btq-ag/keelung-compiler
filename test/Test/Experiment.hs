@@ -65,13 +65,15 @@ tests = describe "Experiment" $ do
 
   describe "from (UInt 1) variable" $ do
     let program = do
-          x <- input Public
-          -- h <- (freshVarUInt :: Comp (UInt 8)) >>= toField -- $6 - $13 and $2
-          m <- (freshVarUInt :: Comp (UInt 1)) >>= toField -- $5 and $3
-          assert $ 1 `eq` (x + m)
-          return x
+          x <- input Public -- $1
+          h <- (freshVarUInt :: Comp (UInt 8)) >>= toField -- $5 - $12 and $2
+          m <- (freshVarUInt :: Comp (UInt 1)) >>= toField -- $4 and $3
+          -- assert $ 1 `eq` (x + m)
+          assert $ 1 `eq` (x + m + h)
+          return x -- $0
     it "GF181" $ do
       -- check gf181 program [n] [] [(n + 1) `mod` 2]
+      -- debugO0 gf181 program
       debug gf181 program
 
     -- it "Prime 2" $ do

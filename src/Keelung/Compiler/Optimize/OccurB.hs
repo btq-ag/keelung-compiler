@@ -27,7 +27,7 @@ instance Show OccurB where
     if null xs
       then ""
       else
-        "  OccurrencesB:\n  "
+        "  Occurrences of Boolean variables:\n  "
           <> indent
             ( showList'
                 ( map

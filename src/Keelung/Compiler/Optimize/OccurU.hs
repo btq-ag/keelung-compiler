@@ -30,6 +30,7 @@ import Keelung.Data.IntervalTable qualified as IntervalTable
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Prelude hiding (null)
+import qualified Data.List as List
 
 newtype OccurU = OccurU (IntMap (IntervalSet Int)) -- IntMap of (width, IntervalSet) pairs
   deriving (Eq, Generic)
@@ -38,24 +39,15 @@ instance NFData OccurU
 
 instance Show OccurU where
   show (OccurU xs) =
-    if null (OccurU xs)
-      then ""
-      else
-        "  OccurrencesU:\n"
-          <> indent
-            ( indent
-                ( unlines
-                    ( map
-                        ( \(width, intervalSet) ->
-                            "U"
-                              <> toSubscript width
-                              <> ": "
-                              <> show intervalSet
-                        )
-                        (IntMap.toList xs)
-                    )
+    let entries =
+          IntMap.toList xs
+            >>= ( \(width, intervalSet) ->
+                    let keys = IntMap.toList (IntervalSet.toIntMap intervalSet)
+                     in [ "U" <> toSubscript width <> show (start `div` width) <> ": " <> show occurrence | (start, (_length, occurrence)) <- keys]
                 )
-            )
+     in if List.null entries
+          then ""
+          else "  Occurrences of UInt variables:\n" <> indent (indent (showList' entries))
 
 -- | O(1). Construct an empty OccurU
 new :: OccurU
