@@ -68,7 +68,7 @@ runM options p = evalStateT p (Relations.new options)
 assign :: Ref -> GF181 -> M ()
 assign var val = do
   xs <- get
-  case runExcept (Relations.assignR var val xs) of
+  case runExcept (Relations.assignRef var val xs) of
     Left err -> error $ show (err :: Error GF181)
     Right Nothing -> return ()
     Right (Just result) -> put result
@@ -76,7 +76,7 @@ assign var val = do
 relate :: RefF -> (GF181, RefF, GF181) -> M ()
 relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (Relations.relateR (F var) slope (F val) intercept xs) of
+  case runExcept (Relations.relateRef (F var) slope (F val) intercept xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result

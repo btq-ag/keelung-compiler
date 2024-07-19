@@ -319,7 +319,7 @@ learnFromAdd poly = case PolyL.view poly of
     --    intercept + slope * var = 0
     --  =>
     --    var = - intercept / slope
-    assign var (-intercept / slope)
+    assignRef var (-intercept / slope)
     return True
   PolyL.RefBinomial intercept (var1, slope1) (var2, slope2) -> do
     --    intercept + slope1 * var1 + slope2 * var2 = 0
@@ -327,19 +327,19 @@ learnFromAdd poly = case PolyL.view poly of
     --    slope1 * var1 = - slope2 * var2 - intercept
     --  =>
     --    var1 = - slope2 * var2 / slope1 - intercept / slope1
-    relateF var1 (-slope2 / slope1, var2, -intercept / slope1)
+    relateRef var1 (-slope2 / slope1, var2, -intercept / slope1)
   PolyL.RefPolynomial _ _ -> return False
   PolyL.SliceMonomial constant (slice1, multiplier1) -> do
     --  constant + slice1 * multiplier1  = 0
     --    =>
     --  slice1 = - constant / multiplier1
-    assignS slice1 (toInteger (-constant / multiplier1))
+    assignSlice slice1 (toInteger (-constant / multiplier1))
     return True
   PolyL.SliceBinomial constant (slice1, multiplier1) (slice2, multiplier2) -> do
     if constant == 0 && multiplier1 == -multiplier2
       then do
         --  slice1 * multiplier1 = slice2 * multiplier2
-        relateS slice1 slice2
+        relateSlice slice1 slice2
       else return False
   PolyL.SlicePolynomial {} -> return False
   PolyL.MixedPolynomial {} -> return False
@@ -354,31 +354,23 @@ learnFromMul poly = do
       markChanged AdditiveFieldConstraintChanged
       modify' $ \cm' -> cm' {cmAddL = poly Seq.<| cmAddL cm'}
 
-assign :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
-assign (B var) value = do
+assignRef :: (GaloisField n, Integral n) => Ref -> n -> RoundM n ()
+assignRef var value = do
   cm <- get
-  result <- lift $ lift $ Relations.assignB var (value == 1) (cmRelations cm)
-  case result of
-    Nothing -> return ()
-    Just relations -> do
-      markChanged RelationChanged
-      put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
-assign (F var) value = do
-  cm <- get
-  result <- lift $ lift $ Relations.assignR (F var) value (cmRelations cm)
+  result <- lift $ lift $ Relations.assignRef var value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
       markChanged RelationChanged
       put $ removeOccurrences (Set.singleton var) $ cm {cmRelations = relations}
 
-assignS :: (GaloisField n, Integral n) => Slice -> Integer -> RoundM n ()
-assignS slice value = do
+assignSlice :: (GaloisField n, Integral n) => Slice -> Integer -> RoundM n ()
+assignSlice slice value = do
   cm <- get
   result <-
     lift $
       lift $
-        Relations.assignS slice value (cmRelations cm)
+        Relations.assignSlice slice value (cmRelations cm)
   case result of
     Nothing -> return ()
     Just relations -> do
@@ -386,10 +378,10 @@ assignS slice value = do
       put $ removeOccurrences (Set.singleton slice) $ cm {cmRelations = relations}
 
 -- | Relates two variables. Returns 'True' if a new relation has been established.
-relateF :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
-relateF var1 (slope, var2, intercept) = do
+relateRef :: (GaloisField n, Integral n) => Ref -> (n, Ref, n) -> RoundM n Bool
+relateRef var1 (slope, var2, intercept) = do
   cm <- get
-  result <- lift $ lift $ Relations.relateR var1 slope var2 intercept (cmRelations cm)
+  result <- lift $ lift $ Relations.relateRef var1 slope var2 intercept (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do
@@ -398,10 +390,10 @@ relateF var1 (slope, var2, intercept) = do
       return True
 
 -- | Relates two Slices. Returns 'True' if a new relation has been established.
-relateS :: (GaloisField n, Integral n) => Slice -> Slice -> RoundM n Bool
-relateS slice1 slice2 = do
+relateSlice :: (GaloisField n, Integral n) => Slice -> Slice -> RoundM n Bool
+relateSlice slice1 slice2 = do
   cm <- get
-  result <- lift $ lift $ Relations.relateS slice1 slice2 (cmRelations cm)
+  result <- lift $ lift $ Relations.relateSlice slice1 slice2 (cmRelations cm)
   case result of
     Nothing -> return False
     Just relations -> do
@@ -500,7 +492,7 @@ substRef ::
   Ref ->
   n ->
   (LC n, Maybe Changes)
-substRef relations (acc, changes) ref coeff = case Relations.lookup ref relations of
+substRef relations (acc, changes) ref coeff = case Relations.lookupRef ref relations of
   Relations.Root -> (acc <> coeff @ ref, changes) -- ref already a root, no need to substitute
   Relations.Constant intercept ->
     -- ref = intercept

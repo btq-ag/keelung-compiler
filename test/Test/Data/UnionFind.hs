@@ -266,7 +266,7 @@ instance Arbitrary (Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool) where
 applyRelate :: a -> Relate a var val -> a
 applyRelate xs (RelateVarField var1 var2 (slope, intercept)) = Maybe.fromMaybe xs (Field.relate var1 var2 (Field.LinRel slope intercept) xs)
 applyRelate xs (RelateVarBool var1 var2 relation) = Maybe.fromMaybe xs (UnionFind.relate var1 var2 (Boolean.Rel relation) xs)
-applyRelate xs (RelateRefField var1 var2 (slope, intercept)) = case runExcept (FieldRef.relateR var1 slope var2 intercept xs) of
+applyRelate xs (RelateRefField var1 var2 (slope, intercept)) = case runExcept (FieldRef.relate var1 slope var2 intercept xs) of
   Left err -> error (show err)
   Right (Just xs') -> xs'
   Right Nothing -> xs -- no-op
@@ -360,7 +360,7 @@ runM options p = evalStateT p (Relations.new options)
 assign :: (GaloisField n, Integral n) => Ref -> n -> M n ()
 assign var val = do
   xs <- get
-  case runExcept (Relations.assignR var val xs) of
+  case runExcept (Relations.assignRef var val xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result
@@ -368,7 +368,7 @@ assign var val = do
 relate :: (GaloisField n, Integral n) => RefF -> (n, RefF, n) -> M n ()
 relate var (slope, val, intercept) = do
   xs <- get
-  case runExcept (Relations.relateR (F var) slope (F val) intercept xs) of
+  case runExcept (Relations.relateRef (F var) slope (F val) intercept xs) of
     Left err -> error $ show err
     Right Nothing -> return ()
     Right (Just result) -> put result

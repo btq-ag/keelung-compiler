@@ -209,55 +209,55 @@ writeRefVal (B a) x = writeRefBVal a (x /= 0)
 
 -- | Assign a field element to a RefF
 writeRefFVal :: (GaloisField n, Integral n) => RefF -> n -> M n ()
-writeRefFVal x c = execRelations $ Relations.assignR (F x) c
+writeRefFVal x c = execRelations $ Relations.assignRef (F x) c
 
 -- | Assign a Bool to a RefB
 writeRefBVal :: (GaloisField n, Integral n) => RefB -> Bool -> M n ()
-writeRefBVal x True = execRelations $ Relations.assignR (B x) 1
-writeRefBVal x False = execRelations $ Relations.assignR (B x) 0
+writeRefBVal x True = execRelations $ Relations.assignRef (B x) 1
+writeRefBVal x False = execRelations $ Relations.assignRef (B x) 0
 
 -- | Assert that two RefBs are equal
 writeRefBEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeRefBEq x y = do
   addOccurrenceOnRefUBit (B x)
   addOccurrenceOnRefUBit (B y)
-  execRelations $ Relations.relateR (B x) 1 (B y) 0
+  execRelations $ Relations.relateRef (B x) 1 (B y) 0
 
 -- | Assert that two Refs are equal
 writeRefEq :: (GaloisField n, Integral n) => Ref -> Ref -> M n ()
 writeRefEq x y = do
   addOccurrenceOnRefUBit x
   addOccurrenceOnRefUBit y
-  execRelations $ Relations.relateR x 1 y 0
+  execRelations $ Relations.relateRef x 1 y 0
 
 -- | Assert that two RefFs are equal
 writeRefFEq :: (GaloisField n, Integral n) => RefF -> RefF -> M n ()
 writeRefFEq x y = do
   addOccurrenceOnRefUBit (F x)
   addOccurrenceOnRefUBit (F y)
-  execRelations $ Relations.relateR (F x) 1 (F y) 0
+  execRelations $ Relations.relateRef (F x) 1 (F y) 0
 
 -- | Assert that one RefB is the negation of another RefB
 writeRefBNEq :: (GaloisField n, Integral n) => RefB -> RefB -> M n ()
 writeRefBNEq x y = do
   addOccurrenceOnRefUBit (B x)
   addOccurrenceOnRefUBit (B y)
-  execRelations $ Relations.relateB x (False, y)
+  execRelations $ Relations.relateRefB x (False, y)
 
 -- | Assign a Integer to a RefU
 writeRefUVal :: (GaloisField n, Integral n) => RefU -> U -> M n ()
-writeRefUVal x c = execRelations $ Relations.assignS (Slice.fromRefU x) (toInteger c)
+writeRefUVal x c = execRelations $ Relations.assignSlice (Slice.fromRefU x) (toInteger c)
 
 -- | Assign an Integer to a Slice
 writeSliceVal :: (GaloisField n, Integral n) => Slice -> Integer -> M n ()
 writeSliceVal x c =
   if widthOf x == 0
     then return () -- no need to add a constraint for slices of width 0
-    else execRelations $ Relations.assignS x (toInteger c)
+    else execRelations $ Relations.assignSlice x (toInteger c)
 
 -- | Assert that two RefUs are equal
 writeRefUEq :: (GaloisField n, Integral n) => RefU -> RefU -> M n ()
-writeRefUEq x y = execRelations $ Relations.relateS (Slice.fromRefU x) (Slice.fromRefU y)
+writeRefUEq x y = execRelations $ Relations.relateSlice (Slice.fromRefU x) (Slice.fromRefU y)
 
 -- | Assert that two Slices are equal
 writeSliceEq :: (GaloisField n, Integral n) => Slice -> Slice -> M n ()
@@ -266,7 +266,7 @@ writeSliceEq x y =
     then
       if widthOf x == 0
         then return () -- no need to add a constraint for slices of width 0
-        else execRelations $ Relations.relateS x y
+        else execRelations $ Relations.relateSlice x y
     else error $ "[ panic ] writeSliceEq: width mismatch, " <> show (widthOf x) <> " /= " <> show (widthOf y)
 
 --------------------------------------------------------------------------------

@@ -4,20 +4,24 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
+-- | Manages the relations between variables and slices.
 module Keelung.Compiler.Relations
-  ( Relations (..),
+  ( -- * Construction
+    Relations (..),
     RelM,
     new,
-    assignR,
-    assignB,
-    assignS,
-    relateB,
-    -- relateL,
-    relateR,
-    relateS,
+
+    -- * Operations
+    assignRef,
+    assignSlice,
+    relateRef,
+    relateRefB,
+    relateSlice,
+
+    -- * Queries
     relationBetween,
     size,
-    lookup,
+    lookupRef,
     RefRelations.Lookup (..),
   )
 where
@@ -37,6 +41,8 @@ import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U qualified as U
 import Prelude hiding (lookup)
 
+--------------------------------------------------------------------------------
+
 data Relations n = Relations
   { relationsR :: RefRelations.RefRelations n,
     relationsS :: SliceRelations.SliceRelations,
@@ -49,11 +55,16 @@ instance (GaloisField n, Integral n) => Show (Relations n) where
     (if RefRelations.size refs == 0 then "" else show refs)
       <> (if SliceRelations.size slices == 0 then "" else show slices)
 
-updateRelationsR ::
+-- | Construct with Options.
+new :: Options -> Relations n
+new = Relations RefRelations.new SliceRelations.new
+
+-- | Helper function for updating the RefRelations.
+updateRefRelations ::
   (RefRelations.RefRelations n -> RelM n (Maybe (RefRelations.RefRelations n))) ->
   Relations n ->
   RelM n (Maybe (Relations n))
-updateRelationsR f xs = do
+updateRefRelations f xs = do
   result <- f (relationsR xs)
   case result of
     Nothing -> return Nothing
@@ -61,37 +72,36 @@ updateRelationsR f xs = do
 
 --------------------------------------------------------------------------------
 
-new :: Options -> Relations n
-new = Relations RefRelations.new SliceRelations.new
-
-assignR :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> RelM n (Maybe (Relations n))
-assignR var val relations = case var of
+-- | Assign a Ref to a constant value.
+assignRef :: (GaloisField n, Integral n) => Ref -> n -> Relations n -> RelM n (Maybe (Relations n))
+assignRef var val relations = case var of
   B (RefUBit refU i) ->
     if val == 0 || val == 1
-      then assignS (Slice.Slice refU i (i + 1)) (toInteger val) relations
+      then assignSlice (Slice.Slice refU i (i + 1)) (toInteger val) relations
       else throwError $ InvalidBooleanValue val
-  _ -> updateRelationsR (RefRelations.assign var val) relations
+  _ -> updateRefRelations (RefRelations.assign var val) relations
 
-assignB :: (GaloisField n, Integral n) => RefB -> Bool -> Relations n -> RelM n (Maybe (Relations n))
-assignB ref val = assignR (B ref) (if val then 1 else 0)
-
-assignS :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> RelM n (Maybe (Relations n))
-assignS slice int relations =
+-- | Assign a Slice to a constant value.
+assignSlice :: (GaloisField n, Integral n) => Slice -> Integer -> Relations n -> RelM n (Maybe (Relations n))
+assignSlice slice int relations =
   return $
     Just $
       relations
         { relationsS = SliceRelations.assign slice (U.new (Slice.sliceEnd slice - Slice.sliceStart slice) int) (relationsS relations)
         }
 
-relateB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> RelM n (Maybe (Relations n))
-relateB refA (polarity, refB) = updateRelationsR (RefRelations.relateB refA (polarity, refB))
+-- | Relate two Refs.
+--    var = slope * var2 + intercept
+relateRef :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> RelM n (Maybe (Relations n))
+relateRef x slope y intercept = updateRefRelations (RefRelations.relate x slope y intercept)
 
--- var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> Relations n -> RelM n (Maybe (Relations n))
-relateR x slope y intercept = updateRelationsR (RefRelations.relateR x slope y intercept)
+-- | Specialized version of `relateRef` for relating two RefBs.
+relateRefB :: (GaloisField n, Integral n) => (GaloisField n) => RefB -> (Bool, RefB) -> Relations n -> RelM n (Maybe (Relations n))
+relateRefB refA (polarity, refB) = updateRefRelations (RefRelations.relateB refA (polarity, refB))
 
-relateS :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> RelM n (Maybe (Relations n))
-relateS slice1 slice2 relations = do
+-- | Relate two Slices.
+relateSlice :: (GaloisField n, Integral n) => Slice -> Slice -> Relations n -> RelM n (Maybe (Relations n))
+relateSlice slice1 slice2 relations = do
   return $
     Just $
       relations
@@ -106,5 +116,5 @@ size (Relations refs slices _) = RefRelations.size refs + SliceRelations.size sl
 
 --------------------------------------------------------------------------------
 
-lookup :: (GaloisField n) => Ref -> Relations n -> RefRelations.Lookup n
-lookup var xs = RefRelations.lookup (relationsS xs) var (relationsR xs)
+lookupRef :: (GaloisField n) => Ref -> Relations n -> RefRelations.Lookup n
+lookupRef var xs = RefRelations.lookup (relationsS xs) var (relationsR xs)
