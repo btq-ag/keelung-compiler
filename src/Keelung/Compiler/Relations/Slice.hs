@@ -64,19 +64,10 @@ instance NFData SliceRelations
 instance Show SliceRelations where
   show (SliceRelations o i p x) =
     "UInt Relations:\n"
-      <> showMapping o
-      <> showMapping i
-      <> showMapping p
-      <> showMapping x
-    where
-      showMapping :: Mapping -> String
-      showMapping = indent . mconcat . map showVarMap . IntMap.elems . unMapping
-
-      showVarMap :: IntMap RefUSegments -> String
-      showVarMap varMap =
-        if IntMap.null varMap
-          then ""
-          else unlines (map show (IntMap.elems varMap))
+      <> show o
+      <> show i
+      <> show p
+      <> show x
 
 new :: SliceRelations
 new = SliceRelations (Mapping mempty) (Mapping mempty) (Mapping mempty) (Mapping mempty)
@@ -359,19 +350,13 @@ newtype Mapping = Mapping {unMapping :: IntMap (IntMap RefUSegments)}
 instance NFData Mapping
 
 instance Show Mapping where
-  show (Mapping xs) =
-    if IntMap.null xs
-      then "Mapping {}"
-      else
-        "Mapping {\n"
-          <> mconcat (map showVarMap (IntMap.elems xs))
-          <> "}"
+  show = indent . mconcat . map showVarMap . IntMap.elems . unMapping
     where
       showVarMap :: IntMap RefUSegments -> String
       showVarMap varMap =
         if IntMap.null varMap
           then ""
-          else unlines (map (\(_, slice) -> "    " <> show slice) (IntMap.toList varMap))
+          else unlines (IntMap.elems varMap >>= RefUSegments.formatRefUSegments)
 
 -- | Given a RefU, modify the RefUSegments referenced by the RefU
 --   Insert a new RefUSegments if it does not exist

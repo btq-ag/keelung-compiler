@@ -7,6 +7,7 @@
 module Keelung.Data.RefUSegments
   ( -- * Construction
     RefUSegments (RefUSegments),
+    formatRefUSegments,
     PartialRefUSegments (PartialRefUSegments),
     fromRefU,
     fromSegment,
@@ -39,6 +40,9 @@ import Control.DeepSeq (NFData)
 import Data.Bits qualified as Bits
 import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
+import Data.List qualified as List
+import Data.Map qualified as Map
+import Data.Set qualified as Set
 import GHC.Generics (Generic)
 import Keelung (HasWidth, widthOf)
 import Keelung.Data.Reference (RefU)
@@ -46,6 +50,7 @@ import Keelung.Data.Segment (Segment)
 import Keelung.Data.Segment qualified as Segment
 import Keelung.Data.Slice (Slice (..))
 import Keelung.Data.Slice qualified as Slice
+import Keelung.Syntax (Width)
 import Prelude hiding (map, null)
 import Prelude qualified
 
@@ -61,7 +66,32 @@ data RefUSegments = RefUSegments
 instance NFData RefUSegments
 
 instance Show RefUSegments where
-  show (RefUSegments ref segments) = show ref <> ": " <> show (IntMap.elems segments)
+  show = unlines . formatRefUSegments
+
+-- | For printing RefUSegments
+formatRefUSegments :: RefUSegments -> [String]
+formatRefUSegments (RefUSegments ref segments) =
+  IntMap.toList segments >>= \(start, segment) ->
+    let leftHandSide = padEnd8 (showRefU start (widthOf segment)) <> " = "
+     in case segment of -- showing only parents
+          Segment.Constant value -> [leftHandSide <> show value]
+          Segment.ChildOf _ -> []
+          Segment.ParentOf _ children ->
+            let childrenStrings = show <$> concatMap Set.toList (Map.elems children)
+             in case childrenStrings of
+                  [] -> []
+                  (x : xs) -> leftHandSide <> x : List.map ("           " <>) xs
+          _ -> []
+  where
+    padEnd8 :: String -> String
+    padEnd8 x = if length x < 8 then x ++ replicate (8 - length x) ' ' else x
+
+    showRefU :: Int -> Width -> String
+    showRefU start 1 = show ref <> "[" <> show start <> "]" -- Slice = a single bit
+    showRefU start width =
+      if start == 0 && width == widthOf ref
+        then show ref -- Slice = the whole ref
+        else show ref <> "[" <> show start <> ":" <> show (start + width) <> "]"
 
 instance HasWidth RefUSegments where
   widthOf (RefUSegments slice _) = widthOf slice
