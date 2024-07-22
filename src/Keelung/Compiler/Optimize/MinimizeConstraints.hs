@@ -328,6 +328,14 @@ learnFromAdd poly = case PolyL.view poly of
     --  =>
     --    var1 = - slope2 * var2 / slope1 - intercept / slope1
     relateRef var1 (-slope2 / slope1, var2, -intercept / slope1)
+  PolyL.RefBitBinomial constant (var1, coeff1) (bit2, coeff2) -> do
+    --   constant + var1 * coeff1 + bit2 * coeff2 = 0
+    --  =>
+    --   var1 * coeff1 = - bit2 * coeff2 - constant
+    --  =>
+    --   var1 = - bit2 * coeff2 / coeff1 - constant / coeff1
+    let bit = B (RefUBit (Slice.sliceRefU bit2) (Slice.sliceStart bit2))
+    relateRef var1 (-coeff2 / coeff1, bit, -constant / coeff1)
   PolyL.RefPolynomial _ _ -> return False
   PolyL.SliceMonomial constant (slice1, multiplier1) -> do
     --  constant + slice1 * multiplier1  = 0
