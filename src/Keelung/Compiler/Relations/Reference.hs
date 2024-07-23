@@ -57,9 +57,9 @@ instance (NFData n) => NFData (RefRelations n)
 
 -- | Instance for pretty-printing RefRelations with Galois fields as constant values
 instance {-# OVERLAPS #-} (KnownNat n) => Show (RefRelations (Prime n)) where
-  show (RefRelations relations) =
+  show (RefRelations refRels) =
     "Reference Relations\n"
-      <> mconcat (map (<> "\n") (concatMap toString (Map.toList relations)))
+      <> mconcat (map (<> "\n") (concatMap toString (Map.toList refRels)))
     where
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
@@ -71,9 +71,9 @@ instance {-# OVERLAPS #-} (KnownNat n) => Show (RefRelations (Prime n)) where
 
 -- | Instance for pretty-printing RefRelations with Galois fields as constant values
 instance {-# OVERLAPPING #-} (KnownNat n) => Show (RefRelations (Binary n)) where
-  show (RefRelations relations) =
+  show (RefRelations refRels) =
     "Reference Relations\n"
-      <> mconcat (map (<> "\n") (concatMap toString (Map.toList relations)))
+      <> mconcat (map (<> "\n") (concatMap toString (Map.toList refRels)))
     where
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
@@ -84,9 +84,9 @@ instance {-# OVERLAPPING #-} (KnownNat n) => Show (RefRelations (Binary n)) wher
       toString (_var, IsChildOf _parent _relation) = []
 
 instance (GaloisField n, Integral n) => Show (RefRelations n) where
-  show (RefRelations relations) =
+  show (RefRelations refRels) =
     "Reference Relations\n"
-      <> mconcat (map (<> "\n") (concatMap toString (Map.toList relations)))
+      <> mconcat (map (<> "\n") (concatMap toString (Map.toList refRels)))
     where
       showVar var = let varString = show var in "  " <> varString <> replicate (8 - length varString) ' '
 
@@ -103,10 +103,10 @@ new = RefRelations mempty
 --------------------------------------------------------------------------------
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> RelM n (Maybe (RefRelations n))
-assign var value (RefRelations relations) = case Map.lookup var relations of
+assign :: (GaloisField n, Integral n) => Ref -> n -> RefRelations n -> SliceRelations -> RelM n (Maybe (RefRelations n))
+assign var value (RefRelations refRels) sliceRels = case Map.lookup var refRels of
   -- The variable is not in the map, so we add it as a constant
-  Nothing -> return $ Just $ RefRelations $ Map.insert var (IsConstant value) relations
+  Nothing -> return $ Just $ RefRelations $ Map.insert var (IsConstant value) refRels
   -- The variable is already a constant, so we check if the value is the same
   Just (IsConstant oldValue) ->
     if oldValue == value
@@ -130,57 +130,57 @@ assign var value (RefRelations relations) = case Map.lookup var relations of
                   (IsConstant (execLinRel relationToChild value))
                   rels
             )
-            (Map.insert var (IsConstant value) relations)
+            (Map.insert var (IsConstant value) refRels)
             (Map.toList toChildren)
   -- The variable is already a child of another variable, so we:
   --    1. Make the parent a constant (by calling `assign` recursively)
   -- child = relation parent
   -- =>
   -- parent = relation^-1 child
-  Just (IsChildOf parent relationToChild) -> assign parent (execLinRel (invertLinRel relationToChild) value) (RefRelations relations)
+  Just (IsChildOf parent relationToChild) -> assign parent (execLinRel (invertLinRel relationToChild) value) (RefRelations refRels) sliceRels
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relateWithLinRel :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> RelM n (Maybe (RefRelations n))
-relateWithLinRel a relation b relations = relateWithLookup (a, lookupInternal a relations) relation (b, lookupInternal b relations) relations
+relateWithLinRel :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> SliceRelations -> RelM n (Maybe (RefRelations n))
+relateWithLinRel a relation b refRels sliceRels = relateWithLookup (a, lookupInternal a refRels sliceRels) relation (b, lookupInternal b refRels sliceRels) refRels sliceRels
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relateWithLookup :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> RelM n (Maybe (RefRelations n))
-relateWithLookup (a, aLookup) relation (b, bLookup) relations =
+relateWithLookup :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> SliceRelations -> RelM n (Maybe (RefRelations n))
+relateWithLookup (a, aLookup) relation (b, bLookup) refRels sliceRels =
   if a == b -- if the variables are the same, do nothing and return the original relations
     then return Nothing
     else case compareSeniority a b of
-      LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
-      GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
+      LT -> relateChildToParent (a, aLookup) relation (b, bLookup) refRels sliceRels
+      GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) refRels sliceRels
       EQ -> case compare (childrenSizeOf aLookup) (childrenSizeOf bLookup) of
-        LT -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
-        GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) relations
-        EQ -> relateChildToParent (a, aLookup) relation (b, bLookup) relations
+        LT -> relateChildToParent (a, aLookup) relation (b, bLookup) refRels sliceRels
+        GT -> relateChildToParent (b, bLookup) (invertLinRel relation) (a, aLookup) refRels sliceRels
+        EQ -> relateChildToParent (a, aLookup) relation (b, bLookup) refRels sliceRels
         where
           childrenSizeOf :: VarStatus n -> Int
           childrenSizeOf (IsRoot children) = Map.size children
           childrenSizeOf (IsConstant _) = 0
-          childrenSizeOf (IsChildOf parent _) = childrenSizeOf (lookupInternal parent relations)
+          childrenSizeOf (IsChildOf parent _) = childrenSizeOf (lookupInternal parent refRels sliceRels)
 
 -- | Specialized version of `relateWithLinRel` for relating a variable to a constant
 --    var = slope * var2 + intercept
-relate :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> RelM n (Maybe (RefRelations n))
+relate :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> SliceRelations -> RelM n (Maybe (RefRelations n))
 relate x slope y intercept = relateWithLinRel x (LinRel slope intercept) y
 
 -- | Specialized version of `relateWithLinRel` for relating Boolean variables
-relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> RelM n (Maybe (RefRelations n))
+relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> SliceRelations -> RelM n (Maybe (RefRelations n))
 relateB refA (polarity, refB) = relateWithLinRel (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB)
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
-relateChildToParent :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> RelM n (Maybe (RefRelations n))
-relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) relations =
+relateChildToParent :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> SliceRelations -> RelM n (Maybe (RefRelations n))
+relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) refRels sliceRels =
   if child == parent
     then return Nothing -- no-op
     else case parentLookup of
       -- The parent is a constant, so we make the child a constant:
       --    * for the parent: do nothing
       --    * for the child: assign it the value of the parent with `relationToChild` applied
-      IsConstant value -> assign child (execLinRel relationToChild value) relations
+      IsConstant value -> assign child (execLinRel relationToChild value) refRels sliceRels
       -- The parent has other children
       IsRoot children -> case childLookup of
         -- The child also has its grandchildren, so we relate all these grandchildren to the parent, too:
@@ -198,13 +198,13 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
                     Map.foldlWithKey' -- point the grandchildren to the new parent
                       ( \rels grandchild relationToGrandChild -> Map.insert grandchild (IsChildOf parent (relationToChild <> relationToGrandChild)) rels
                       )
-                      (unRefRelations relations)
+                      (unRefRelations refRels)
                       toGrandChildren
         --
         -- The child is a constant, so we make the parent a constant, too:
         --  * for the parent: assign it the value of the child with the inverted relation applied
         --  * for the child: do nothing
-        IsConstant value -> assign parent (execLinRel (invertLinRel relationToChild) value) relations
+        IsConstant value -> assign parent (execLinRel (invertLinRel relationToChild) value) refRels sliceRels
         -- The child is already a child of another variable `parent2`:
         --    * for the another variable `parent2`: point `parent2` to `parent` with `invertLinRel parent2ToChild <> relationToChild`
         --    * for the parent: add the child and `parent2` to the children map
@@ -216,27 +216,27 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
             -- child = parent2ToChild parent2
             --    => parent = (invertLinRel relationToChild <> parent2ToChild) parent2
             --    or parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
-              relateWithLookup (parent, parentLookup) (invertLinRel relationToChild <> parent2ToChild) (parent2, lookupInternal parent2 relations) relations
+              relateWithLookup (parent, parentLookup) (invertLinRel relationToChild <> parent2ToChild) (parent2, lookupInternal parent2 refRels sliceRels) refRels sliceRels
             else do
               --
               -- child = relationToChild parent
               -- child = parent2ToChild parent2
               --    => parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
               --    or parent = (invertLinRel relationToChild <> parent2ToChild) parent2
-              relateWithLookup (parent2, lookupInternal parent2 relations) (invertLinRel parent2ToChild <> relationToChild) (parent, parentLookup) $
-                RefRelations $
+              relateWithLookup (parent2, lookupInternal parent2 refRels sliceRels) (invertLinRel parent2ToChild <> relationToChild) (parent, parentLookup)
+                (RefRelations $
                   Map.insert child (IsChildOf parent relationToChild) $
-                    unRefRelations relations
+                    unRefRelations refRels) sliceRels
 
       -- The parent is a child of another variable, so we relate the child to the grandparent instead
-      IsChildOf grandparent relationFromGrandparent -> relateWithLookup (child, childLookup) (relationToChild <> relationFromGrandparent) (grandparent, lookupInternal grandparent relations) relations
+      IsChildOf grandparent relationFromGrandparent -> relateWithLookup (child, childLookup) (relationToChild <> relationFromGrandparent) (grandparent, lookupInternal grandparent refRels sliceRels) refRels sliceRels
 
 --------------------------------------------------------------------------------
 
 -- | Calculates the relation between two variables, O(lg n)
-relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> RefRelations n -> Maybe (n, n)
-relationBetween var1 var2 xs =
-  fromLinRel <$> case (lookupInternal var1 xs, lookupInternal var2 xs) of
+relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> RefRelations n -> SliceRelations -> Maybe (n, n)
+relationBetween var1 var2 refRels sliceRels =
+  fromLinRel <$> case (lookupInternal var1 refRels sliceRels, lookupInternal var2 refRels sliceRels) of
     (IsConstant _, _) -> Nothing
     (_, IsConstant _) -> Nothing
     (IsRoot _, IsRoot _) ->
@@ -297,18 +297,18 @@ size = Map.size . unRefRelations
 
 -- | A Reference is valid if:
 --          1. all children of a parent recognize the parent as their parent
-isValid :: (GaloisField n, Integral n) => RefRelations n -> Bool
-isValid relations = allChildrenRecognizeTheirParent relations && rootsAreSenior relations
+isValid :: (GaloisField n, Integral n) => RefRelations n -> SliceRelations -> Bool
+isValid refRels sliceRels = allChildrenRecognizeTheirParent refRels sliceRels && rootsAreSenior refRels
 
 -- | A Reference is valid if all children of a parent recognize the parent as their parent
-allChildrenRecognizeTheirParent :: (GaloisField n, Integral n) => RefRelations n -> Bool
-allChildrenRecognizeTheirParent relations =
-  let families = Map.mapMaybe isParent (unRefRelations relations)
+allChildrenRecognizeTheirParent :: (GaloisField n, Integral n) => RefRelations n -> SliceRelations -> Bool
+allChildrenRecognizeTheirParent refRels sliceRels =
+  let families = Map.mapMaybe isParent (unRefRelations refRels)
 
       isParent (IsRoot children) = Just children
       isParent _ = Nothing
 
-      recognizeParent parent child relation = case lookupInternal child relations of
+      recognizeParent parent child relation = case lookupInternal child refRels sliceRels of
         IsChildOf parent' relation' -> parent == parent' && relation == relation'
         _ -> False
       childrenAllRecognizeParent parent = and . Map.elems . Map.mapWithKey (recognizeParent parent)
@@ -337,8 +337,8 @@ data VarStatus n
 instance (NFData n) => NFData (VarStatus n)
 
 -- | Returns the result of looking up a variable, O(lg n)
-lookupInternal :: Ref -> RefRelations n -> VarStatus n
-lookupInternal var (RefRelations relations) = case Map.lookup var relations of
+lookupInternal :: Ref -> RefRelations n -> SliceRelations -> VarStatus n
+lookupInternal var (RefRelations refRels) _sliceRels = case Map.lookup var refRels of
   Nothing -> IsRoot mempty
   Just result -> result
 
@@ -349,20 +349,20 @@ data Lookup n = Root | Constant n | ChildOf n Ref n
   deriving (Eq, Show)
 
 lookup :: (GaloisField n) => SliceRelations -> Ref -> RefRelations n -> Lookup n
-lookup relationsS (B (RefUBit refU index)) relationsR =
+lookup sliceRels (B (RefUBit refU index)) refRels =
   let -- look in the SliceRelations first
-      lookupSliceRelations = case SliceRelations.refUSegmentsRefUBit refU index relationsS of
+      lookupSliceRelations = case SliceRelations.refUSegmentsRefUBit refU index sliceRels of
         Nothing -> lookupRefRelations
         Just (Left (parent, index')) -> ChildOf 1 (B (RefUBit parent index')) 0
         Just (Right bitVal) -> Constant (if bitVal then 1 else 0)
       -- look in the RefRelations later if we cannot find any result in the SliceRelations
-      lookupRefRelations = case lookupInternal (B (RefUBit refU index)) relationsR of
+      lookupRefRelations = case lookupInternal (B (RefUBit refU index)) refRels sliceRels of
         IsConstant value -> Constant value
         IsRoot _ -> Root
         IsChildOf parent (LinRel a b) -> ChildOf a parent b
    in lookupSliceRelations
-lookup _ var relations =
-  case lookupInternal var relations of
+lookup sliceRels var refRels =
+  case lookupInternal var refRels sliceRels of
     IsConstant value -> Constant value
     IsRoot _ -> Root
     IsChildOf parent (LinRel a b) -> ChildOf a parent b

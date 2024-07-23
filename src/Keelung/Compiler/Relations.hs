@@ -61,11 +61,11 @@ new = Relations RefRelations.new SliceRelations.new
 
 -- | Helper function for updating the RefRelations.
 updateRefRelations ::
-  (RefRelations.RefRelations n -> RelM n (Maybe (RefRelations.RefRelations n))) ->
+  (RefRelations.RefRelations n -> SliceRelations.SliceRelations -> RelM n (Maybe (RefRelations.RefRelations n))) ->
   Relations n ->
   RelM n (Maybe (Relations n))
 updateRefRelations f xs = do
-  result <- f (relationsR xs)
+  result <- f (relationsR xs) (relationsS xs)
   case result of
     Nothing -> return Nothing
     Just relations -> return $ Just $ xs {relationsR = relations}
@@ -109,7 +109,7 @@ relateSlice slice1 slice2 relations = do
         }
 
 relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> Maybe (n, n)
-relationBetween var1 var2 = RefRelations.relationBetween var1 var2 . relationsR
+relationBetween var1 var2 relations = RefRelations.relationBetween var1 var2 (relationsR relations) (relationsS relations)
 
 size :: Relations n -> Int
 size (Relations refs slices _) = RefRelations.size refs + SliceRelations.size slices

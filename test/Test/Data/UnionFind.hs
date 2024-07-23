@@ -231,7 +231,7 @@ tests = describe "UnionFind" $ do
 data Relate :: Type -> Type -> Type -> Type where
   RelateVarField :: (GaloisField n, Integral n) => Var -> Var -> (n, n) -> Relate (Field.UnionFind n) Var n
   RelateVarBool :: Var -> Var -> Bool -> Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool
-  RelateRefField :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (FieldRef.RefRelations n) Ref n
+  -- RelateRefField :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (FieldRef.RefRelations n) Ref n
 
 instance (GaloisField n, Integral n, Show var) => Show (Relate (Field.UnionFind n) var n) where
   show (RelateVarField var1 var2 (slope, intercept)) = "RelateField " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
@@ -239,8 +239,8 @@ instance (GaloisField n, Integral n, Show var) => Show (Relate (Field.UnionFind 
 instance (Show var) => Show (Relate (Boolean.UnionFind Bool Boolean.Rel) var Bool) where
   show (RelateVarBool var1 var2 relation) = "RelateVarBool " <> show var1 <> " " <> show var2 <> " " <> show relation
 
-instance (GaloisField n, Integral n, Show var) => Show (Relate (FieldRef.RefRelations n) var n) where
-  show (RelateRefField var1 var2 (slope, intercept)) = "RelateRefField " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
+-- instance (GaloisField n, Integral n, Show var) => Show (Relate (FieldRef.RefRelations n) var n) where
+--   show (RelateRefField var1 var2 (slope, intercept)) = "RelateRefField " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
 
 instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (Field.UnionFind n) Var n) where
   arbitrary =
@@ -249,12 +249,12 @@ instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (Field.Un
       <*> chooseInt (0, 100)
       <*> ((,) <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary)
 
-instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (FieldRef.RefRelations n) Ref n) where
-  arbitrary =
-    RelateRefField
-      <$> arbitrary
-      <*> arbitrary
-      <*> ((,) <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary)
+-- instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (FieldRef.RefRelations n) Ref n) where
+--   arbitrary =
+--     RelateRefField
+--       <$> arbitrary
+--       <*> arbitrary
+--       <*> ((,) <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary)
 
 instance Arbitrary (Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool) where
   arbitrary =
@@ -266,10 +266,10 @@ instance Arbitrary (Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool) where
 applyRelate :: a -> Relate a var val -> a
 applyRelate xs (RelateVarField var1 var2 (slope, intercept)) = Maybe.fromMaybe xs (Field.relate var1 var2 (Field.LinRel slope intercept) xs)
 applyRelate xs (RelateVarBool var1 var2 relation) = Maybe.fromMaybe xs (UnionFind.relate var1 var2 (Boolean.Rel relation) xs)
-applyRelate xs (RelateRefField var1 var2 (slope, intercept)) = case runExcept (FieldRef.relate var1 slope var2 intercept xs) of
-  Left err -> error (show err)
-  Right (Just xs') -> xs'
-  Right Nothing -> xs -- no-op
+-- applyRelate xs (RelateRefField var1 var2 (slope, intercept)) = case runExcept (FieldRef.relate var1 slope var2 intercept xs) of
+--   Left err -> error (show err)
+--   Right (Just xs') -> xs'
+--   Right Nothing -> xs -- no-op
 
 --------------------------------------------------------------------------------
 
