@@ -387,7 +387,7 @@ newtype FamilyLookup = FamilyLookup [[Slice]] -- the equivalence class of each s
 
 -- | Given a Slice and its corresponding Segment, return all member Slices of the equivalence class of that Slice
 --   so that we can, for example, assign a value to all members of the equivalence class
---   or relate then to another Slice
+--   or relate them to another Slice
 familySlicesOfSliceSegmentPair :: SliceRelations -> SliceSegmentPair -> [Slice]
 familySlicesOfSliceSegmentPair relations (slice, segment) = case segment of
   Segment.Constant _ -> []
