@@ -28,7 +28,6 @@ import Keelung.Syntax.Counters
 import Keelung.CircuitFormat hiding (WtnsBinHeader(..))
 import Keelung (FieldType(..))
 import Data.Int (Int64)
-import GHC.Num (integerLogBase)
 import Debug.Trace
 
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
@@ -68,8 +67,11 @@ serializeInputAndWitnessToBin p witnessVec =
         toLazyByteString $
           int32LE (fromIntegral (primeLen p))
             <> lazyByteString primeBS
-            <> int32LE (fromIntegral $ length witnesses)
-      wtnses = toLazyByteString $ mconcat (fitPrimeSize p 1 : map (fitPrimeSize p . mod p . fromIntegral) witnesses)
+            <> int32LE (fromIntegral $ length witnesses + 1)
+      wtnses = toLazyByteString $ mconcat (fitPrimeSize p 1 : map (fitPrimeSize p . toInteger) witnesses)
+      -- "wtns, version 2, 2 sections"
+      meta :: ByteString
+      meta = BS.pack [0x77, 0x74, 0x6e, 0x73, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]
    in meta
         <> BS.pack [0x01, 0x00, 0x00, 0x00]
         <> secLength header
@@ -79,9 +81,6 @@ serializeInputAndWitnessToBin p witnessVec =
         <> wtnses
   where
     secLength = toLazyByteString . word64LE . fromIntegral . BS.length
-    -- "wtns, version 2, 2 sections"
-    meta :: ByteString
-    meta = BS.pack [0x77, 0x74, 0x6e, 0x73, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00]
 --------------------------------------------------------------------------------
 
 -- | Encodes a R1CS in the JSON Lines text file format
