@@ -11,7 +11,6 @@ import Data.Aeson.Encoding
 import Data.ByteString.Lazy (ByteString, pack)
 import Data.ByteString.Lazy qualified as BS
 import Data.ByteString.Builder
-import Data.Binary qualified as B
 import Data.Sequence (Seq)
 import Data.Field.Galois (GaloisField)
 import Data.Foldable (Foldable (toList))
