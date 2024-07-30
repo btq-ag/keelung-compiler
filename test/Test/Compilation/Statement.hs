@@ -31,6 +31,7 @@ tests = describe "Statement" $ do
       it "Binary 7" $ do
         forAll (chooseInteger (-10, 8)) $ \n -> do
           check (Binary 7) program [n] [] [n `mod` 4]
+
     describe "from constant" $ do
       let program n = toField (n :: UInt 8)
       it "GF181" $ do

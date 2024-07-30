@@ -37,7 +37,7 @@ instance Show OccurF where
     if null xs
       then ""
       else
-        "  OccurrencesF:\n  "
+        "  Occurrences of Field variables:\n  "
           <> indent
             ( showList'
                 ( map

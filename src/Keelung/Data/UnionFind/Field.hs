@@ -75,7 +75,7 @@ instance (Ord n) => Ord (Wrapper n) where
 export ::
   UnionFind n ->
   ( IntMap n, -- constants
-    IntMap (IntMap (n, n)) -- families
+    IntMap (UnionFind.Range (Wrapper n), IntMap (n, n)) -- families
   )
 export (UnionFind.UnionFind relations) = (constants, roots)
   where
@@ -85,17 +85,23 @@ export (UnionFind.UnionFind relations) = (constants, roots)
     toConstant (UnionFind.IsConstant (Wrapper value)) = Just value
     toConstant _ = Nothing
 
-    toRoot (UnionFind.IsRoot _ children) = Just $ IntMap.map fromLinRel children
+    toRoot (UnionFind.IsRoot range children) = Just (range, IntMap.map fromLinRel children)
     toRoot _ = Nothing
 
 -- | Helper function to render the families resulted from `export`
-renderFamilies :: (GaloisField n, Integral n) => IntMap (IntMap (n, n)) -> String
+renderFamilies :: (GaloisField n, Integral n) => IntMap (UnionFind.Range (Wrapper n), IntMap (n, n)) -> String
 renderFamilies families = mconcat (map (<> "\n") (concatMap toString (IntMap.toList families)))
   where
-    showVar var = let varString = "$" <> show var in "  " <> varString <> replicate (8 - length varString) ' '
-    toString (root, toChildren) = case map (uncurry Relation.renderWithVar) (IntMap.toList (fmap (uncurry LinRel) toChildren)) of
-      [] -> [showVar root <> " = []"] -- should never happen
-      (x : xs) -> showVar root <> " = " <> x : map ("           = " <>) xs
+    showVar range var =
+      let rangeString = case range of 
+            UnionFind.Range Nothing -> ""
+            UnionFind.Range (Just (Wrapper 0, Wrapper 2)) -> " Bool"
+            UnionFind.Range (Just (Wrapper l, Wrapper u)) -> "[" <> show l <> ", " <> show u <> ")"
+          varString = "$" <> show var <> rangeString
+       in "  " <> varString <> replicate (8 - length varString) ' '
+    toString (root, (range, toChildren)) = case map (uncurry Relation.renderWithVar) (IntMap.toList (fmap (uncurry LinRel) toChildren)) of
+      [] -> [showVar range root <> " = []"] -- should never happen
+      (x : xs) -> showVar range root <> " = " <> x : map ("           = " <>) xs
 
 --------------------------------------------------------------------------------
 

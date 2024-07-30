@@ -39,6 +39,7 @@ import Data.Map.Strict qualified as Map
 import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
+import Keelung (widthOf)
 import Keelung.Data.IntervalSet qualified as IntervalSet
 import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
@@ -160,6 +161,10 @@ negate (PolyL c rs sp) = PolyL (-c) (fmap Prelude.negate rs) (SlicePoly.multiply
 data View n
   = RefMonomial n (Ref, n)
   | RefBinomial n (Ref, n) (Ref, n)
+  | RefBitBinomial
+      n
+      (Ref, n)
+      (Slice, n) -- 1-bit width Slice
   | RefPolynomial n (Map Ref n)
   | SliceMonomial n (Slice, n)
   | SliceBinomial n (Slice, n) (Slice, n)
@@ -176,8 +181,13 @@ view (PolyL constant refs slicePoly) =
         ([], []) -> error "[ panic ] PolyL.view: empty"
         ([], [slice1, slice2]) -> SliceBinomial constant slice1 slice2
         ([], _) -> SlicePolynomial constant slices
-        ([term], []) -> RefMonomial constant term
-        ([term1, term2], []) -> RefBinomial constant term1 term2
+        ([ref1], []) -> RefMonomial constant ref1
+        ([ref1, ref2], []) -> RefBinomial constant ref1 ref2
+        ([ref1], [(slice1, coeff1)]) ->
+          -- see if the slice is a single bit
+          if widthOf slice1 == 1
+            then RefBitBinomial constant ref1 (slice1, coeff1)
+            else MixedPolynomial constant refs slices
         (_, []) -> RefPolynomial constant refs
         _ -> MixedPolynomial constant refs slices
 

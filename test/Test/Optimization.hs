@@ -94,7 +94,7 @@ tests = do
         assertCountO0 gf181 program 1
         assertCount gf181 program 1
         cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
-        Relations.lookup (F $ RefFO 0) (cmRelations cm) `shouldBe` Relations.Constant 8
+        Relations.lookupRef (F $ RefFO 0) (cmRelations cm) `shouldBe` Relations.Constant 8
 
       it "Field 5" $ do
         let program = do

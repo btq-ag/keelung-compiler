@@ -85,9 +85,9 @@ instance (GaloisField n, Integral n) => Show (ConstraintModule n) where
       <> showDivModHints
       <> showCLDivModHints
       <> showModInvHints
-      -- <> show (cmOccurrenceF cm)
-      -- <> show (cmOccurrenceB cm)
-      -- <> show (cmOccurrenceU cm)
+      <> show (cmOccurrenceF cm)
+      <> show (cmOccurrenceB cm)
+      <> show (cmOccurrenceU cm)
       <> prettyVariables (cmCounters cm)
       <> "}"
     where

@@ -12,7 +12,7 @@ module Keelung.Compiler.Relations.Reference
 
     -- * Operations
     assign,
-    relateR,
+    relate,
     relateB,
 
     -- * Conversions,
@@ -140,8 +140,8 @@ assign var value (RefRelations relations) = case Map.lookup var relations of
   Just (IsChildOf parent relationToChild) -> assign parent (execLinRel (invertLinRel relationToChild) value) (RefRelations relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> RelM n (Maybe (RefRelations n))
-relate a relation b relations = relateWithLookup (a, lookupInternal a relations) relation (b, lookupInternal b relations) relations
+relateWithLinRel :: (GaloisField n, Integral n) => Ref -> LinRel n -> Ref -> RefRelations n -> RelM n (Maybe (RefRelations n))
+relateWithLinRel a relation b relations = relateWithLookup (a, lookupInternal a relations) relation (b, lookupInternal b relations) relations
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
 relateWithLookup :: (GaloisField n, Integral n) => (Ref, VarStatus n) -> LinRel n -> (Ref, VarStatus n) -> RefRelations n -> RelM n (Maybe (RefRelations n))
@@ -161,14 +161,14 @@ relateWithLookup (a, aLookup) relation (b, bLookup) relations =
           childrenSizeOf (IsConstant _) = 0
           childrenSizeOf (IsChildOf parent _) = childrenSizeOf (lookupInternal parent relations)
 
--- | Specialized version of `relate` for relating a variable to a constant
+-- | Specialized version of `relateWithLinRel` for relating a variable to a constant
 --    var = slope * var2 + intercept
-relateR :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> RelM n (Maybe (RefRelations n))
-relateR x slope y intercept = relate x (LinRel slope intercept) y
+relate :: (GaloisField n, Integral n) => Ref -> n -> Ref -> n -> RefRelations n -> RelM n (Maybe (RefRelations n))
+relate x slope y intercept = relateWithLinRel x (LinRel slope intercept) y
 
--- | Specialized version of `relate` for relating Boolean variables
+-- | Specialized version of `relateWithLinRel` for relating Boolean variables
 relateB :: (GaloisField n, Integral n) => RefB -> (Bool, RefB) -> RefRelations n -> RelM n (Maybe (RefRelations n))
-relateB refA (polarity, refB) = relate (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB)
+relateB refA (polarity, refB) = relateWithLinRel (B refA) (if polarity then LinRel 1 0 else LinRel (-1) 1) (B refB)
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent

@@ -35,6 +35,7 @@ import Keelung.Solver.BinRep qualified as BinRep
 import Keelung.Solver.Binary qualified as Binary
 import Keelung.Solver.Monad
 import Keelung.Syntax.Counters
+-- import Debug.Trace
 
 -- | Execute the R1CS solver
 run :: (GaloisField n, Integral n) => Options -> R1CS n -> Inputs n -> Either (Error n) (Vector n, Vector n)
@@ -237,14 +238,14 @@ shrinkAddBySubst xs = do
     Constant c -> eliminateIfHold c 0
     Uninomial _ _ c (var, coeff) -> do
       -- c + coeff var = 0
-      assign "add" var (-c / coeff)
+      assign "add uni" var (-c / coeff)
       return Eliminated
     Polynomial changed xs' -> case viewBinomial changed xs' of
       Just (Binomial _ _ c (x, a) (y, b)) -> do
         -- c + a x + b y = 0
         --    =>
         -- x = (-b / a) y + (-c / a)
-        relate "add" x (-b / a) y (-c / a)
+        relate "add poly" x (-b / a) y (-c / a)
         return $ shrinkedOrStuck [changed] xs'
       Nothing ->
         return $ shrinkedOrStuck [changed] xs'

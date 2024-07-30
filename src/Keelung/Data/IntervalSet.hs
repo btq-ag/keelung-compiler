@@ -28,6 +28,7 @@ module Keelung.Data.IntervalSet
     null,
     lookup,
     member,
+    toIntMap,
     Error (..),
     validate,
     isValid,
@@ -140,6 +141,10 @@ member :: (Eq n, Num n) => IntervalSet n -> Int -> Bool
 member (IntervalSet xs) x = case IntMap.lookupLE x xs of
   Nothing -> False
   Just (_, (end, count)) -> x < end && count /= 0
+
+-- | O(n): Return an IntMap representation of the interval set
+toIntMap :: IntervalSet n -> IntMap (Int, n)
+toIntMap (IntervalSet xs) = xs
 
 -- | Given an interval, return a list of intervals that occurred (i.e. count /= 0) in this interval
 intervalsWithin :: (Eq n, Num n) => IntervalSet n -> (Int, Int) -> Seq (Int, Int)
