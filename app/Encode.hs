@@ -27,7 +27,6 @@ import Keelung.Syntax.Counters
 import Keelung.CircuitFormat hiding (WtnsBinHeader(..))
 import Keelung (FieldType(..))
 import Data.Int (Int64)
-import Debug.Trace
 
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
@@ -226,8 +225,7 @@ toSnarkjsBin r1cs p =
       if constant == 0
         then word32LE 0
         -- constant is 1? why? and length doesn't match?
-        else traceShow ("p: " <> show p <> ", constant: " <> show constant <> ", extended constant bytestring: " <> show (fitPrimeSize p constant)) $
-               word32LE 1 <> word32LE 0 <> fitPrimeSize p constant
+        else word32LE 1 <> word32LE 0 <> fitPrimeSize p constant
     encodePoly (Right poly) =
       mconcat $
          -- Number of coefficients in this polynomial, adding one for the constant
@@ -240,7 +238,7 @@ toSnarkjsBin r1cs p =
              ]
                <> body
       where size = fromIntegral $ IntMap.size (Poly.coeffs poly)
-            body = traceShowId $ traceShow ("poly: " <> show poly) $ map coeffsToBuilder (IntMap.toAscList $ Poly.coeffs poly)
+            body = map coeffsToBuilder (IntMap.toAscList $ Poly.coeffs poly)
 
     coeffsToBuilder :: (Int, Integer) -> Builder
     coeffsToBuilder (k, c) = word32LE (fromIntegral (k + 1)) <> fitPrimeSize p (mod c p)
