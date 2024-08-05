@@ -60,8 +60,8 @@ instance Monoid Rel where
 instance Relation Rel Bool where
   invert (Rel x) = Rel (not x)
   execute (Rel x) val = x == val -- NXOR
-  renderWithVar child (Rel False) = "¬$" <> show child
-  renderWithVar child (Rel True) = "$" <> show child
+  renderWithVarString child (Rel True) = "$" <> child
+  renderWithVarString child (Rel False) = "¬$" <> child
 
 --------------------------------------------------------------------------------
 

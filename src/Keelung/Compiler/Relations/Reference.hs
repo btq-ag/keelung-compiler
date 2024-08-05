@@ -223,10 +223,15 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
               -- child = parent2ToChild parent2
               --    => parent2 = (invertLinRel parent2ToChild <> relationToChild) parent
               --    or parent = (invertLinRel relationToChild <> parent2ToChild) parent2
-              relateWithLookup (parent2, lookupInternal parent2 refRels sliceRels) (invertLinRel parent2ToChild <> relationToChild) (parent, parentLookup)
-                (RefRelations $
-                  Map.insert child (IsChildOf parent relationToChild) $
-                    unRefRelations refRels) sliceRels
+              relateWithLookup
+                (parent2, lookupInternal parent2 refRels sliceRels)
+                (invertLinRel parent2ToChild <> relationToChild)
+                (parent, parentLookup)
+                ( RefRelations $
+                    Map.insert child (IsChildOf parent relationToChild) $
+                      unRefRelations refRels
+                )
+                sliceRels
 
       -- The parent is a child of another variable, so we relate the child to the grandparent instead
       IsChildOf grandparent relationFromGrandparent -> relateWithLookup (child, childLookup) (relationToChild <> relationFromGrandparent) (grandparent, lookupInternal grandparent refRels sliceRels) refRels sliceRels

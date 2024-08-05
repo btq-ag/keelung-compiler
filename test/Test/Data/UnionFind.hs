@@ -14,17 +14,19 @@ import Data.Kind (Type)
 import Data.Maybe qualified as Maybe
 import Keelung (GF181, Var)
 import Keelung.Compiler.Options (Options, defaultOptions)
+import Keelung.Compiler.Options qualified as Options
 import Keelung.Compiler.Relations qualified as Relations
+-- import Keelung.Compiler.Relations.EquivClass qualified as EC
+import Keelung.Compiler.Relations.Reference ()
 import Keelung.Data.Reference (Ref (..), RefF (..))
 import Keelung.Data.UnionFind qualified as UnionFind
 import Keelung.Data.UnionFind.Boolean qualified as Boolean
 import Keelung.Data.UnionFind.Field qualified as Field
 import Keelung.Data.UnionFind.Relation qualified as UnionFind.Relation
+import Keelung.Field qualified as Field
 import Test.Arbitrary ()
 import Test.Hspec
 import Test.QuickCheck
-import qualified Keelung.Compiler.Options as Options
-import qualified Keelung.Field as Field
 
 run :: IO ()
 run = hspec tests
@@ -233,6 +235,7 @@ data Relate :: Type -> Type -> Type -> Type where
   RelateVarField :: (GaloisField n, Integral n) => Var -> Var -> (n, n) -> Relate (Field.UnionFind n) Var n
   RelateVarBool :: Var -> Var -> Bool -> Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool
   RelateRelations :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (Relations.Relations n) Ref n
+  -- RelateEC :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (EC.EquivClass Ref n (Field.LinRel n)) Ref n
 
 instance (GaloisField n, Integral n, Show var) => Show (Relate (Field.UnionFind n) var n) where
   show (RelateVarField var1 var2 (slope, intercept)) = "RelateField " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
@@ -242,6 +245,9 @@ instance (Show var) => Show (Relate (Boolean.UnionFind Bool Boolean.Rel) var Boo
 
 instance (GaloisField n, Integral n, Show var) => Show (Relate (Relations.Relations n) var n) where
   show (RelateRelations var1 var2 (slope, intercept)) = "RelateRelations " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
+
+-- instance (GaloisField n, Integral n, Show var) => Show (Relate (EC.EquivClass Ref n (Field.LinRel n)) var n) where
+--   show (RelateEC var1 var2 (slope, intercept)) = "RelateEC " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
 
 instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (Field.UnionFind n) Var n) where
   arbitrary =
@@ -271,6 +277,10 @@ applyRelate xs (RelateRelations var1 var2 (slope, intercept)) = case runExcept (
   Left err -> error (show err)
   Right (Just xs') -> xs'
   Right Nothing -> xs -- no-op
+-- applyRelate xs (RelateEC var1 var2 (slope, intercept)) = case runExcept (EC.runM (EC.relate var1 (Field.LinRel slope intercept) var2 xs)) of
+--   Left err -> error (show err)
+--   Right (Just xs') -> xs'
+--   Right Nothing -> xs -- no-op
 
 --------------------------------------------------------------------------------
 

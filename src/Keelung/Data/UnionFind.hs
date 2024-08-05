@@ -71,7 +71,7 @@ instance (Show val, Relation rel val, Eq val) => Show (UnionFind val rel) where
       showVar range var = let varString = "$" <> show var <> show range in "  " <> varString <> replicate (8 - length varString) ' '
 
       toString (var, IsConstant value) = [showVarWithoutRange var <> " = " <> show value]
-      toString (var, IsRoot range toChildren) = case map (uncurry Relation.renderWithVar) (IntMap.toList toChildren) of
+      toString (var, IsRoot range toChildren) = case map (uncurry (Relation.renderWithVarString . show)) (IntMap.toList toChildren) of
         [] -> [showVar range var <> " = []"] -- should never happen
         (x : xs) -> showVar range var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
