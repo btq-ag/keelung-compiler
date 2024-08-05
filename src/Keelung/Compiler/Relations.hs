@@ -9,11 +9,10 @@
 --    * RefRel: bianry relation on 2 Refs
 --        * 2 Refs `x` and `y` are related by RefRel if `x = a * y + b` where `a` is not 0.
 --        * RefRel is symmetric, reflexive and transitive. This makes it an equivalence relation.
---      
+--
 --    * SliceRel: binary relation on 2 Slices
 --        * 2 Slices `s1` and `s2` are related by SliceRel if `s1 = s2`
 --        * SliceRel is symmetric, reflexive and transitive. This makes it an equivalence relation.
-
 module Keelung.Compiler.Relations
   ( -- * Construction
     Relations (..),
@@ -33,6 +32,9 @@ module Keelung.Compiler.Relations
     size,
     lookupRef,
     RefRelations.Lookup (..),
+
+    -- * Testing
+    isValid,
   )
 where
 
@@ -128,3 +130,9 @@ size (Relations refs slices _) = RefRelations.size refs + SliceRelations.size sl
 
 lookupRef :: (GaloisField n) => Ref -> Relations n -> RefRelations.Lookup n
 lookupRef var xs = RefRelations.lookup (relationsS xs) var (relationsR xs)
+
+--------------------------------------------------------------------------------
+
+-- | See if the data structure is in a valid state.
+isValid :: (GaloisField n, Integral n) => Relations n -> Bool
+isValid (Relations refs slices _) = RefRelations.isValid refs slices && SliceRelations.isValid slices

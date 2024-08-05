@@ -15,7 +15,6 @@ import Data.Maybe qualified as Maybe
 import Keelung (GF181, Var)
 import Keelung.Compiler.Options (Options, defaultOptions)
 import Keelung.Compiler.Relations qualified as Relations
-import Keelung.Compiler.Relations.Reference qualified as FieldRef
 import Keelung.Data.Reference (Ref (..), RefF (..))
 import Keelung.Data.UnionFind qualified as UnionFind
 import Keelung.Data.UnionFind.Boolean qualified as Boolean
@@ -24,6 +23,8 @@ import Keelung.Data.UnionFind.Relation qualified as UnionFind.Relation
 import Test.Arbitrary ()
 import Test.Hspec
 import Test.QuickCheck
+import qualified Keelung.Compiler.Options as Options
+import qualified Keelung.Field as Field
 
 run :: IO ()
 run = hspec tests
@@ -54,18 +55,18 @@ tests = describe "UnionFind" $ do
         property $ \relates -> do
           let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind (Binary 7)) Var (Binary 7)]) :: Field.UnionFind (Binary 7)
           Field.validate xs `shouldBe` []
-    -- it "Ref / Field / GF181" $ do
-    --   property $ \relates -> do
-    --     let xs = foldl applyRelate FieldRef.new (relates :: [Relate (FieldRef.RefRelations GF181) Ref GF181]) :: FieldRef.RefRelations GF181
-    --     RefRelations.isValid xs `shouldBe` True
-    -- it "Ref / Field / Prime 17" $ do
-    --   property $ \relates -> do
-    --     let xs = foldl applyRelate FieldRef.new (relates :: [Relate (FieldRef.RefRelations (Prime 17)) Ref (Prime 17)]) :: FieldRef.RefRelations (Prime 17)
-    --     RefRelations.isValid xs `shouldBe` True
-    -- it "Ref / Field / Binary 7" $ do
-    --   property $ \relates -> do
-    --     let xs = foldl applyRelate FieldRef.new (relates :: [Relate (FieldRef.RefRelations (Binary 7)) Ref (Binary 7)]) :: FieldRef.RefRelations (Binary 7)
-    --     RefRelations.isValid xs `shouldBe` True
+      it "Relations / Ref / GF181" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate (Relations.new (Options.new Field.gf181)) (relates :: [Relate (Relations.Relations GF181) Ref GF181]) :: Relations.Relations GF181
+          Relations.isValid xs `shouldBe` True
+      it "Relations / Ref / Prime 17" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate (Relations.new (Options.new Field.gf181)) (relates :: [Relate (Relations.Relations (Prime 17)) Ref (Prime 17)]) :: Relations.Relations (Prime 17)
+          Relations.isValid xs `shouldBe` True
+      it "Relations / Ref / Binary 7" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate (Relations.new (Options.new Field.gf181)) (relates :: [Relate (Relations.Relations (Binary 7)) Ref (Binary 7)]) :: Relations.Relations (Binary 7)
+          Relations.isValid xs `shouldBe` True
 
     describe "relate and then assign" $ do
       it "Boolean" $ do
@@ -231,7 +232,7 @@ tests = describe "UnionFind" $ do
 data Relate :: Type -> Type -> Type -> Type where
   RelateVarField :: (GaloisField n, Integral n) => Var -> Var -> (n, n) -> Relate (Field.UnionFind n) Var n
   RelateVarBool :: Var -> Var -> Bool -> Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool
-  -- RelateRefField :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (FieldRef.RefRelations n) Ref n
+  RelateRelations :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (Relations.Relations n) Ref n
 
 instance (GaloisField n, Integral n, Show var) => Show (Relate (Field.UnionFind n) var n) where
   show (RelateVarField var1 var2 (slope, intercept)) = "RelateField " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
@@ -239,8 +240,8 @@ instance (GaloisField n, Integral n, Show var) => Show (Relate (Field.UnionFind 
 instance (Show var) => Show (Relate (Boolean.UnionFind Bool Boolean.Rel) var Bool) where
   show (RelateVarBool var1 var2 relation) = "RelateVarBool " <> show var1 <> " " <> show var2 <> " " <> show relation
 
--- instance (GaloisField n, Integral n, Show var) => Show (Relate (FieldRef.RefRelations n) var n) where
---   show (RelateRefField var1 var2 (slope, intercept)) = "RelateRefField " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
+instance (GaloisField n, Integral n, Show var) => Show (Relate (Relations.Relations n) var n) where
+  show (RelateRelations var1 var2 (slope, intercept)) = "RelateRelations " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
 
 instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (Field.UnionFind n) Var n) where
   arbitrary =
@@ -249,12 +250,12 @@ instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (Field.Un
       <*> chooseInt (0, 100)
       <*> ((,) <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary)
 
--- instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (FieldRef.RefRelations n) Ref n) where
---   arbitrary =
---     RelateRefField
---       <$> arbitrary
---       <*> arbitrary
---       <*> ((,) <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary)
+instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (Relations.Relations n) Ref n) where
+  arbitrary =
+    RelateRelations
+      <$> arbitrary
+      <*> arbitrary
+      <*> ((,) <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary)
 
 instance Arbitrary (Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool) where
   arbitrary =
@@ -266,17 +267,17 @@ instance Arbitrary (Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool) where
 applyRelate :: a -> Relate a var val -> a
 applyRelate xs (RelateVarField var1 var2 (slope, intercept)) = Maybe.fromMaybe xs (Field.relate var1 var2 (Field.LinRel slope intercept) xs)
 applyRelate xs (RelateVarBool var1 var2 relation) = Maybe.fromMaybe xs (UnionFind.relate var1 var2 (Boolean.Rel relation) xs)
--- applyRelate xs (RelateRefField var1 var2 (slope, intercept)) = case runExcept (FieldRef.relate var1 slope var2 intercept xs) of
---   Left err -> error (show err)
---   Right (Just xs') -> xs'
---   Right Nothing -> xs -- no-op
+applyRelate xs (RelateRelations var1 var2 (slope, intercept)) = case runExcept (Relations.relateRef var1 slope var2 intercept xs) of
+  Left err -> error (show err)
+  Right (Just xs') -> xs'
+  Right Nothing -> xs -- no-op
 
 --------------------------------------------------------------------------------
 
 data Assign :: Type -> Type -> Type -> Type where
   AssignVarField :: (GaloisField n, Integral n) => var -> n -> Assign (Field.UnionFind n) var n
   AssignVarBool :: var -> Bool -> Assign (Boolean.UnionFind Bool Boolean.Rel) var Bool
-  AssignRefField :: (GaloisField n, Integral n) => Ref -> n -> Assign (FieldRef.RefRelations n) Ref n
+  AssignRelations :: (GaloisField n, Integral n) => Ref -> n -> Assign (Relations.Relations n) Ref n
 
 instance (GaloisField n, Integral n, Show var) => Show (Assign (Field.UnionFind n) var n) where
   show (AssignVarField var val) = "AssignVarField " <> show var <> " " <> show val
@@ -284,8 +285,8 @@ instance (GaloisField n, Integral n, Show var) => Show (Assign (Field.UnionFind 
 instance Show (Assign (Boolean.UnionFind Bool Boolean.Rel) Var Bool) where
   show (AssignVarBool var val) = "AssignVarBool " <> show var <> " " <> show val
 
-instance (GaloisField n, Integral n, Show var) => Show (Assign (FieldRef.RefRelations n) var n) where
-  show (AssignRefField var val) = "AssignRefField " <> show var <> " " <> show val
+instance (GaloisField n, Integral n, Show var) => Show (Assign (Relations.Relations n) var n) where
+  show (AssignRelations var val) = "Assign Relations " <> show var <> " " <> show val
 
 instance {-# OVERLAPPING #-} (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Assign (Field.UnionFind n) Var n) where
   arbitrary =
@@ -299,9 +300,9 @@ instance (Arbitrary n, GaloisField n, Integral n, Arbitrary var) => Arbitrary (A
       <$> arbitrary
       <*> arbitrary
 
-instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Assign (FieldRef.RefRelations n) Ref n) where
+instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Assign (Relations.Relations n) Ref n) where
   arbitrary =
-    AssignRefField
+    AssignRelations
       <$> arbitrary
       <*> arbitrary
 
@@ -325,7 +326,7 @@ data DesignateRange :: Type -> Type -> Type -> Type where
   DesignateRangeVarField :: (GaloisField n, Integral n) => Var -> UnionFind.Range (Field.Wrapper n) -> DesignateRange (Field.UnionFind n) Var n
 
 -- DesignateRangeRefField :: (GaloisField n, Integral n) => Ref -> UnionFind.Range n -> DesignateRange (Field.UnionFind n) Var n
--- DesignateRangeRefField :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (FieldRef.RefRelations n) Ref n
+-- DesignateRangeRefField :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (Relations.Relations n) Ref n
 
 applyDesignateRange :: a -> DesignateRange a var val -> a
 applyDesignateRange xs (DesignateRangeVarField var range) = Maybe.fromMaybe xs (Field.designateRange var range xs)
