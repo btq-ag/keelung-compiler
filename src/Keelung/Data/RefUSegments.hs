@@ -56,9 +56,9 @@ import Prelude qualified
 
 --------------------------------------------------------------------------------
 
--- | A "RefUSegments" of a RefU, with non-overlapping Segments indexed by their starting offset
+-- | Non-overlapping Segments of a RefU, indexed by starting offsets
 data RefUSegments = RefUSegments
-  { rsRefU :: RefU, -- the Slice these segments belong to
+  { rsRefU :: RefU, -- the RefU these segments belong to
     rsSegments :: IntMap Segment -- the segments
   }
   deriving (Eq, Generic)

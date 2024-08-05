@@ -109,6 +109,7 @@ relate slice1 slice2 relations = case handleOverlappingSlices slice1 slice2 of
                   Slice (sliceRefU sliceB) rootEnd childEnd
                 )
 
+-- | Count the number of RefUSegments in the SliceRelations
 size :: SliceRelations -> Int
 size (SliceRelations refO refI refP refX) = sum (map sizeMapping [refO, refI, refP, refX])
   where
@@ -288,8 +289,9 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
       then relateRootToSegment slice1 slice2
       else relateRootToSegment slice2 slice1
 
-assignValueToSegment :: U -> Slice -> M ()
-assignValueToSegment val (Slice ref start end) =
+-- | Assign a value to a Slice
+assignValueToSlice :: U -> Slice -> M ()
+assignValueToSlice val (Slice ref start end) =
   modify $
     modifyRefUSegments
       ref
@@ -305,7 +307,7 @@ assignValueToFamily val (FamilyLookup ([] : xs)) = do
   assignValueToFamily val (FamilyLookup xs)
 assignValueToFamily val (FamilyLookup ((x : xs) : xss)) = do
   let (val1, val2) = U.split val (widthOf x)
-  mapM_ (assignValueToSegment val1) (x : xs)
+  mapM_ (assignValueToSlice val1) (x : xs)
   assignValueToFamily val2 (FamilyLookup xss)
 
 -- | Relate a child Slice with a parent Slice
