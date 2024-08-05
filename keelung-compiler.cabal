@@ -60,9 +60,11 @@ library
       Keelung.Compiler.Options
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations
+      Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Monad
       Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.Slice
+      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
@@ -159,9 +161,11 @@ executable keelungc
       Keelung.Compiler.Options
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations
+      Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Monad
       Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.Slice
+      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
@@ -260,6 +264,7 @@ test-suite keelung-test
       Test.Compilation.UInt.Logical
       Test.Compilation.UInt.ModInv
       Test.Compilation.UInt.Multiplication
+      Test.Data.EquivClass
       Test.Data.IntervalSet
       Test.Data.IntervalTable
       Test.Data.LC
@@ -320,9 +325,11 @@ test-suite keelung-test
       Keelung.Compiler.Options
       Keelung.Compiler.R1CS
       Keelung.Compiler.Relations
+      Keelung.Compiler.Relations.EquivClass
       Keelung.Compiler.Relations.Monad
       Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.Slice
+      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
