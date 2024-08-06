@@ -264,7 +264,6 @@ test-suite keelung-test
       Test.Compilation.UInt.Logical
       Test.Compilation.UInt.ModInv
       Test.Compilation.UInt.Multiplication
-      Test.Data.EquivClass
       Test.Data.IntervalSet
       Test.Data.IntervalTable
       Test.Data.LC

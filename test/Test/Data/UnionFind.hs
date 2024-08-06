@@ -113,16 +113,16 @@ tests = describe "UnionFind" $ do
         property $ \rel -> do
           (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel (Binary 7))
 
-    describe "execLinRel invertLinRel rel . execLinRel rel = id" $ do
-      it "GF181" $ do
-        property $ \(rel, points) -> do
-          map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel GF181)) points `shouldBe` points
-      it "Prime 17" $ do
-        property $ \(rel, points) -> do
-          map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Prime 17))) points `shouldBe` points
-      it "Binary 7" $ do
-        property $ \(rel, points) -> do
-          map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Binary 7))) points `shouldBe` points
+  describe "execLinRel invertLinRel rel . execLinRel rel = id" $ do
+    it "GF181" $ do
+      property $ \(rel, points) -> do
+        map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel GF181)) points `shouldBe` (points :: [Field.Wrapper GF181])
+    it "Prime 17" $ do
+      property $ \(rel, points) -> do
+        map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Prime 17))) points `shouldBe` (points :: [Field.Wrapper (Prime 17)])
+    it "Binary 7" $ do
+      property $ \(rel, points) -> do
+        map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Binary 7))) points `shouldBe` (points :: [Field.Wrapper (Binary 7)])
 
   describe "Concrete cases: relate + desginate range" $ do
     describe "Var / Field" $ do
@@ -235,7 +235,8 @@ data Relate :: Type -> Type -> Type -> Type where
   RelateVarField :: (GaloisField n, Integral n) => Var -> Var -> (n, n) -> Relate (Field.UnionFind n) Var n
   RelateVarBool :: Var -> Var -> Bool -> Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool
   RelateRelations :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (Relations.Relations n) Ref n
-  -- RelateEC :: (GaloisField n, Integral n) => Ref -> Ref -> (n, n) -> Relate (EC.EquivClass Ref n (Field.LinRel n)) Ref n
+
+-- RelateEC :: Ref -> Ref -> (n, n) -> Relate (EC.EquivClass Ref n (Field.LinRel n)) Ref n
 
 instance (GaloisField n, Integral n, Show var) => Show (Relate (Field.UnionFind n) var n) where
   show (RelateVarField var1 var2 (slope, intercept)) = "RelateField " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
@@ -277,10 +278,10 @@ applyRelate xs (RelateRelations var1 var2 (slope, intercept)) = case runExcept (
   Left err -> error (show err)
   Right (Just xs') -> xs'
   Right Nothing -> xs -- no-op
--- applyRelate xs (RelateEC var1 var2 (slope, intercept)) = case runExcept (EC.runM (EC.relate var1 (Field.LinRel slope intercept) var2 xs)) of
---   Left err -> error (show err)
---   Right (Just xs') -> xs'
---   Right Nothing -> xs -- no-op
+  -- applyRelate xs (RelateEC var1 var2 (slope, intercept)) = case runExcept (EC.runM (EC.relate var1 (Field.LinRel slope intercept) var2 xs)) of
+  --   Left err -> error (show err)
+  --   Right (Just xs') -> xs'
+  --   Right Nothing -> xs -- no-op
 
 --------------------------------------------------------------------------------
 

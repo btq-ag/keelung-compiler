@@ -49,7 +49,7 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung.Data.UnionFind qualified as UnionFind
-import Keelung.Data.UnionFind.Relation (Relation (..))
+import Keelung.Data.UnionFind.Relation (ExecRelation (..), IsRelation (..))
 import Keelung.Data.UnionFind.Relation qualified as Relation
 import Prelude hiding (lookup)
 
@@ -132,15 +132,12 @@ instance (NFData n) => NFData (UnionFind.Status n (LinRel n))
 fromLinRel :: LinRel n -> (n, n)
 fromLinRel (LinRel a b) = (a, b)
 
-instance (GaloisField n, Integral n) => Relation (LinRel n) (Wrapper n) where
+instance (GaloisField n, Integral n) => IsRelation (LinRel n) where
   -- Computes the inverse of a relation
   --      x = ay + b
   --        =>
   --      y = (1/a) x + (-b/a)
   invert (LinRel a b) = LinRel (recip a) ((-b) / a)
-
-  -- `execute relation parent = child`
-  execute (LinRel a b) (Wrapper value) = Wrapper (a * value + b)
 
   renderWithVarString var rel = go (Relation.invert rel)
     where
@@ -157,6 +154,10 @@ instance (GaloisField n, Integral n) => Relation (LinRel n) (Wrapper n) where
             --   then " + " <> show (N b)
             --   else " - " <> show (N (-b))
             slope <> intercept
+
+instance (GaloisField n, Integral n) => ExecRelation (LinRel n) (Wrapper n) where
+  -- `execute relation parent = child`
+  execute (LinRel a b) (Wrapper value) = Wrapper (a * value + b)
 
 --------------------------------------------------------------------------------
 

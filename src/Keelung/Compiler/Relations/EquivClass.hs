@@ -34,7 +34,7 @@ import GHC.Generics (Generic)
 import GHC.TypeLits
 import Keelung.Compiler.Relations.Util
 import Keelung.Data.N (N (..))
-import Keelung.Data.UnionFind.Relation (Relation)
+import Keelung.Data.UnionFind.Relation (ExecRelation, IsRelation)
 import Keelung.Data.UnionFind.Relation qualified as Relation
 import Prelude hiding (lookup)
 
@@ -76,7 +76,7 @@ data EquivClass var n rel = EquivClass
 instance (NFData var, NFData n, NFData rel) => NFData (EquivClass var n rel)
 
 -- | Instance for pretty-printing EquivClass with Galois fields as constant values
-instance {-# OVERLAPS #-} (KnownNat n, Show var, Relation rel (Prime n)) => Show (EquivClass var (Prime n) rel) where
+instance {-# OVERLAPS #-} (KnownNat n, Show var, IsRelation rel) => Show (EquivClass var (Prime n) rel) where
   show (EquivClass name relations) =
     name
       <> "\n"
@@ -91,7 +91,7 @@ instance {-# OVERLAPS #-} (KnownNat n, Show var, Relation rel (Prime n)) => Show
       toString (_var, IsChildOf _parent _relation) = []
 
 -- | Instance for pretty-printing EquivClass with Galois fields as constant values
-instance {-# OVERLAPPING #-} (KnownNat n, Show var, Relation rel (Binary n)) => Show (EquivClass var (Binary n) rel) where
+instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation rel) => Show (EquivClass var (Binary n) rel) where
   show (EquivClass name relations) =
     name
       <> "\n"
@@ -105,7 +105,7 @@ instance {-# OVERLAPPING #-} (KnownNat n, Show var, Relation rel (Binary n)) => 
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
 
-instance (Show var, Relation rel n, Show n) => Show (EquivClass var n rel) where
+instance (Show var, IsRelation rel, Show n) => Show (EquivClass var n rel) where
   show (EquivClass name relations) =
     name
       <> "\n"
@@ -130,7 +130,7 @@ lookup var (EquivClass _ relations) = case Map.lookup var relations of
   Just result -> result
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: (Ord var, Relation rel n, Eq n) => var -> n -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
+assign :: (Ord var, IsRelation rel, ExecRelation rel n, Eq n) => var -> n -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
 assign var value (EquivClass name relations) = case Map.lookup var relations of
   -- The variable is not in the map, so we add it as a constant
   Nothing -> do
@@ -169,7 +169,7 @@ assign var value (EquivClass name relations) = case Map.lookup var relations of
   Just (IsChildOf parent relationToChild) -> assign parent (Relation.execute (Relation.invert relationToChild) value) (EquivClass name relations)
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (Seniority var, Relation rel n, Ord var, Eq n) => var -> rel -> var -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
+relate :: (Seniority var, IsRelation rel, ExecRelation rel n, Ord var, Eq n) => var -> rel -> var -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
 relate a relation b relations =
   case compareSeniority a b of
     LT -> relateChildToParent a relation b relations
@@ -186,7 +186,7 @@ relate a relation b relations =
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
-relateChildToParent :: (Ord var, Relation rel n, Eq n, Seniority var) => var -> rel -> var -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
+relateChildToParent :: (Ord var, IsRelation rel, ExecRelation rel n, Eq n, Seniority var) => var -> rel -> var -> EquivClass var n rel -> M (n, n) (EquivClass var n rel)
 relateChildToParent child relationToChild parent relations =
   if child == parent
     then return relations
@@ -246,7 +246,7 @@ relateChildToParent child relationToChild parent relations =
       IsChildOf grandparent relationFromGrandparent -> relate child (relationToChild <> relationFromGrandparent) grandparent relations
 
 -- | Calculates the relation between two variables, O(lg n)
-relationBetween :: (Ord var, Relation rel n) => var -> var -> EquivClass var n rel -> Maybe rel
+relationBetween :: (Ord var, IsRelation rel) => var -> var -> EquivClass var n rel -> Maybe rel
 relationBetween var1 var2 xs = case (lookup var1 xs, lookup var2 xs) of
   (IsConstant _, _) -> Nothing
   (_, IsConstant _) -> Nothing
@@ -296,11 +296,11 @@ size = Map.size . eqPool
 
 -- | A EquivClass is valid if:
 --          1. all children of a parent recognize the parent as their parent
-isValid :: (Ord var, Relation rel n, Eq rel, Seniority var) => EquivClass var n rel -> Bool
+isValid :: (Ord var, IsRelation rel, Eq rel, Seniority var) => EquivClass var n rel -> Bool
 isValid relations = allChildrenRecognizeTheirParent relations && rootsAreSenior relations
 
 -- | A EquivClass is valid if all children of a parent recognize the parent as their parent
-allChildrenRecognizeTheirParent :: (Ord var, Relation rel n, Eq rel) => EquivClass var n rel -> Bool
+allChildrenRecognizeTheirParent :: (Ord var, IsRelation rel, Eq rel) => EquivClass var n rel -> Bool
 allChildrenRecognizeTheirParent relations =
   let families = Map.mapMaybe isParent (eqPool relations)
 
@@ -314,7 +314,7 @@ allChildrenRecognizeTheirParent relations =
    in Map.foldlWithKey' (\acc parent children -> acc && childrenAllRecognizeParent parent children) True families
 
 -- | A EquivClass is valid if the seniority of the root of a family is greater than equal the seniority of all its children
-rootsAreSenior :: (Ord var, Relation rel n, Eq rel, Seniority var) => EquivClass var n rel -> Bool
+rootsAreSenior :: (Ord var, IsRelation rel, Eq rel, Seniority var) => EquivClass var n rel -> Bool
 rootsAreSenior = Map.foldlWithKey' go True . eqPool
   where
     go :: (Seniority var) => Bool -> var -> VarStatus var n rel -> Bool
