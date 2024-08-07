@@ -15,7 +15,7 @@ module Keelung.Compiler.Relations.Slice
     toConstraints,
     -- Testing
     isValid,
-    Failure (..),
+    Error (..),
     validate,
   )
 where
@@ -231,25 +231,25 @@ isValid = null . validate
 
 --------------------------------------------------------------------------------
 
-data Failure
+data Error
   = InvalidRefUSegments RefUSegments.Error
   | InvalidKinship Kinship
   deriving (Eq, Show)
 
-validate :: SliceRelations -> [Failure]
+validate :: SliceRelations -> [Error]
 validate relations = fromKinshipConstruction <> fromInvalidRefUSegments
   where
     SliceRelations refO refI refP refX = relations
 
     fromInvalidRefUSegments = mconcat (map isValidMapping [refO, refI, refP, refX])
 
-    isValidMapping :: Mapping -> [Failure]
+    isValidMapping :: Mapping -> [Error]
     isValidMapping (Mapping xs) = mconcat $ map (mconcat . map isValidRefUSegments . IntMap.elems) (IntMap.elems xs)
 
-    isValidRefUSegments :: RefUSegments -> [Failure]
+    isValidRefUSegments :: RefUSegments -> [Error]
     isValidRefUSegments x = map InvalidRefUSegments (RefUSegments.validate x)
 
-    fromKinshipConstruction :: [Failure]
+    fromKinshipConstruction :: [Error]
     fromKinshipConstruction = case nullKinship (destroyKinshipWithParent relations (constructKinshipWithChildOf relations)) of
       Nothing -> []
       Just x -> [InvalidKinship x]

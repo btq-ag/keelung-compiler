@@ -159,6 +159,10 @@ instance (GaloisField n, Integral n) => ExecRelation (LinRel n) (Wrapper n) wher
   -- `execute relation parent = child`
   execute (LinRel a b) (Wrapper value) = Wrapper (a * value + b)
 
+instance (GaloisField n, Integral n) => ExecRelation (LinRel n) n where
+  -- `execute relation parent = child`
+  execute (LinRel a b) value = a * value + b
+
 --------------------------------------------------------------------------------
 
 instance (Ord n, Num n) => UnionFind.HasRange (Wrapper n) where

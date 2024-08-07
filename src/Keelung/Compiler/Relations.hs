@@ -34,7 +34,9 @@ module Keelung.Compiler.Relations
     RefRelations.Lookup (..),
 
     -- * Testing
+    Error (..),
     isValid,
+    validate,
   )
 where
 
@@ -42,7 +44,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Except
 import Data.Field.Galois (GaloisField)
 import GHC.Generics (Generic)
-import Keelung.Compiler.Compile.Error
+import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Options (Options)
 import Keelung.Compiler.Relations.Monad
 import Keelung.Compiler.Relations.Reference qualified as RefRelations
@@ -90,7 +92,7 @@ assignRef var val relations = case var of
   B (RefUBit refU i) ->
     if val == 0 || val == 1
       then assignSlice (Slice.Slice refU i (i + 1)) (toInteger val) relations
-      else throwError $ InvalidBooleanValue val
+      else throwError $ Compiler.InvalidBooleanValue val
   _ -> updateRefRelations (RefRelations.assign var val) relations
 
 -- | Assign a Slice to a constant value.
@@ -133,6 +135,12 @@ lookupRef var xs = RefRelations.lookup (relationsS xs) var (relationsR xs)
 
 --------------------------------------------------------------------------------
 
+data Error = RefError RefRelations.Error | SliceError SliceRelations.Error
+  deriving (Show, Eq)
+
 -- | See if the data structure is in a valid state.
 isValid :: (GaloisField n, Integral n) => Relations n -> Bool
 isValid (Relations refs slices _) = RefRelations.isValid refs slices && SliceRelations.isValid slices
+
+validate :: (GaloisField n, Integral n) => Relations n -> [Error]
+validate (Relations refs slices _) = map RefError (RefRelations.validate refs slices) ++ map SliceError (SliceRelations.validate slices)

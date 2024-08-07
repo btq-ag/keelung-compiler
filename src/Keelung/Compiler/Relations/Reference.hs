@@ -3,6 +3,9 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use list comprehension" #-}
 
 module Keelung.Compiler.Relations.Reference
   ( RefRelations,
@@ -23,7 +26,11 @@ module Keelung.Compiler.Relations.Reference
     lookup,
     relationBetween,
     size,
+
+    -- * Testing
+    Error (..),
     isValid,
+    validate,
   )
 where
 
@@ -38,7 +45,7 @@ import Data.Sequence (Seq)
 import Data.Sequence qualified as Seq
 import GHC.Generics (Generic)
 import GHC.TypeLits
-import Keelung.Compiler.Compile.Error (Error (..))
+import Keelung.Compiler.Compile.Error qualified as Compiler
 import Keelung.Compiler.Relations.Monad
 import Keelung.Compiler.Relations.Slice (SliceRelations)
 import Keelung.Compiler.Relations.Slice qualified as SliceRelations
@@ -111,7 +118,7 @@ assign var value (RefRelations refRels) sliceRels = case Map.lookup var refRels 
   Just (IsConstant oldValue) ->
     if oldValue == value
       then return Nothing
-      else throwError (ConflictingValuesF oldValue value)
+      else throwError (Compiler.ConflictingValuesF oldValue value)
   -- The variable is already a root, so we:
   --    1. Make its children constants
   --    2. Make the root itself a constant
@@ -193,6 +200,8 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
             Just $
               RefRelations $
                 Map.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
+                -- add the child and its grandchildren to the parent
+                -- add the child and its grandchildren to the parent
                 -- add the child and its grandchildren to the parent
                   Map.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
                     Map.foldlWithKey' -- point the grandchildren to the new parent
@@ -300,35 +309,6 @@ toConstraints shouldBeKept = Seq.fromList . toList . Map.mapMaybeWithKey convert
 size :: RefRelations n -> Int
 size = Map.size . unRefRelations
 
--- | A Reference is valid if:
---          1. all children of a parent recognize the parent as their parent
-isValid :: (GaloisField n, Integral n) => RefRelations n -> SliceRelations -> Bool
-isValid refRels sliceRels = allChildrenRecognizeTheirParent refRels sliceRels && rootsAreSenior refRels
-
--- | A Reference is valid if all children of a parent recognize the parent as their parent
-allChildrenRecognizeTheirParent :: (GaloisField n, Integral n) => RefRelations n -> SliceRelations -> Bool
-allChildrenRecognizeTheirParent refRels sliceRels =
-  let families = Map.mapMaybe isParent (unRefRelations refRels)
-
-      isParent (IsRoot children) = Just children
-      isParent _ = Nothing
-
-      recognizeParent parent child relation = case lookupInternal child refRels sliceRels of
-        IsChildOf parent' relation' -> parent == parent' && relation == relation'
-        _ -> False
-      childrenAllRecognizeParent parent = and . Map.elems . Map.mapWithKey (recognizeParent parent)
-   in Map.foldlWithKey' (\acc parent children -> acc && childrenAllRecognizeParent parent children) True families
-
--- | A Reference is valid if the seniority of the root of a family is greater than equal the seniority of all its children
-rootsAreSenior :: RefRelations n -> Bool
-rootsAreSenior = Map.foldlWithKey' go True . unRefRelations
-  where
-    go :: Bool -> Ref -> VarStatus n -> Bool
-    go False _ _ = False
-    go True _ (IsConstant _) = True
-    go True var (IsRoot children) = all (\child -> compareSeniority var child /= LT) (Map.keys children)
-    go True var (IsChildOf parent _) = compareSeniority parent var /= LT
-
 --------------------------------------------------------------------------------
 
 data VarStatus n
@@ -418,3 +398,51 @@ invertLinRel (LinRel a b) = LinRel (recip a) (-b / a)
 -- | `execLinRel relation parent = child`
 execLinRel :: (GaloisField n, Integral n) => LinRel n -> n -> n
 execLinRel (LinRel a b) value = a * value + b
+
+--------------------------------------------------------------------------------
+
+-- | Error for testing
+data Error
+  = RootNotSenior Ref
+  | ChildrenNotRecognizingParent Ref Ref -- parent & child
+  deriving (Show, Eq)
+
+-- | A Reference is valid if:
+--          1. all children of a parent recognize the parent as their parent
+--          2. the seniority of the root of a family is greater than equal the seniority of all its children
+isValid :: (GaloisField n, Integral n) => RefRelations n -> SliceRelations -> Bool
+isValid refRels sliceRels = null (validate refRels sliceRels)
+
+validate :: (GaloisField n, Integral n) => RefRelations n -> SliceRelations -> [Error]
+validate refRels sliceRels = allChildrenRecognizeTheirParent refRels sliceRels <> rootsAreSenior refRels
+
+-- | A Reference is valid if all children of a parent recognize the parent as their parent
+allChildrenRecognizeTheirParent :: (GaloisField n, Integral n) => RefRelations n -> SliceRelations -> [Error]
+allChildrenRecognizeTheirParent refRels sliceRels =
+  let families = Map.mapMaybe isParent (unRefRelations refRels)
+
+      isParent (IsRoot children) = Just children
+      isParent _ = Nothing
+   in concatMap (uncurry childrenAllRecognizeParent) (Map.toList families)
+  where
+    childRecognizeParent parent child relation = case lookupInternal child refRels sliceRels of
+      IsChildOf parent' relation' ->
+        if parent == parent' && relation == relation'
+          then []
+          else [ChildrenNotRecognizingParent parent child]
+      _ -> []
+
+    childrenAllRecognizeParent parent = concat . Map.elems . Map.mapWithKey (childRecognizeParent parent)
+
+--  where
+--     toErrors :: Ref -> Map Ref (LinRel n) -> [Error]
+--     toErrors parent children
+
+-- | A Reference is valid if the seniority of the root of a family is greater than equal the seniority of all its children
+rootsAreSenior :: RefRelations n -> [Error]
+rootsAreSenior = concatMap (uncurry toErrors) . Map.toList . unRefRelations
+  where
+    toErrors :: Ref -> VarStatus n -> [Error]
+    toErrors _ (IsConstant _) = []
+    toErrors var (IsRoot children) = map RootNotSenior (filter (\child -> compareSeniority var child == LT) (Map.keys children))
+    toErrors var (IsChildOf parent _) = if compareSeniority parent var == LT then [RootNotSenior var] else []
