@@ -2,10 +2,10 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# HLINT ignore "Use list comprehension" #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use list comprehension" #-}
 
 module Keelung.Compiler.Relations.Reference
   ( RefRelations,
@@ -201,8 +201,6 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
               RefRelations $
                 Map.insert parent (IsRoot (children <> newSiblings)) $ -- add the child and its grandchildren to the parent
                 -- add the child and its grandchildren to the parent
-                -- add the child and its grandchildren to the parent
-                -- add the child and its grandchildren to the parent
                   Map.insert child (IsChildOf parent relationToChild) $ -- point the child to the parent
                     Map.foldlWithKey' -- point the grandchildren to the new parent
                       ( \rels grandchild relationToGrandChild -> Map.insert grandchild (IsChildOf parent (relationToChild <> relationToGrandChild)) rels
@@ -237,8 +235,8 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
                 (invertLinRel parent2ToChild <> relationToChild)
                 (parent, parentLookup)
                 ( RefRelations $
-                    Map.insert child (IsChildOf parent relationToChild) $
-                      unRefRelations refRels
+                    -- Map.insert child (IsChildOf parent relationToChild) $
+                    unRefRelations refRels
                 )
                 sliceRels
 
@@ -420,17 +418,17 @@ validate refRels sliceRels = allChildrenRecognizeTheirParent refRels sliceRels <
 allChildrenRecognizeTheirParent :: (GaloisField n, Integral n) => RefRelations n -> SliceRelations -> [Error]
 allChildrenRecognizeTheirParent refRels sliceRels =
   let families = Map.mapMaybe isParent (unRefRelations refRels)
-
       isParent (IsRoot children) = Just children
       isParent _ = Nothing
    in concatMap (uncurry childrenAllRecognizeParent) (Map.toList families)
   where
-    childRecognizeParent parent child relation = case lookupInternal child refRels sliceRels of
-      IsChildOf parent' relation' ->
-        if parent == parent' && relation == relation'
-          then []
-          else [ChildrenNotRecognizingParent parent child]
-      _ -> []
+    childRecognizeParent expectedParent child expectedRelation =
+      case lookupInternal child refRels sliceRels of
+        IsChildOf actualParent actualRelation ->
+          if expectedParent == actualParent && expectedRelation == actualRelation
+            then []
+            else [ChildrenNotRecognizingParent expectedParent child]
+        _ -> []
 
     childrenAllRecognizeParent parent = concat . Map.elems . Map.mapWithKey (childRecognizeParent parent)
 
