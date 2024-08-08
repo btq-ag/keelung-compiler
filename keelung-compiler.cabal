@@ -64,7 +64,6 @@ library
       Keelung.Compiler.Relations.Monad
       Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.Slice
-      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
@@ -165,7 +164,6 @@ executable keelungc
       Keelung.Compiler.Relations.Monad
       Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.Slice
-      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
@@ -328,7 +326,6 @@ test-suite keelung-test
       Keelung.Compiler.Relations.Monad
       Keelung.Compiler.Relations.Reference
       Keelung.Compiler.Relations.Slice
-      Keelung.Compiler.Relations.Util
       Keelung.Compiler.Syntax.Inputs
       Keelung.Compiler.Syntax.Internal
       Keelung.Compiler.Syntax.ToInternal
