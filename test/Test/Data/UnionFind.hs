@@ -37,224 +37,252 @@ run = hspec tests
 tests :: SpecWith ()
 tests = describe "UnionFind" $ do
   -- it "error 1" $ do
+  --   let relates =
+  --         [ RelateRelations (F (RefFX 0)) (B (RefBP 0)) (1, 2),
+  --           RelateRelations (F (RefFX 0)) (B (RefBI 5)) (3, 4)
+  --         ]
+  --   let xs = foldl applyRelate (Relations.new (Options.new Field.gf181)) (relates :: [Relate (Relations.Relations GF181) Ref GF181]) :: Relations.Relations GF181
+  --   print xs
+  --   Relations.validate xs `shouldBe` []
+
+  -- it "error 2" $ do
   --     let relates =
-  --           [ RelateEC (F (RefFX 0)) (B (RefBP 0)) (1, 2),
-  --             RelateEC (F (RefFX 0)) (B (RefBI 5)) (3, 4)
+  --           [ RelateEC  (B (RefBX 0)) (F (RefFX 0)) (1, 2),
+  --             RelateEC  (B (RefBX 0))(F(RefFO 5)) (1/3, 4)
   --           ]
   --     let xs = foldl applyRelate (EC.new "Ref / GF181") (relates :: [Relate (EC.EquivClass Ref GF181 (Field.LinRel GF181)) Ref GF181]) ::  EC.EquivClass Ref GF181 (Field.LinRel GF181)
   --     print xs
   --     EC.validate xs `shouldBe` []
 
-  it "error 2" $ do
-      let relates =
-            [ RelateEC  (B (RefBX 0)) (F (RefFX 0)) (1, 2),
-              RelateEC  (B (RefBX 0))(F(RefFO 5)) (3, 4)
-            ]
-      let xs = foldl applyRelate (EC.new "Ref / GF181") (relates :: [Relate (EC.EquivClass Ref GF181 (Field.LinRel GF181)) Ref GF181]) ::  EC.EquivClass Ref GF181 (Field.LinRel GF181)
-      print xs
-      EC.validate xs `shouldBe` []
+  -- it "error 3" $ do
+  --   let relates =
+  --         [ RelateRelations (B (RefBX 0)) (F (RefFX 0)) (1, 2),
+  --           RelateRelations (B (RefBX 0))(F(RefFO 5)) (1/3, 4)
+  --         ]
+  --   let xs = foldl applyRelate (Relations.new (Options.new Field.gf181)) (relates :: [Relate (Relations.Relations GF181) Ref GF181]) :: Relations.Relations GF181
+  --   print xs
+  --   Relations.validate xs `shouldBe` []
 
-  -- describe "operations" $ do
-  --   describe "relate" $ do
-  --     it "Var / Boolean" $ do
-  --       property $ \relates -> do
-  --         let xs = foldl applyRelate Boolean.new (relates :: [Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool]) :: Boolean.UnionFind Bool Boolean.Rel
-  --         Boolean.validate xs `shouldBe` []
-  --     it "Var / Field / GF181" $ do
-  --       property $ \relates -> do
-  --         let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind GF181) Var GF181]) :: Field.UnionFind GF181
-  --         Field.validate xs `shouldBe` []
-  --     it "Var / Field / Prime 17" $ do
-  --       property $ \relates -> do
-  --         let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind (Prime 17)) Var (Prime 17)]) :: Field.UnionFind (Prime 17)
-  --         Field.validate xs `shouldBe` []
-  --     it "Var / Field / Binary 7" $ do
-  --       property $ \relates -> do
-  --         let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind (Binary 7)) Var (Binary 7)]) :: Field.UnionFind (Binary 7)
-  --         Field.validate xs `shouldBe` []
-  --     it "Relations / Ref / GF181" $ do
-  --       property $ \relates -> do
-  --         let xs = foldl applyRelate (Relations.new (Options.new Field.gf181)) (relates :: [Relate (Relations.Relations GF181) Ref GF181]) :: Relations.Relations GF181
-  --         Relations.validate xs `shouldBe` []
-  --     it "Relations / Ref / Prime 17" $ do
-  --       property $ \relates -> do
-  --         let xs = foldl applyRelate (Relations.new (Options.new (Field.Prime 17))) (relates :: [Relate (Relations.Relations (Prime 17)) Ref (Prime 17)]) :: Relations.Relations (Prime 17)
-  --         Relations.validate xs `shouldBe` []
-  --     it "Relations / Ref / Binary 7" $ do
-  --       property $ \relates -> do
-  --         let xs = foldl applyRelate (Relations.new (Options.new (Field.Binary 7))) (relates :: [Relate (Relations.Relations (Binary 7)) Ref (Binary 7)]) :: Relations.Relations (Binary 7)
-  --         Relations.validate xs `shouldBe` []
-  --     it "EC / Ref / GF181" $ do
-  --       property $ \relates -> do
-  --         let xs = foldl applyRelate (EC.new "Ref / GF181") (relates :: [Relate (EC.EquivClass Ref GF181 (Field.LinRel GF181)) Ref GF181]) :: EC.EquivClass Ref GF181 (Field.LinRel GF181)
-  --         EC.validate xs `shouldBe` []
-  --   -- it "Relations / Ref / Prime 17" $ do
-  --   --   property $ \relates -> do
-  --   --     let xs = foldl applyRelate (Relations.new (Options.new (Field.Prime 17))) (relates :: [Relate (Relations.Relations (Prime 17)) Ref (Prime 17)]) :: Relations.Relations (Prime 17)
-  --   --     Relations.validate xs `shouldBe` []
-  --   -- it "Relations / Ref / Binary 7" $ do
-  --   --   property $ \relates -> do
-  --   --     let xs = foldl applyRelate (Relations.new (Options.new (Field.Binary 7))) (relates :: [Relate (Relations.Relations (Binary 7)) Ref (Binary 7)]) :: Relations.Relations (Binary 7)
-  --   --     Relations.validate xs `shouldBe` []
+  -- B = F + 2
+  -- F = B - 2
+  -- B = X/3 + 4
+  -- 3F + 6 = X + 12
+  -- X = 3F - 6
+  --   = 3B - 12
 
-  --   describe "relate and then assign" $ do
-  --     it "Boolean" $ do
-  --       property $ \(relates, assignments) -> do
-  --         let xs = foldl applyRelate Boolean.new (relates :: [Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool])
-  --         let xs' = foldl applyAssign xs (assignments :: [Assign (Boolean.UnionFind Bool Boolean.Rel) Var Bool])
-  --         Boolean.validate xs' `shouldBe` []
-  --     it "Field / GF181" $ do
-  --       property $ \(relates, assignments) -> do
-  --         let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind GF181) Var GF181])
-  --         let xs' = foldl applyAssign xs (assignments :: [Assign (Field.UnionFind GF181) Var GF181])
-  --         Field.validate xs' `shouldBe` []
-  --     it "Field / Prime 17" $ do
-  --       property $ \(relates, assignments) -> do
-  --         let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind (Prime 17)) Var (Prime 17)])
-  --         let xs' = foldl applyAssign xs (assignments :: [Assign (Field.UnionFind (Prime 17)) Var (Prime 17)])
-  --         Field.validate xs' `shouldBe` []
-  --     it "Field / Binary 7" $ do
-  --       property $ \(relates, assignments) -> do
-  --         let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind (Binary 7)) Var (Binary 7)])
-  --         let xs' = foldl applyAssign xs (assignments :: [Assign (Field.UnionFind (Binary 7)) Var (Binary 7)])
-  --         Field.validate xs' `shouldBe` []
+  describe "operations" $ do
+    describe "relate" $ do
+      it "Var / Boolean" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate Boolean.new (relates :: [Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool]) :: Boolean.UnionFind Bool Boolean.Rel
+          Boolean.validate xs `shouldBe` []
+      it "Var / Field / GF181" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind GF181) Var GF181]) :: Field.UnionFind GF181
+          Field.validate xs `shouldBe` []
+      it "Var / Field / Prime 17" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind (Prime 17)) Var (Prime 17)]) :: Field.UnionFind (Prime 17)
+          Field.validate xs `shouldBe` []
+      it "Var / Field / Binary 7" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind (Binary 7)) Var (Binary 7)]) :: Field.UnionFind (Binary 7)
+          Field.validate xs `shouldBe` []
+      it "Relations / Ref / GF181" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate (Relations.new (Options.new Field.gf181)) (relates :: [Relate (Relations.Relations GF181) Ref GF181]) :: Relations.Relations GF181
+          Relations.validate xs `shouldBe` []
+      it "Relations / Ref / Prime 17" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate (Relations.new (Options.new (Field.Prime 17))) (relates :: [Relate (Relations.Relations (Prime 17)) Ref (Prime 17)]) :: Relations.Relations (Prime 17)
+          Relations.validate xs `shouldBe` []
+      it "Relations / Ref / Binary 7" $ do
+        property $ \relates -> do
+          let xs = foldl applyRelate (Relations.new (Options.new (Field.Binary 7))) (relates :: [Relate (Relations.Relations (Binary 7)) Ref (Binary 7)]) :: Relations.Relations (Binary 7)
+          Relations.validate xs `shouldBe` []
+      -- it "EC / Ref / GF181" $ do
+      --   property $ \relates -> do
+      --     let xs = foldl applyRelate (EC.new "Ref / GF181") (relates :: [Relate (EC.EquivClass Ref GF181 (Field.LinRel GF181)) Ref GF181]) :: EC.EquivClass Ref GF181 (Field.LinRel GF181)
+      --     EC.validate xs `shouldBe` []
+      -- it "Relations / Ref / Prime 17" $ do
+      --   property $ \relates -> do
+      --     let xs = foldl applyRelate (Relations.new (Options.new (Field.Prime 17))) (relates :: [Relate (Relations.Relations (Prime 17)) Ref (Prime 17)]) :: Relations.Relations (Prime 17)
+      --     Relations.validate xs `shouldBe` []
+      -- it "Relations / Ref / Binary 7" $ do
+      --   property $ \relates -> do
+      --     let xs = foldl applyRelate (Relations.new (Options.new (Field.Binary 7))) (relates :: [Relate (Relations.Relations (Binary 7)) Ref (Binary 7)]) :: Relations.Relations (Binary 7)
+      --     Relations.validate xs `shouldBe` []
 
-  -- describe "symmetricity" $ do
-  --   it "relate and then assign" $ do
-  --     property $ \xs -> do
-  --       let (_assignments, families) = Field.export (xs :: Field.UnionFind GF181)
-  --       forM_ (IntMap.toList families) $ \(root, (_range, family)) -> do
-  --         Field.lookup root xs `shouldBe` Field.Root mempty
-  --         forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
-  --           Field.lookup child xs `shouldBe` Field.ChildOf root (Field.LinRel slope intercept) mempty
+      it "relate and then lookup the relation" $ do
+        property $ \(var1, var2, rel1) -> do
+          let relates =
+                [ RelateRelations var1 var2 rel1
+                ]
+          let xs = foldl applyRelate (Relations.new (Options.new Field.gf181)) (relates :: [Relate (Relations.Relations GF181) Ref GF181]) :: Relations.Relations GF181
+          Relations.validate xs `shouldBe` []
 
-  -- describe "Field.LinRel" $ do
-  --   describe "invertLinRel . invertLinRel = id" $ do
-  --     it "GF181" $ do
-  --       property $ \rel -> do
-  --         (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel GF181)
-  --     it "Prime 17" $ do
-  --       property $ \rel -> do
-  --         (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel (Prime 17))
-  --     it "Binary 7" $ do
-  --       property $ \rel -> do
-  --         (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel (Binary 7))
+          if var1 == var2
+            then Relations.relationBetween var1 var2 xs `shouldBe` Just (1, 0)
+            else Relations.relationBetween var1 var2 xs `shouldBe` Just rel1
 
-  -- describe "execLinRel invertLinRel rel . execLinRel rel = id" $ do
-  --   it "GF181" $ do
-  --     property $ \(rel, points) -> do
-  --       map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel GF181)) points `shouldBe` (points :: [Field.Wrapper GF181])
-  --   it "Prime 17" $ do
-  --     property $ \(rel, points) -> do
-  --       map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Prime 17))) points `shouldBe` (points :: [Field.Wrapper (Prime 17)])
-  --   it "Binary 7" $ do
-  --     property $ \(rel, points) -> do
-  --       map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Binary 7))) points `shouldBe` (points :: [Field.Wrapper (Binary 7)])
+    describe "relate and then assign" $ do
+      it "Boolean" $ do
+        property $ \(relates, assignments) -> do
+          let xs = foldl applyRelate Boolean.new (relates :: [Relate (Boolean.UnionFind Bool Boolean.Rel) Var Bool])
+          let xs' = foldl applyAssign xs (assignments :: [Assign (Boolean.UnionFind Bool Boolean.Rel) Var Bool])
+          Boolean.validate xs' `shouldBe` []
+      it "Field / GF181" $ do
+        property $ \(relates, assignments) -> do
+          let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind GF181) Var GF181])
+          let xs' = foldl applyAssign xs (assignments :: [Assign (Field.UnionFind GF181) Var GF181])
+          Field.validate xs' `shouldBe` []
+      it "Field / Prime 17" $ do
+        property $ \(relates, assignments) -> do
+          let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind (Prime 17)) Var (Prime 17)])
+          let xs' = foldl applyAssign xs (assignments :: [Assign (Field.UnionFind (Prime 17)) Var (Prime 17)])
+          Field.validate xs' `shouldBe` []
+      it "Field / Binary 7" $ do
+        property $ \(relates, assignments) -> do
+          let xs = foldl applyRelate Field.new (relates :: [Relate (Field.UnionFind (Binary 7)) Var (Binary 7)])
+          let xs' = foldl applyAssign xs (assignments :: [Assign (Field.UnionFind (Binary 7)) Var (Binary 7)])
+          Field.validate xs' `shouldBe` []
 
-  -- describe "Concrete cases: relate + desginate range" $ do
-  --   describe "Var / Field" $ do
-  --     it "GF181" $ do
-  --       let xs =
-  --             foldl
-  --               applyRelate
-  --               Field.new
-  --               ( [ RelateVarField 0 1 (1, 0),
-  --                   -- \$0 = $1
-  --                   RelateVarField 0 2 (1, -1),
-  --                   -- \$0 = $2 - 1
-  --                   RelateVarField 0 3 (1, 1),
-  --                   -- \$0 = $3 + 1
-  --                   RelateVarField 0 4 (2, 3)
-  --                 ] ::
-  --                   -- \$0 = 2$4 + 3
+  describe "symmetricity" $ do
+    it "relate and then assign" $ do
+      property $ \xs -> do
+        let (_assignments, families) = Field.export (xs :: Field.UnionFind GF181)
+        forM_ (IntMap.toList families) $ \(root, (_range, family)) -> do
+          Field.lookup root xs `shouldBe` Field.Root mempty
+          forM_ (IntMap.toList family) $ \(child, (slope, intercept)) -> do
+            Field.lookup child xs `shouldBe` Field.ChildOf root (Field.LinRel slope intercept) mempty
 
-  --                   [Relate (Field.UnionFind GF181) Var GF181]
-  --               )
-  --       let xs' =
-  --             foldl
-  --               applyDesignateRange
-  --               xs
-  --               ( [ DesignateRangeVarField 0 (UnionFind.Range (Just (Field.Wrapper 0, Field.Wrapper 2)))
-  --                 ] ::
-  --                   [DesignateRange (Field.UnionFind GF181) Var GF181]
-  --               )
-  --       Field.validate xs' `shouldBe` []
-  --       Field.lookup 1 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel 1 0) (UnionFind.Range (Just (Field.Wrapper 0, Field.Wrapper 2)))
-  --       Field.lookup 2 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel 1 1) (UnionFind.Range (Just (Field.Wrapper 1, Field.Wrapper 3)))
-  --       Field.lookup 3 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel 1 (-1)) (UnionFind.Range (Just (Field.Wrapper (-1), Field.Wrapper 1)))
-  --       Field.lookup 4 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel (1 / 2) (-3 / 2)) (UnionFind.Range (Just (Field.Wrapper (-3 / 2), Field.Wrapper (-1 / 2))))
+  describe "Field.LinRel" $ do
+    describe "invertLinRel . invertLinRel = id" $ do
+      it "GF181" $ do
+        property $ \rel -> do
+          (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel GF181)
+      it "Prime 17" $ do
+        property $ \rel -> do
+          (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel (Prime 17))
+      it "Binary 7" $ do
+        property $ \rel -> do
+          (UnionFind.Relation.invert . UnionFind.Relation.invert) rel `shouldBe` (rel :: Field.LinRel (Binary 7))
 
-  -- describe "Concrete cases: assign + relate" $ do
-  --   describe "Var / Field" $ do
-  --     it "Binary 7" $ do
-  --       let xs =
-  --             foldl
-  --               applyRelate
-  --               Field.new
-  --               ( [ RelateVarField 4 51 (1, 0),
-  --                   RelateVarField 5 52 (1, 1),
-  --                   RelateVarField 4 5 (2, 1)
-  --                 ] ::
-  --                   [Relate (Field.UnionFind (Binary 7)) Var (Binary 7)]
-  --               )
-  --       Field.validate xs `shouldBe` []
-  --       Field.lookup 52 xs `shouldBe` Field.ChildOf 4 (Field.LinRel 3 2) mempty
+  describe "execLinRel invertLinRel rel . execLinRel rel = id" $ do
+    it "GF181" $ do
+      property $ \(rel, points) -> do
+        map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel GF181)) points `shouldBe` (points :: [Field.Wrapper GF181])
+    it "Prime 17" $ do
+      property $ \(rel, points) -> do
+        map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Prime 17))) points `shouldBe` (points :: [Field.Wrapper (Prime 17)])
+    it "Binary 7" $ do
+      property $ \(rel, points) -> do
+        map (UnionFind.Relation.execute (UnionFind.Relation.invert rel) . UnionFind.Relation.execute (rel :: Field.LinRel (Binary 7))) points `shouldBe` (points :: [Field.Wrapper (Binary 7)])
 
-  --     it "Prime 7" $ do
-  --       let xs =
-  --             foldl
-  --               applyRelate
-  --               Field.new
-  --               ( [ RelateVarField 4 51 (1, 0),
-  --                   RelateVarField 5 52 (1, 1),
-  --                   RelateVarField 4 5 (2, 1)
-  --                 ] ::
-  --                   [Relate (Field.UnionFind (Prime 7)) Var (Prime 7)]
-  --               )
-  --       Field.validate xs `shouldBe` []
-  --       Field.lookup 52 xs `shouldBe` Field.ChildOf 4 (Field.LinRel 4 2) mempty
+  describe "Concrete cases: relate + desginate range" $ do
+    describe "Var / Field" $ do
+      it "GF181" $ do
+        let xs =
+              foldl
+                applyRelate
+                Field.new
+                ( [ RelateVarField 0 1 (1, 0),
+                    -- \$0 = $1
+                    RelateVarField 0 2 (1, -1),
+                    -- \$0 = $2 - 1
+                    RelateVarField 0 3 (1, 1),
+                    -- \$0 = $3 + 1
+                    RelateVarField 0 4 (2, 3)
+                  ] ::
+                    -- \$0 = 2$4 + 3
 
-  --   describe "Ref / Field / GF181" $ do
-  --     it "$0 = 0" $
-  --       runM defaultOptions $ do
-  --         F (RefFX 0) `assign` 0 :: M GF181 ()
+                    [Relate (Field.UnionFind GF181) Var GF181]
+                )
+        let xs' =
+              foldl
+                applyDesignateRange
+                xs
+                ( [ DesignateRangeVarField 0 (UnionFind.Range (Just (Field.Wrapper 0, Field.Wrapper 2)))
+                  ] ::
+                    [DesignateRange (Field.UnionFind GF181) Var GF181]
+                )
+        Field.validate xs' `shouldBe` []
+        Field.lookup 1 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel 1 0) (UnionFind.Range (Just (Field.Wrapper 0, Field.Wrapper 2)))
+        Field.lookup 2 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel 1 1) (UnionFind.Range (Just (Field.Wrapper 1, Field.Wrapper 3)))
+        Field.lookup 3 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel 1 (-1)) (UnionFind.Range (Just (Field.Wrapper (-1), Field.Wrapper 1)))
+        Field.lookup 4 xs' `shouldBe` Field.ChildOf 0 (Field.LinRel (1 / 2) (-3 / 2)) (UnionFind.Range (Just (Field.Wrapper (-3 / 2), Field.Wrapper (-1 / 2))))
 
-  --     it "$0 = $1" $
-  --       runM defaultOptions $ do
-  --         RefFX 0 `relate` (1, RefFX 1, 0) :: M GF181 ()
-  --         assertRelation (RefFX 0) 1 (RefFX 1) 0
-  --         assertRelation (RefFX 1) 1 (RefFX 0) 0
+  describe "Concrete cases: assign + relate" $ do
+    describe "Var / Field" $ do
+      it "Binary 7" $ do
+        let xs =
+              foldl
+                applyRelate
+                Field.new
+                ( [ RelateVarField 4 51 (1, 0),
+                    RelateVarField 5 52 (1, 1),
+                    RelateVarField 4 5 (2, 1)
+                  ] ::
+                    [Relate (Field.UnionFind (Binary 7)) Var (Binary 7)]
+                )
+        Field.validate xs `shouldBe` []
+        Field.lookup 52 xs `shouldBe` Field.ChildOf 4 (Field.LinRel 3 2) mempty
 
-  --     it "$0 = 2$1" $
-  --       runM defaultOptions $ do
-  --         RefFX 0 `relate` (2, RefFX 1, 0) :: M GF181 () -- x = 2y
-  --         assertRelation (RefFX 0) 2 (RefFX 1) 0
-  --         assertRelation (RefFX 0) 1 (RefFX 0) 0
-  --         assertRelation (RefFX 1) (1 / 2) (RefFX 0) 0
-  --         assertRelation (RefFX 1) 1 (RefFX 1) 0
+      it "Prime 7" $ do
+        let xs =
+              foldl
+                applyRelate
+                Field.new
+                ( [ RelateVarField 4 51 (1, 0),
+                    RelateVarField 5 52 (1, 1),
+                    RelateVarField 4 5 (2, 1)
+                  ] ::
+                    [Relate (Field.UnionFind (Prime 7)) Var (Prime 7)]
+                )
+        Field.validate xs `shouldBe` []
+        Field.lookup 52 xs `shouldBe` Field.ChildOf 4 (Field.LinRel 4 2) mempty
 
-  --     it "$0 = 2$1 + 1" $
-  --       runM defaultOptions $ do
-  --         RefFX 0 `relate` (2, RefFX 1, 1) :: M GF181 () -- x = 2y + 1
-  --         assertRelation (RefFX 0) 2 (RefFX 1) 1
-  --         assertRelation (RefFX 1) (1 / 2) (RefFX 0) (-1 / 2) -- y = 1/2x - 1/2
-  --     it "$0 = 2$1 + 1 & $1 = 3$2 + 2" $
-  --       runM defaultOptions $ do
-  --         RefFX 0 `relate` (2, RefFX 1, 1) :: M GF181 () -- x = 2y + 1
-  --         RefFX 1 `relate` (3, RefFX 2, 2) -- y = 3z + 2
+    describe "Ref / Field / GF181" $ do
+      it "$0 = 0" $
+        runM defaultOptions $ do
+          F (RefFX 0) `assign` 0 :: M GF181 ()
 
-  --         -- x = 2y + 1
-  --         assertRelation (RefFX 0) 2 (RefFX 1) 1
-  --         -- y = 1/2x - 1/2
-  --         assertRelation (RefFX 1) (1 / 2) (RefFX 0) (-1 / 2)
-  --         -- x = 6z + 5
-  --         assertRelation (RefFX 0) 6 (RefFX 2) 5
-  --         -- z = 1/6x - 5/6
-  --         assertRelation (RefFX 2) (1 / 6) (RefFX 0) (-5 / 6)
-  --         -- y = 3z + 2
-  --         assertRelation (RefFX 1) 3 (RefFX 2) 2
-  --         -- z = 1/3y - 2/3
-  --         assertRelation (RefFX 2) (1 / 3) (RefFX 1) (-2 / 3)
+      it "$0 = $1" $
+        runM defaultOptions $ do
+          RefFX 0 `relate` (1, RefFX 1, 0) :: M GF181 ()
+          assertRelation (RefFX 0) 1 (RefFX 1) 0
+          assertRelation (RefFX 1) 1 (RefFX 0) 0
+
+      it "$0 = 2$1" $
+        runM defaultOptions $ do
+          RefFX 0 `relate` (2, RefFX 1, 0) :: M GF181 () -- x = 2y
+          assertRelation (RefFX 0) 2 (RefFX 1) 0
+          assertRelation (RefFX 0) 1 (RefFX 0) 0
+          assertRelation (RefFX 1) (1 / 2) (RefFX 0) 0
+          assertRelation (RefFX 1) 1 (RefFX 1) 0
+
+      it "$0 = 2$1 + 1" $
+        runM defaultOptions $ do
+          RefFX 0 `relate` (2, RefFX 1, 1) :: M GF181 () -- x = 2y + 1
+          assertRelation (RefFX 0) 2 (RefFX 1) 1
+          assertRelation (RefFX 1) (1 / 2) (RefFX 0) (-1 / 2) -- y = 1/2x - 1/2
+      it "$0 = 2$1 + 1 & $1 = 3$2 + 2" $
+        runM defaultOptions $ do
+          RefFX 0 `relate` (2, RefFX 1, 1) :: M GF181 () -- x = 2y + 1
+          RefFX 1 `relate` (3, RefFX 2, 2) -- y = 3z + 2
+
+          -- x = 2y + 1
+          assertRelation (RefFX 0) 2 (RefFX 1) 1
+          -- y = 1/2x - 1/2
+          assertRelation (RefFX 1) (1 / 2) (RefFX 0) (-1 / 2)
+          -- x = 6z + 5
+          assertRelation (RefFX 0) 6 (RefFX 2) 5
+          -- z = 1/6x - 5/6
+          assertRelation (RefFX 2) (1 / 6) (RefFX 0) (-5 / 6)
+          -- y = 3z + 2
+          assertRelation (RefFX 1) 3 (RefFX 2) 2
+          -- z = 1/3y - 2/3
+          assertRelation (RefFX 2) (1 / 3) (RefFX 1) (-2 / 3)
 
 --------------------------------------------------------------------------------
 

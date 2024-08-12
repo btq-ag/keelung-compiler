@@ -44,7 +44,6 @@ import Keelung.Data.N (N (..))
 import Keelung.Data.UnionFind.Relation (ExecRelation, IsRelation)
 import Keelung.Data.UnionFind.Relation qualified as Relation
 import Prelude hiding (lookup)
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -97,7 +96,8 @@ instance {-# OVERLAPS #-} (KnownNat n, Show var, IsRelation rel) => Show (EquivC
         [] -> [showVar var <> " = []"] -- should never happen
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = [showVar _var <> " = child of " <> showVar _parent]
-      -- toString (_var, IsChildOf _parent _relation) = []
+
+-- toString (_var, IsChildOf _parent _relation) = []
 
 -- | Instance for pretty-printing EquivClass with Galois fields as constant values
 instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation rel) => Show (EquivClass var (Binary n) rel) where
@@ -249,7 +249,7 @@ relateChildToParent child relationToChild parent relations =
               relate parent2 (Relation.invert parent2ToChild <> relationToChild) parent $
                 EquivClass (ecName relations) $
                   -- Map.insert child (IsChildOf parent relationToChild) $
-                    eqPool relations
+                  eqPool relations
 
       -- The parent is a child of another variable, so we relate the child to the grandparent instead
       IsChildOf grandparent relationFromGrandparent -> relate child (relationToChild <> relationFromGrandparent) grandparent relations
@@ -364,9 +364,7 @@ allChildrenRecognizeTheirParent xs =
         IsChildOf actualParent actualRelation ->
           if expectedParent == actualParent && expectedRelation == actualRelation
             then []
-            else
-              traceShow (expectedRelation, actualRelation)
-                [ChildrenNotRecognizingParent expectedParent child]
+            else [ChildrenNotRecognizingParent expectedParent child]
         _ -> []
 
     childrenAllRecognizeParent parent = concat . Map.elems . Map.mapWithKey (childRecognizeParent parent)

@@ -52,6 +52,7 @@ import Keelung.Data.UnionFind qualified as UnionFind
 import Keelung.Data.UnionFind.Relation (ExecRelation (..), IsRelation (..))
 import Keelung.Data.UnionFind.Relation qualified as Relation
 import Prelude hiding (lookup)
+import Keelung (N(N))
 
 --------------------------------------------------------------------------------
 
@@ -146,10 +147,10 @@ instance (GaloisField n, Integral n) => IsRelation (LinRel n) where
         let slope = case a of
               1 -> var
               (-1) -> "-" <> var
-              _ -> show a <> var
+              _ -> show (N a) <> var
             intercept = case b of
               0 -> ""
-              _ -> " + " <> show b
+              _ -> " + " <> show (N b)
          in -- if N.isPositive b
             --   then " + " <> show (N b)
             --   else " - " <> show (N (-b))
