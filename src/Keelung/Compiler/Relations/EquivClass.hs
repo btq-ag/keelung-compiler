@@ -3,6 +3,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use list comprehension" #-}
 
 module Keelung.Compiler.Relations.EquivClass
   ( -- IsRelation (..),
@@ -18,9 +21,13 @@ module Keelung.Compiler.Relations.EquivClass
     relate,
     relationBetween,
     toMap,
-    isValid,
     size,
     lookup,
+
+    -- * Testing
+    Error (..),
+    isValid,
+    validate,
   )
 where
 
@@ -32,7 +39,7 @@ import Data.Map qualified as Map
 import Data.Map.Strict (Map)
 import GHC.Generics (Generic)
 import GHC.TypeLits
-import Keelung.Compiler.Relations.Util
+import Keelung.Compiler.Relations.Monad
 import Keelung.Data.N (N (..))
 import Keelung.Data.UnionFind.Relation (ExecRelation, IsRelation)
 import Keelung.Data.UnionFind.Relation qualified as Relation
@@ -88,7 +95,9 @@ instance {-# OVERLAPS #-} (KnownNat n, Show var, IsRelation rel) => Show (EquivC
       toString (var, IsRoot toChildren) = case map (uncurry (Relation.renderWithVarString . show)) (Map.toList toChildren) of
         [] -> [showVar var <> " = []"] -- should never happen
         (x : xs) -> showVar var <> " = " <> x : map ("           = " <>) xs
-      toString (_var, IsChildOf _parent _relation) = []
+      toString (_var, IsChildOf _parent _relation) = [showVar _var <> " = child of " <> showVar _parent]
+
+-- toString (_var, IsChildOf _parent _relation) = []
 
 -- | Instance for pretty-printing EquivClass with Galois fields as constant values
 instance {-# OVERLAPPING #-} (KnownNat n, Show var, IsRelation rel) => Show (EquivClass var (Binary n) rel) where
@@ -239,8 +248,8 @@ relateChildToParent child relationToChild parent relations =
               markChanged
               relate parent2 (Relation.invert parent2ToChild <> relationToChild) parent $
                 EquivClass (ecName relations) $
-                  Map.insert child (IsChildOf parent relationToChild) $
-                    eqPool relations
+                  -- Map.insert child (IsChildOf parent relationToChild) $
+                  eqPool relations
 
       -- The parent is a child of another variable, so we relate the child to the grandparent instead
       IsChildOf grandparent relationFromGrandparent -> relate child (relationToChild <> relationFromGrandparent) grandparent relations
@@ -294,31 +303,81 @@ toMap = eqPool
 size :: EquivClass var n rel -> Int
 size = Map.size . eqPool
 
--- | A EquivClass is valid if:
+-- --------------------------------------------------------------------------------
+
+-- -- | A EquivClass is valid if:
+-- --          1. all children of a parent recognize the parent as their parent
+-- isValid :: (Ord var, IsRelation rel, Eq rel, Seniority var) => EquivClass var n rel -> Bool
+-- isValid relations = allChildrenRecognizeTheirParent relations && rootsAreSenior relations
+
+-- -- | A EquivClass is valid if all children of a parent recognize the parent as their parent
+-- allChildrenRecognizeTheirParent :: (Ord var, IsRelation rel, Eq rel) => EquivClass var n rel -> Bool
+-- allChildrenRecognizeTheirParent relations =
+--   let families = Map.mapMaybe isParent (eqPool relations)
+
+--       isParent (IsRoot children) = Just children
+--       isParent _ = Nothing
+
+--       recognizeParent parent child relation = case lookup child relations of
+--         IsChildOf parent' relation' -> parent == parent' && relation == relation'
+--         _ -> False
+--       childrenAllRecognizeParent parent = and . Map.elems . Map.mapWithKey (recognizeParent parent)
+--    in Map.foldlWithKey' (\acc parent children -> acc && childrenAllRecognizeParent parent children) True families
+
+-- -- | A EquivClass is valid if the seniority of the root of a family is greater than equal the seniority of all its children
+-- rootsAreSenior :: (Ord var, IsRelation rel, Eq rel, Seniority var) => EquivClass var n rel -> Bool
+-- rootsAreSenior = Map.foldlWithKey' go True . eqPool
+--   where
+--     go :: (Seniority var) => Bool -> var -> VarStatus var n rel -> Bool
+--     go False _ _ = False
+--     go True _ (IsConstant _) = True
+--     go True var (IsRoot children) = all (\child -> compareSeniority var child /= LT) (Map.keys children)
+--     go True var (IsChildOf parent _) = compareSeniority parent var /= LT
+
+--------------------------------------------------------------------------------
+
+-- | Error for testing
+data Error var
+  = RootNotSenior var
+  | ChildrenNotRecognizingParent var var -- parent & child
+  deriving (Show, Eq)
+
+-- | A Reference is valid if:
 --          1. all children of a parent recognize the parent as their parent
-isValid :: (Ord var, IsRelation rel, Eq rel, Seniority var) => EquivClass var n rel -> Bool
-isValid relations = allChildrenRecognizeTheirParent relations && rootsAreSenior relations
+--          2. the seniority of the root of a family is greater than equal the seniority of all its children
+validate :: (Ord var, Seniority var, Eq rel, Show var, Show rel) => EquivClass var n rel -> [Error var]
+validate xs = allChildrenRecognizeTheirParent xs <> rootsAreSenior xs
 
--- | A EquivClass is valid if all children of a parent recognize the parent as their parent
-allChildrenRecognizeTheirParent :: (Ord var, IsRelation rel, Eq rel) => EquivClass var n rel -> Bool
-allChildrenRecognizeTheirParent relations =
-  let families = Map.mapMaybe isParent (eqPool relations)
+isValid :: (Ord var, Seniority var, Eq rel, Show var, Show rel) => EquivClass var n rel -> Bool
+isValid = null . validate
 
+-- | A Reference is valid if all children of a parent recognize the parent as their parent
+allChildrenRecognizeTheirParent :: (Ord var, Eq rel, Show var, Show rel) => EquivClass var n rel -> [Error var]
+allChildrenRecognizeTheirParent xs =
+  let families = Map.mapMaybe isParent (eqPool xs)
       isParent (IsRoot children) = Just children
       isParent _ = Nothing
-
-      recognizeParent parent child relation = case lookup child relations of
-        IsChildOf parent' relation' -> parent == parent' && relation == relation'
-        _ -> False
-      childrenAllRecognizeParent parent = and . Map.elems . Map.mapWithKey (recognizeParent parent)
-   in Map.foldlWithKey' (\acc parent children -> acc && childrenAllRecognizeParent parent children) True families
-
--- | A EquivClass is valid if the seniority of the root of a family is greater than equal the seniority of all its children
-rootsAreSenior :: (Ord var, IsRelation rel, Eq rel, Seniority var) => EquivClass var n rel -> Bool
-rootsAreSenior = Map.foldlWithKey' go True . eqPool
+   in concatMap (uncurry childrenAllRecognizeParent) (Map.toList families)
   where
-    go :: (Seniority var) => Bool -> var -> VarStatus var n rel -> Bool
-    go False _ _ = False
-    go True _ (IsConstant _) = True
-    go True var (IsRoot children) = all (\child -> compareSeniority var child /= LT) (Map.keys children)
-    go True var (IsChildOf parent _) = compareSeniority parent var /= LT
+    childRecognizeParent expectedParent child expectedRelation =
+      case lookup child xs of
+        IsChildOf actualParent actualRelation ->
+          if expectedParent == actualParent && expectedRelation == actualRelation
+            then []
+            else [ChildrenNotRecognizingParent expectedParent child]
+        _ -> []
+
+    childrenAllRecognizeParent parent = concat . Map.elems . Map.mapWithKey (childRecognizeParent parent)
+
+--  where
+--     toErrors :: Ref -> Map Ref (LinRel n) -> [Error]
+--     toErrors parent children
+
+-- | A Reference is valid if the seniority of the root of a family is greater than equal the seniority of all its children
+rootsAreSenior :: (Ord var, Seniority var) => EquivClass var n rel -> [Error var]
+rootsAreSenior = concatMap (uncurry toErrors) . Map.toList . eqPool
+  where
+    toErrors :: (Ord var, Seniority var) => var -> VarStatus var n rel -> [Error var]
+    toErrors _ (IsConstant _) = []
+    toErrors var (IsRoot children) = map RootNotSenior (filter (\child -> compareSeniority var child == LT) (Map.keys children))
+    toErrors var (IsChildOf parent _) = if compareSeniority parent var == LT then [RootNotSenior var] else []

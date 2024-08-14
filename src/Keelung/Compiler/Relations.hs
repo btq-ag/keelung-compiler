@@ -53,6 +53,7 @@ import Keelung.Data.Reference
 import Keelung.Data.Slice (Slice)
 import Keelung.Data.Slice qualified as Slice
 import Keelung.Data.U qualified as U
+import Keelung.Data.UnionFind.Field qualified as Field
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -122,8 +123,8 @@ relateSlice slice1 slice2 relations = do
         { relationsS = SliceRelations.relate slice1 slice2 (relationsS relations)
         }
 
-relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> Maybe (n, n)
-relationBetween var1 var2 relations = RefRelations.relationBetween var1 var2 (relationsR relations) (relationsS relations)
+relationBetween :: (GaloisField n, Integral n) => Ref -> Ref -> Relations n -> Maybe (Field.LinRel n)
+relationBetween var1 var2 relations = uncurry Field.LinRel <$> RefRelations.relationBetween var1 var2 (relationsR relations) (relationsS relations)
 
 size :: Relations n -> Int
 size (Relations refs slices _) = RefRelations.size refs + SliceRelations.size slices
