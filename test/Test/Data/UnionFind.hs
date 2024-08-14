@@ -122,8 +122,8 @@ tests = describe "UnionFind" $ do
           Relations.validate xs `shouldBe` []
 
           if var1 == var2
-            then Relations.relationBetween var1 var2 xs `shouldBe` Just (Field.LinRel 1 0)
-            else Relations.relationBetween var1 var2 xs `shouldBe` Just rel1
+            then relationBetween var1 var2 xs `shouldBe` Just (Field.LinRel 1 0)
+            else relationBetween var1 var2 xs `shouldBe` Just rel1
 
       it "SolverVarField GF181" $ do
         property $ \(TestRelateComposition2Vars var1 var2 rel1) -> do
@@ -132,8 +132,8 @@ tests = describe "UnionFind" $ do
           Field.validate xs `shouldBe` []
 
           if var1 == var2
-            then UnionFind.relationBetween var1 var2 xs `shouldBe` Just (Field.LinRel 1 0)
-            else UnionFind.relationBetween var1 var2 xs `shouldBe` Just rel1
+            then relationBetween var1 var2 xs `shouldBe` Just (Field.LinRel 1 0)
+            else relationBetween var1 var2 xs `shouldBe` Just rel1
 
     -- TestRelateComposition2Vars
     -- it "relate 3 variables and then lookup the relation" $ do
@@ -156,7 +156,7 @@ tests = describe "UnionFind" $ do
     describe "relate and then assign" $ do
       it "Boolean" $ do
         property $ \(relates, assignments) -> do
-          let xs = foldl applyRelate Boolean.new (relates :: [Relate SolverVarBool Var Bool])
+          let xs = foldl applyRelate Boolean.new (relates :: [Relate SolverVarBool Var Boolean.Rel])
           let xs' = foldl applyAssign xs (assignments :: [Assign SolverVarBool Var Bool])
           Boolean.validate xs' `shouldBe` []
       it "Field / GF181" $ do
@@ -328,31 +328,34 @@ type Unified var field rel = EC.EquivClass var field rel
 
 -- | Typeclass for UnionFind data structures
 class RelateC a var rel | a -> var, a -> rel where
-  relate :: a -> Relate a var rel -> a
-
-  -- validate :: a -> [UnionFind.Error]
   new :: a
+  relate :: a -> Relate a var rel -> a
+  relationBetween :: var -> var -> a -> Maybe rel
 
 instance (GaloisField n, Integral n) => RelateC (SolverVarField n) Var (Field.LinRel n) where
-  relate = applyRelate
   new = Field.new
-
-instance RelateC SolverVarBool Var Bool where
   relate = applyRelate
+  relationBetween = UnionFind.relationBetween
+
+instance RelateC SolverVarBool Var Boolean.Rel where
   new = Boolean.new
+  relate = applyRelate
+  relationBetween = UnionFind.relationBetween
 
 instance (GaloisField n, Integral n) => RelateC (CompilerRefField n) Ref (Field.LinRel n) where
   relate = applyRelate
   new = Relations.new (Options.new Field.gf181)
+  relationBetween = Relations.relationBetween
 
 instance (GaloisField n, Integral n, Seniority var, Ord var) => RelateC (Unified var n (Field.LinRel n)) var (Field.LinRel n) where
   relate = applyRelate
   new = EC.new "Ref / GF181"
+  relationBetween = EC.relationBetween
 
 -- | Datatype for relating two variables
 data Relate :: Type -> Type -> Type -> Type where
   RelateSolverVarField :: (GaloisField n, Integral n) => Var -> Var -> Field.LinRel n -> Relate (SolverVarField n) Var (Field.LinRel n)
-  RelateSolverVarBool :: Var -> Var -> Bool -> Relate SolverVarBool Var Bool
+  RelateSolverVarBool :: Var -> Var -> Boolean.Rel -> Relate SolverVarBool Var Boolean.Rel
   RelateCompilerRefField :: (GaloisField n, Integral n) => Ref -> Ref -> (Field.LinRel n) -> Relate (CompilerRefField n) Ref (Field.LinRel n)
   RelateEC :: (GaloisField n, Integral n, Seniority var, Ord var) => var -> var -> (Field.LinRel n) -> Relate (Unified var n (Field.LinRel n)) var (Field.LinRel n)
 
@@ -368,7 +371,7 @@ applyRelates = foldl relate
 instance (GaloisField n, Integral n, Show var) => Show (Relate (SolverVarField n) var (Field.LinRel n)) where
   show (RelateSolverVarField var1 var2 (Field.LinRel slope intercept)) = "RelateField " <> show var1 <> " " <> show var2 <> " (" <> show slope <> ", " <> show intercept <> ")"
 
-instance (Show var) => Show (Relate SolverVarBool var Bool) where
+instance (Show var) => Show (Relate SolverVarBool var Boolean.Rel) where
   show (RelateSolverVarBool var1 var2 relation) = "RelateSolverVarBool " <> show var1 <> " " <> show var2 <> " " <> show relation
 
 instance (GaloisField n, Integral n, Show var) => Show (Relate (CompilerRefField n) var (Field.LinRel n)) where
@@ -391,12 +394,12 @@ instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (Relate (Compiler
       <*> arbitrary
       <*> (Field.LinRel <$> (arbitrary `suchThat` (/= 0)) <*> arbitrary)
 
-instance Arbitrary (Relate SolverVarBool Var Bool) where
+instance Arbitrary (Relate SolverVarBool Var Boolean.Rel) where
   arbitrary =
     RelateSolverVarBool
       <$> chooseInt (0, 100)
       <*> chooseInt (0, 100)
-      <*> arbitrary
+      <*> (Boolean.Rel <$> arbitrary)
 
 instance (GaloisField n, Integral n, Arbitrary n, Arbitrary var, Seniority var, Ord var) => Arbitrary (Relate (EC.EquivClass var n (Field.LinRel n)) var (Field.LinRel n)) where
   arbitrary =
@@ -407,7 +410,7 @@ instance (GaloisField n, Integral n, Arbitrary n, Arbitrary var, Seniority var, 
 
 applyRelate :: a -> Relate a var val -> a
 applyRelate xs (RelateSolverVarField var1 var2 (Field.LinRel slope intercept)) = Maybe.fromMaybe xs (Field.relate var1 var2 (Field.LinRel slope intercept) xs)
-applyRelate xs (RelateSolverVarBool var1 var2 relation) = Maybe.fromMaybe xs (UnionFind.relate var1 var2 (Boolean.Rel relation) xs)
+applyRelate xs (RelateSolverVarBool var1 var2 relation) = Maybe.fromMaybe xs (UnionFind.relate var1 var2 relation xs)
 applyRelate xs (RelateCompilerRefField var1 var2 (Field.LinRel slope intercept)) = case runExcept (Relations.relateRef var1 slope var2 intercept xs) of
   Left err -> error (show err)
   Right (Just xs') -> xs'
