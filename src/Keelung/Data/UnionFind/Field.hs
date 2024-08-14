@@ -31,6 +31,7 @@ module Keelung.Data.UnionFind.Field
 
     -- * Linear Relations
     LinRel (..),
+    fromLinRel,
 
     -- * Range
     UnionFind.designateRange,
@@ -48,11 +49,11 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung (N (N))
 import Keelung.Data.UnionFind qualified as UnionFind
 import Keelung.Data.UnionFind.Relation (ExecRelation (..), IsRelation (..))
 import Keelung.Data.UnionFind.Relation qualified as Relation
 import Prelude hiding (lookup)
-import Keelung (N(N))
 
 --------------------------------------------------------------------------------
 
