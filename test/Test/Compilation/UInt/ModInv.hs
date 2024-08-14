@@ -5,10 +5,10 @@ module Test.Compilation.UInt.ModInv (tests, run) where
 import Control.Monad
 import Keelung hiding (compile)
 import Keelung.Data.U qualified as U
-import Test.Util
 import Test.HUnit
 import Test.Hspec
 import Test.QuickCheck
+import Test.Util
 
 run :: IO ()
 run = hspec tests
@@ -34,14 +34,14 @@ tests =
       check (Prime 17) program [] [] [5]
 
     it "modInv N (mod 2833)" $ do
-      let prime = 2833
+      let primeNumber = 2833
       let program = do
             x <- input Public :: Comp (UInt 32)
-            return $ modInv x prime
+            return $ modInv x primeNumber
       let genPair = do
-            -- only choosing from 1 to prime - 1
-            a <- choose (1, prime - 1)
-            let expected = U.modInv a prime
+            -- only choosing from 1 to primeNumber - 1
+            a <- choose (1, primeNumber - 1)
+            let expected = U.modInv a primeNumber
             return (a, expected)
       forAll genPair $ \(a, result) -> do
         case result of
@@ -55,18 +55,18 @@ tests =
       check gf181 program [] [] [3466]
       check (Prime 17) program [] [] [3466]
 
-    let genPair prime = do
-          -- only choosing from 1 to prime - 1
-          a <- choose (1, prime - 1)
-          let expected = U.modInv a prime
+    let genPair primeNumber = do
+          -- only choosing from 1 to primeNumber - 1
+          a <- choose (1, primeNumber - 1)
+          let expected = U.modInv a primeNumber
           return (a, expected)
 
     it "modInv N (mod 71)" $ do
-      let prime = 71
+      let primeNumber = 71
       let program = do
             x <- input Public :: Comp (UInt 8)
-            return $ modInv x prime
-      forAll (genPair prime) $ \(a, result) -> do
+            return $ modInv x primeNumber
+      forAll (genPair primeNumber) $ \(a, result) -> do
         case result of
           Nothing -> assertFailure "[ panic ] modInv: cannot find the inverse"
           Just inverse -> do
@@ -75,11 +75,11 @@ tests =
               check field program [a] [] expected
 
     it "modInv N (mod 7)" $ do
-      let prime = 7
+      let primeNumber = 7
       let program = do
             x <- input Public :: Comp (UInt 4)
-            return $ modInv x prime
-      forAll (genPair prime) $ \(a, result) -> do
+            return $ modInv x primeNumber
+      forAll (genPair primeNumber) $ \(a, result) -> do
         case result of
           Nothing -> assertFailure "[ panic ] modInv: cannot find the inverse"
           Just inverse -> do
