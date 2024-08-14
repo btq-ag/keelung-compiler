@@ -4,8 +4,11 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
+
+{-# HLINT ignore "Use lambda-case" #-}
 
 module Test.Data.UnionFind (run, tests) where
 
@@ -26,6 +29,7 @@ import Keelung.Data.Reference (Ref (..), RefB (..), RefF (..))
 import Keelung.Data.UnionFind qualified as UnionFind
 import Keelung.Data.UnionFind.Boolean qualified as Boolean
 import Keelung.Data.UnionFind.Field qualified as Field
+import Keelung.Data.UnionFind.Relation qualified as Relation
 import Keelung.Data.UnionFind.Relation qualified as UnionFind.Relation
 import Keelung.Field qualified as Field
 import Test.Arbitrary ()
@@ -63,6 +67,21 @@ tests = describe "UnionFind" $ do
   --   let xs = foldl applyRelate (Relations.new (Options.new Field.gf181)) (relates :: [Relate (Relations.Relations GF181) Ref GF181]) :: Relations.Relations GF181
   --   print xs
   --   Relations.validate xs `shouldBe` []
+
+  -- it "error 4" $ do
+  --     let var1 = F (RefFX 1)
+  --         var2 = F (RefFX 2)
+  --         var3 = B (RefBI 1)
+  --         rel1 = Field.LinRel 1 1
+  --         ref2 = Field.LinRel 2 0
+  --         relates =
+  --           [ RelateCompilerRefField var1 var2 rel1,
+  --             RelateCompilerRefField var2 var3 ref2
+  --           ]
+  --     let xs = applyRelates new relates :: CompilerRefField GF181
+  --     Relations.validate xs `shouldBe` []
+  --     relationBetween var1 var2 xs `shouldBe` Just rel1
+  --     relationBetween var2 var3 xs `shouldBe` Just ref2
 
   -- B = F + 2
   -- F = B - 2
@@ -135,23 +154,58 @@ tests = describe "UnionFind" $ do
             then relationBetween var1 var2 xs `shouldBe` Just (Field.LinRel 1 0)
             else relationBetween var1 var2 xs `shouldBe` Just rel1
 
-    -- TestRelateComposition2Vars
-    -- it "relate 3 variables and then lookup the relation" $ do
-    --   property $ \(var1, var2, var3, rel1, rel2) -> do
-    --     let relates =
-    --           [ RelateCompilerRefField var1 var2 rel1,
-    --             RelateCompilerRefField var2 var3 rel2
-    --           ]
-    --     let xs = applyRelates new relates :: CompilerRefField GF181
-    --     Relations.validate xs `shouldBe` []
+      it "SolverVarField (Binary 7)" $ do
+        property $ \(TestRelateComposition2Vars var1 var2 rel1) -> do
+          let relates = [RelateSolverVarField var1 var2 rel1]
+          let xs = applyRelates new relates :: SolverVarField (Binary 7)
+          Field.validate xs `shouldBe` []
 
-    --     if var1 == var2
-    --       then Relations.relationBetween var2 var3 xs `shouldBe` Just rel2
-    --       else if var2 == var3
-    --         then do
-    --           Relations.relationBetween var1 var2 xs `shouldBe` Just rel1
-    --         else
-    --           _
+          if var1 == var2
+            then relationBetween var1 var2 xs `shouldBe` Just (Field.LinRel 1 0)
+            else relationBetween var1 var2 xs `shouldBe` Just rel1
+
+    -- it "relate 3 variables and then lookup the relation" $ do
+    --   property $ \testCase -> case testCase of
+    --     TestRelateComposition3VarsAllDifferent var1 var2 var3 rel1 ref2 -> do 
+    --       let relates =
+    --             [ RelateCompilerRefField var1 var2 rel1,
+    --               RelateCompilerRefField var2 var3 ref2
+    --             ]
+    --       let xs = applyRelates new relates :: CompilerRefField GF181
+    --       Relations.validate xs `shouldBe` []
+    --       Relations.relationBetween var1 var2 xs `shouldBe` Just rel1
+    --       Relations.relationBetween var2 var3 xs `shouldBe` Just ref2
+    --     TestRelateComposition3VarsAllTheSame var -> do
+    --       let relates =
+    --             [ RelateCompilerRefField var var (Field.LinRel 1 0),
+    --               RelateCompilerRefField var var (Field.LinRel 1 0)
+    --             ]
+    --       let xs = applyRelates new relates :: CompilerRefField GF181
+    --       Relations.validate xs `shouldBe` []
+    --     TestRelateComposition3Vars12TheSame var1 var3 rel1 -> do
+    --       let relates =
+    --             [ RelateCompilerRefField var1 var1 (Field.LinRel 1 0),
+    --               RelateCompilerRefField var1 var3 rel1
+    --             ]
+    --       let xs = applyRelates new relates :: CompilerRefField GF181
+    --       Relations.validate xs `shouldBe` []
+    --       Relations.relationBetween var1 var3 xs `shouldBe` Just rel1
+    --     TestRelateComposition3Vars13TheSame var1 var2 rel1 -> do
+    --       let relates =
+    --             [ RelateCompilerRefField var1 var2 rel1,
+    --               RelateCompilerRefField var2 var1 (Relation.invert rel1)
+    --             ]
+    --       let xs = applyRelates new relates :: CompilerRefField GF181
+    --       Relations.validate xs `shouldBe` []
+    --       Relations.relationBetween var1 var2 xs `shouldBe` Just rel1
+    --     TestRelateComposition3Vars23TheSame var1 var2 rel1 -> do
+    --       let relates =
+    --             [ RelateCompilerRefField var1 var2 rel1,
+    --               RelateCompilerRefField var2 var1 (Relation.invert rel1)
+    --             ]
+    --       let xs = applyRelates new relates :: CompilerRefField GF181
+    --       Relations.validate xs `shouldBe` []
+    --       Relations.relationBetween var1 var2 xs `shouldBe` Just rel1
 
     describe "relate and then assign" $ do
       it "Boolean" $ do
@@ -533,28 +587,83 @@ assertRelation var1 slope var2 intercept = do
 -- | Test case for relating 2 variables
 data TestRelateComposition2Vars var rel = TestRelateComposition2Vars var var rel deriving (Show)
 
-instance Arbitrary (TestRelateComposition2Vars Var (Field.LinRel GF181)) where
+instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (TestRelateComposition2Vars Var (Field.LinRel n)) where
   arbitrary = do
     var1 <- chooseInt (0, 100)
     var2 <- chooseInt (0, 100)
-    slope <- arbitrary `suchThat` (/= 0)
-    intercept <- arbitrary
+    relation <- arbitrary
 
     if var1 == var2
       then return $ TestRelateComposition2Vars var1 var2 (Field.LinRel 1 0)
-      else return $ TestRelateComposition2Vars var1 var2 (Field.LinRel slope intercept)
+      else return $ TestRelateComposition2Vars var1 var2 relation
 
 instance Arbitrary (TestRelateComposition2Vars Ref (Field.LinRel GF181)) where
   arbitrary = do
     var1 <- arbitrary
     var2 <- arbitrary
-    rel <- arbitrary
 
     if var1 == var2
       then return $ TestRelateComposition2Vars var1 var2 (Field.LinRel 1 0)
-      else return $ TestRelateComposition2Vars var1 var2 rel
+      else TestRelateComposition2Vars var1 var2 <$> arbitrary
 
--- -- | Test case for relating 3 variables
--- data TestRelateComposition3Vars var rel = TestRelateComposition3Vars var var var rel rel deriving (Show)
+-- | Test case for relating 3 variables
+data TestRelateComposition3Vars var rel
+  = TestRelateComposition3VarsAllTheSame
+      var -- var1 = var2 = var3
+  | TestRelateComposition3VarsAllDifferent
+      var -- var1
+      var -- var2
+      var -- var3
+      rel -- relation between var1 and var2
+      rel -- relation between var2 and var3
+  | TestRelateComposition3Vars12TheSame
+      var -- var1 = var2
+      var -- var3
+      rel -- relation between var1 and var3
+  | TestRelateComposition3Vars13TheSame
+      var -- var1 = var3
+      var -- var2
+      rel -- relation between var1 and var2
+  | TestRelateComposition3Vars23TheSame
+      var -- var1
+      var -- var2 = var3
+      rel -- relation between var1 and var2
+  deriving (Show)
 
--- instance Arbitrary
+instance (Arbitrary var, Arbitrary rel, Eq var) => Arbitrary (TestRelateComposition3Vars var rel) where
+  arbitrary = do
+    var1 <- arbitrary
+    var2 <- arbitrary
+    var3 <- arbitrary
+
+    if var1 == var2
+      then
+        if var1 == var3
+          then return $ TestRelateComposition3VarsAllTheSame var1
+          else TestRelateComposition3Vars12TheSame var1 var3 <$> arbitrary -- var1 == var2 =/= var3
+      else
+        if var1 == var3
+          then TestRelateComposition3Vars13TheSame var1 var2 <$> arbitrary
+          else
+            if var2 == var3
+              then TestRelateComposition3Vars23TheSame var1 var2 <$> arbitrary -- var1 =/= var2 == var3
+              else TestRelateComposition3VarsAllDifferent var1 var2 var3 <$> arbitrary <*> arbitrary -- all 3 variables are different
+
+-- instance (Arbitrary n, GaloisField n, Integral n) => Arbitrary (TestRelateComposition3Vars Var (Field.LinRel n)) where
+--   arbitrary = do
+--     var1 <- chooseInt (0, 100)
+--     var2 <- chooseInt (0, 100)
+--     var3 <- chooseInt (0, 100)
+
+--     if var1 == var2
+--       then
+--         if var1 == var3
+--           then return $ TestRelateComposition3VarsAllTheSame var1
+--           else TestRelateComposition3Vars12TheSame var1 var3 <$> arbitrary -- var1 == var2 =/= var3
+--       else
+--         if var1 == var3
+--           then TestRelateComposition3Vars13TheSame var1 var2 <$> arbitrary
+--           else
+--             if var2 == var3
+--               then TestRelateComposition3Vars23TheSame var1 var2 <$> arbitrary -- var1 =/= var2 == var3
+--               else TestRelateComposition3VarsAllDifferent var1 var2 var3 <$> arbitrary <*> arbitrary -- all 3 variables are different
