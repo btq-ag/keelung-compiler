@@ -38,6 +38,8 @@ dependencies:
 - split
 - validation
 - vector
+- process
+- directory
 
 default-extensions: 
 - ImportQualifiedPost

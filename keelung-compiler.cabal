@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.2.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -107,11 +107,13 @@ library
     , cereal
     , containers
     , deepseq
+    , directory
     , equivalence
     , galois-field
     , keelung
     , mtl
     , optparse-applicative
+    , process
     , random
     , semirings
     , split
@@ -211,12 +213,14 @@ executable keelungc
     , cereal
     , containers
     , deepseq
+    , directory
     , equivalence
     , galois-field
     , keelung
     , keelung-compiler
     , mtl
     , optparse-applicative
+    , process
     , random
     , semirings
     , split
@@ -243,6 +247,7 @@ test-suite keelung-test
       Test.Compilation.Field.Exponentiation
       Test.Compilation.Field.Inequality
       Test.Compilation.Misc
+      Test.Compilation.Snarkjs
       Test.Compilation.Statement
       Test.Compilation.UInt
       Test.Compilation.UInt.Addition
@@ -373,6 +378,7 @@ test-suite keelung-test
     , cereal
     , containers
     , deepseq
+    , directory
     , equivalence
     , galois-field
     , hspec
@@ -381,6 +387,7 @@ test-suite keelung-test
     , keelung-compiler
     , mtl
     , optparse-applicative
+    , process
     , quickcheck-transformer
     , random
     , semirings
