@@ -2,14 +2,14 @@
 module Test.Compilation.Snarkjs where
 
 import Keelung
-import Test.Util
 import Test.Hspec
-import Test.QuickCheck
 import System.Process
 import System.Directory
 import GHC.IO.Exception (ExitCode(..))
 import Data.Either (isRight)
 import Data.Functor ((<&>))
+import qualified System.Info
+import System.IO.Error (catchIOError)
 
 run :: IO ()
 run = hspec tests
@@ -29,7 +29,9 @@ tests = do
       shouldReturn (inDir (genWtns "quad.wtns" bn128 quad [3,5,-22] [2]) <&> isRight) True
 
   describe ("Testing Snarkjs-related compiler functions...\n[ INFO ] These tests are possible only if you have Keelung compiler >= " <> keelungVersion <> " and Snarkjs installed.") $ do
-    (code, _, _) <- runIO (readProcessWithExitCode "snarkjs" [] [])
+    snarkjsExists <- runIO (checkCmd "snarkjs")
+    (code, _, _) <- if snarkjsExists then runIO (readProcessWithExitCode "snarkjs" [] [])
+                                     else return (ExitFailure 127, "", "")
     if code == ExitFailure 99 then
       describe "Testing compatibility with Snarkjs" $ do
         it "Checking if Snarkjs exists" $ do
@@ -67,3 +69,16 @@ quad = do
     _x :: Field <- input Private
     assert (eq (_a * _x * _x + _b * _x + _c) 0)
     return ()
+
+-- | Check if a command exists
+checkCmd :: String -> IO Bool
+checkCmd cmd =
+    catchIOError
+      (readProcess whichCmd [cmd] mempty >> return True)
+      (\_ -> return False)
+  where
+    -- decide the command for locating executables
+    whichCmd :: String
+    whichCmd = case System.Info.os of
+      "mingw32" -> "where" -- Windows uses "where"
+      _ -> "which" -- Unix uses "which"
