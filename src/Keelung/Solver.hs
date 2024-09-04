@@ -214,7 +214,6 @@ shrinkAdd (Stuck (AddConstraint polynomial)) = do
             Prime _ -> False
             Binary _ -> True
       let allBoolean = all isBoolean (IntSet.toList (Poly.vars poly))
-      -- traceShowM $ zip (IntSet.toList (Poly.vars poly)) (map isBoolean (IntSet.toList (Poly.vars poly)))
       if onBinaryField && allBoolean
         then case Binary.run poly of
           Nothing -> return (Stuck poly)

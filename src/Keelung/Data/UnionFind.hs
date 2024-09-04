@@ -15,7 +15,7 @@ import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
 import Keelung (Var)
 import Keelung.Compiler.Relations.Monad (Seniority (..))
-import Keelung.Data.UnionFind.Relation (Relation)
+import Keelung.Data.UnionFind.Relation (ExecRelation, IsRelation)
 import Keelung.Data.UnionFind.Relation qualified as Relation
 
 --------------------------------------------------------------------------------
@@ -31,7 +31,7 @@ data Lookup var val rel
   deriving (Show, Eq, Generic, Functor)
 
 -- | Result of looking up a variable in the Relations
-lookup :: (Ord val, HasRange val, Relation rel val) => Var -> UnionFind val rel -> Lookup Var val rel
+lookup :: (Ord val, HasRange val, IsRelation rel, ExecRelation rel val) => Var -> UnionFind val rel -> Lookup Var val rel
 lookup var relations =
   case lookupStatus var relations of
     IsConstant value -> Constant value
@@ -61,7 +61,7 @@ newtype UnionFind val rel = UnionFind {unUnionFind :: IntMap (Status val rel)} d
 
 instance (Serialize val, Serialize rel) => Serialize (UnionFind val rel)
 
-instance (Show val, Relation rel val, Eq val) => Show (UnionFind val rel) where
+instance (Show val, IsRelation rel, Eq val) => Show (UnionFind val rel) where
   show (UnionFind relations) =
     "UnionFind\n"
       <> mconcat (map (<> "\n") (concatMap toString (IntMap.toList relations)))
@@ -71,7 +71,7 @@ instance (Show val, Relation rel val, Eq val) => Show (UnionFind val rel) where
       showVar range var = let varString = "$" <> show var <> show range in "  " <> varString <> replicate (8 - length varString) ' '
 
       toString (var, IsConstant value) = [showVarWithoutRange var <> " = " <> show value]
-      toString (var, IsRoot range toChildren) = case map (uncurry Relation.renderWithVar) (IntMap.toList toChildren) of
+      toString (var, IsRoot range toChildren) = case map (uncurry (Relation.renderWithVarString . show)) (IntMap.toList toChildren) of
         [] -> [showVar range var <> " = []"] -- should never happen
         (x : xs) -> showVar range var <> " = " <> x : map ("           = " <>) xs
       toString (_var, IsChildOf _parent _relation) = []
@@ -91,7 +91,7 @@ lookupStatus var (UnionFind relations) = case IntMap.lookup var relations of
   Just result -> result
 
 -- | Assigns a value to a variable, O(lg n)
-assign :: (Relation rel val, Eq val, HasRange val) => Var -> val -> UnionFind val rel -> Maybe (UnionFind val rel)
+assign :: (IsRelation rel, ExecRelation rel val, Eq val, HasRange val) => Var -> val -> UnionFind val rel -> Maybe (UnionFind val rel)
 assign var value (UnionFind relations) = case IntMap.lookup var relations of
   -- The variable is not in the map, so we add it as a constant
   Nothing -> Just $ UnionFind $ IntMap.insert var (IsConstant value) relations
@@ -130,7 +130,7 @@ assign var value (UnionFind relations) = case IntMap.lookup var relations of
   Just (IsChildOf parent relationToChild) ->
     assign parent (Relation.execute (Relation.invert relationToChild) value) (UnionFind relations)
 
-designateRange :: (Relation rel val, Eq val, HasRange val, Ord val) => Var -> Range val -> UnionFind val rel -> Maybe (UnionFind val rel)
+designateRange :: (IsRelation rel, ExecRelation rel val, Eq val, HasRange val, Ord val) => Var -> Range val -> UnionFind val rel -> Maybe (UnionFind val rel)
 designateRange var newRange (UnionFind relations) = case IntMap.lookup var relations of
   Nothing -> Nothing
   Just (IsRoot oldRange children) ->
@@ -145,11 +145,11 @@ designateRange var newRange (UnionFind relations) = case IntMap.lookup var relat
 --------------------------------------------------------------------------------
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relate :: (Relation rel val, Eq val, HasRange val, Ord val) => Var -> Var -> rel -> UnionFind val rel -> Maybe (UnionFind val rel)
+relate :: (IsRelation rel, ExecRelation rel val, Eq val, HasRange val, Ord val) => Var -> Var -> rel -> UnionFind val rel -> Maybe (UnionFind val rel)
 relate a b relation relations = relateWithLookup (a, lookupStatus a relations) relation (b, lookupStatus b relations) relations
 
 -- | Relates two variables, using the more "senior" one as the root, if they have the same seniority, the one with the most children is used, O(lg n)
-relateWithLookup :: (Relation rel val, HasRange val, Ord val) => (Var, Status val rel) -> rel -> (Var, Status val rel) -> UnionFind val rel -> Maybe (UnionFind val rel)
+relateWithLookup :: (IsRelation rel, ExecRelation rel val, HasRange val, Ord val) => (Var, Status val rel) -> rel -> (Var, Status val rel) -> UnionFind val rel -> Maybe (UnionFind val rel)
 relateWithLookup (a, aLookup) relation (b, bLookup) relations =
   if a == b -- if the variables are the same, do nothing and return the original relations
     then Nothing
@@ -168,7 +168,7 @@ relateWithLookup (a, aLookup) relation (b, bLookup) relations =
 
 -- | Relates a child to a parent, O(lg n)
 --   child = relation parent
-relateChildToParent :: (Relation rel val, Eq val, HasRange val, Ord val) => (Var, Status val rel) -> rel -> (Var, Status val rel) -> UnionFind val rel -> Maybe (UnionFind val rel)
+relateChildToParent :: (IsRelation rel, ExecRelation rel val, Eq val, HasRange val, Ord val) => (Var, Status val rel) -> rel -> (Var, Status val rel) -> UnionFind val rel -> Maybe (UnionFind val rel)
 relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) relations = case parentLookup of
   -- The parent is a constant, so we make the child a constant:
   --    * for the parent: do nothing
@@ -227,7 +227,7 @@ relateChildToParent (child, childLookup) relationToChild (parent, parentLookup) 
 --------------------------------------------------------------------------------
 
 -- | Calculates the relation between two variables, O(lg n)
-relationBetween :: (Relation rel val, Ord val) => Var -> Var -> UnionFind val rel -> Maybe rel
+relationBetween :: (IsRelation rel, Ord val) => Var -> Var -> UnionFind val rel -> Maybe rel
 relationBetween var1 var2 xs = case (lookupStatus var1 xs, lookupStatus var2 xs) of
   (IsConstant _, _) -> Nothing
   (_, IsConstant _) -> Nothing
@@ -340,4 +340,4 @@ instance (Ord val) => Monoid (Range val) where
 -- | For checking if a value is within the range
 class HasRange val where
   isWithinRange :: Range val -> val -> Bool
-  execRelOnRange :: (Relation rel val) => rel -> Range val -> Range val
+  execRelOnRange :: (IsRelation rel, ExecRelation rel val) => rel -> Range val -> Range val

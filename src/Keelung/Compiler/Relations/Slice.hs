@@ -15,7 +15,7 @@ module Keelung.Compiler.Relations.Slice
     toConstraints,
     -- Testing
     isValid,
-    Failure (..),
+    Error (..),
     validate,
   )
 where
@@ -64,19 +64,10 @@ instance NFData SliceRelations
 instance Show SliceRelations where
   show (SliceRelations o i p x) =
     "UInt Relations:\n"
-      <> showMapping o
-      <> showMapping i
-      <> showMapping p
-      <> showMapping x
-    where
-      showMapping :: Mapping -> String
-      showMapping = indent . mconcat . map showVarMap . IntMap.elems . unMapping
-
-      showVarMap :: IntMap RefUSegments -> String
-      showVarMap varMap =
-        if IntMap.null varMap
-          then ""
-          else unlines (map show (IntMap.elems varMap))
+      <> show o
+      <> show i
+      <> show p
+      <> show x
 
 new :: SliceRelations
 new = SliceRelations (Mapping mempty) (Mapping mempty) (Mapping mempty) (Mapping mempty)
@@ -118,6 +109,7 @@ relate slice1 slice2 relations = case handleOverlappingSlices slice1 slice2 of
                   Slice (sliceRefU sliceB) rootEnd childEnd
                 )
 
+-- | Count the number of RefUSegments in the SliceRelations
 size :: SliceRelations -> Int
 size (SliceRelations refO refI refP refX) = sum (map sizeMapping [refO, refI, refP, refX])
   where
@@ -239,25 +231,25 @@ isValid = null . validate
 
 --------------------------------------------------------------------------------
 
-data Failure
+data Error
   = InvalidRefUSegments RefUSegments.Error
   | InvalidKinship Kinship
   deriving (Eq, Show)
 
-validate :: SliceRelations -> [Failure]
+validate :: SliceRelations -> [Error]
 validate relations = fromKinshipConstruction <> fromInvalidRefUSegments
   where
     SliceRelations refO refI refP refX = relations
 
     fromInvalidRefUSegments = mconcat (map isValidMapping [refO, refI, refP, refX])
 
-    isValidMapping :: Mapping -> [Failure]
+    isValidMapping :: Mapping -> [Error]
     isValidMapping (Mapping xs) = mconcat $ map (mconcat . map isValidRefUSegments . IntMap.elems) (IntMap.elems xs)
 
-    isValidRefUSegments :: RefUSegments -> [Failure]
+    isValidRefUSegments :: RefUSegments -> [Error]
     isValidRefUSegments x = map InvalidRefUSegments (RefUSegments.validate x)
 
-    fromKinshipConstruction :: [Failure]
+    fromKinshipConstruction :: [Error]
     fromKinshipConstruction = case nullKinship (destroyKinshipWithParent relations (constructKinshipWithChildOf relations)) of
       Nothing -> []
       Just x -> [InvalidKinship x]
@@ -297,8 +289,9 @@ relateSegment ((slice1, segment1), (slice2, segment2)) = case (segment1, segment
       then relateRootToSegment slice1 slice2
       else relateRootToSegment slice2 slice1
 
-assignValueToSegment :: U -> Slice -> M ()
-assignValueToSegment val (Slice ref start end) =
+-- | Assign a value to a Slice
+assignValueToSlice :: U -> Slice -> M ()
+assignValueToSlice val (Slice ref start end) =
   modify $
     modifyRefUSegments
       ref
@@ -314,7 +307,7 @@ assignValueToFamily val (FamilyLookup ([] : xs)) = do
   assignValueToFamily val (FamilyLookup xs)
 assignValueToFamily val (FamilyLookup ((x : xs) : xss)) = do
   let (val1, val2) = U.split val (widthOf x)
-  mapM_ (assignValueToSegment val1) (x : xs)
+  mapM_ (assignValueToSlice val1) (x : xs)
   assignValueToFamily val2 (FamilyLookup xss)
 
 -- | Relate a child Slice with a parent Slice
@@ -359,19 +352,13 @@ newtype Mapping = Mapping {unMapping :: IntMap (IntMap RefUSegments)}
 instance NFData Mapping
 
 instance Show Mapping where
-  show (Mapping xs) =
-    if IntMap.null xs
-      then "Mapping {}"
-      else
-        "Mapping {\n"
-          <> mconcat (map showVarMap (IntMap.elems xs))
-          <> "}"
+  show = indent . mconcat . map showVarMap . IntMap.elems . unMapping
     where
       showVarMap :: IntMap RefUSegments -> String
       showVarMap varMap =
         if IntMap.null varMap
           then ""
-          else unlines (map (\(_, slice) -> "    " <> show slice) (IntMap.toList varMap))
+          else unlines (IntMap.elems varMap >>= RefUSegments.formatRefUSegments)
 
 -- | Given a RefU, modify the RefUSegments referenced by the RefU
 --   Insert a new RefUSegments if it does not exist
@@ -402,7 +389,7 @@ newtype FamilyLookup = FamilyLookup [[Slice]] -- the equivalence class of each s
 
 -- | Given a Slice and its corresponding Segment, return all member Slices of the equivalence class of that Slice
 --   so that we can, for example, assign a value to all members of the equivalence class
---   or relate then to another Slice
+--   or relate them to another Slice
 familySlicesOfSliceSegmentPair :: SliceRelations -> SliceSegmentPair -> [Slice]
 familySlicesOfSliceSegmentPair relations (slice, segment) = case segment of
   Segment.Constant _ -> []

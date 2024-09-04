@@ -1,4 +1,4 @@
-module Keelung.Compiler.Relations.Monad (RelM, Seniority (..)) where
+module Keelung.Compiler.Relations.Monad (RelM, runRelM, Seniority (..)) where
 
 import Control.Monad.Except
 import Data.Function (on)
@@ -8,6 +8,9 @@ import Keelung.Data.Reference
 --------------------------------------------------------------------------------
 
 type RelM n = Except (Error n)
+
+runRelM :: RelM n a -> Either (Error n) a
+runRelM = runExcept
 
 --------------------------------------------------------------------------------
 

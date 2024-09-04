@@ -31,6 +31,7 @@ module Keelung.Data.UnionFind.Field
 
     -- * Linear Relations
     LinRel (..),
+    fromLinRel,
 
     -- * Range
     UnionFind.designateRange,
@@ -48,8 +49,9 @@ import Data.IntMap.Strict (IntMap)
 import Data.IntMap.Strict qualified as IntMap
 import Data.Serialize (Serialize)
 import GHC.Generics (Generic)
+import Keelung (N (N))
 import Keelung.Data.UnionFind qualified as UnionFind
-import Keelung.Data.UnionFind.Relation (Relation (..))
+import Keelung.Data.UnionFind.Relation (ExecRelation (..), IsRelation (..))
 import Keelung.Data.UnionFind.Relation qualified as Relation
 import Prelude hiding (lookup)
 
@@ -93,13 +95,13 @@ renderFamilies :: (GaloisField n, Integral n) => IntMap (UnionFind.Range (Wrappe
 renderFamilies families = mconcat (map (<> "\n") (concatMap toString (IntMap.toList families)))
   where
     showVar range var =
-      let rangeString = case range of 
+      let rangeString = case range of
             UnionFind.Range Nothing -> ""
             UnionFind.Range (Just (Wrapper 0, Wrapper 2)) -> " Bool"
             UnionFind.Range (Just (Wrapper l, Wrapper u)) -> "[" <> show l <> ", " <> show u <> ")"
           varString = "$" <> show var <> rangeString
        in "  " <> varString <> replicate (8 - length varString) ' '
-    toString (root, (range, toChildren)) = case map (uncurry Relation.renderWithVar) (IntMap.toList (fmap (uncurry LinRel) toChildren)) of
+    toString (root, (range, toChildren)) = case map (uncurry (Relation.renderWithVarString . show)) (IntMap.toList (fmap (uncurry LinRel) toChildren)) of
       [] -> [showVar range root <> " = []"] -- should never happen
       (x : xs) -> showVar range root <> " = " <> x : map ("           = " <>) xs
 
@@ -132,33 +134,36 @@ instance (NFData n) => NFData (UnionFind.Status n (LinRel n))
 fromLinRel :: LinRel n -> (n, n)
 fromLinRel (LinRel a b) = (a, b)
 
-instance (GaloisField n, Integral n) => Relation (LinRel n) (Wrapper n) where
+instance (GaloisField n, Integral n) => IsRelation (LinRel n) where
   -- Computes the inverse of a relation
   --      x = ay + b
   --        =>
   --      y = (1/a) x + (-b/a)
   invert (LinRel a b) = LinRel (recip a) ((-b) / a)
 
-  -- `execute relation parent = child`
-  execute (LinRel a b) (Wrapper value) = Wrapper (a * value + b)
-
-  renderWithVar var rel = go (Relation.invert rel)
+  renderWithVarString var rel = go (Relation.invert rel)
     where
-      var' = "$" <> show var
-
-      go (LinRel (-1) 1) = "¬" <> var'
+      go (LinRel (-1) 1) = "¬" <> var
       go (LinRel a b) =
         let slope = case a of
-              1 -> var'
-              (-1) -> "-" <> var'
-              _ -> show a <> var'
+              1 -> var
+              (-1) -> "-" <> var
+              _ -> show (N a) <> var
             intercept = case b of
               0 -> ""
-              _ -> " + " <> show b
+              _ -> " + " <> show (N b)
          in -- if N.isPositive b
             --   then " + " <> show (N b)
             --   else " - " <> show (N (-b))
             slope <> intercept
+
+instance (GaloisField n, Integral n) => ExecRelation (LinRel n) (Wrapper n) where
+  -- `execute relation parent = child`
+  execute (LinRel a b) (Wrapper value) = Wrapper (a * value + b)
+
+instance (GaloisField n, Integral n) => ExecRelation (LinRel n) n where
+  -- `execute relation parent = child`
+  execute (LinRel a b) value = a * value + b
 
 --------------------------------------------------------------------------------
 

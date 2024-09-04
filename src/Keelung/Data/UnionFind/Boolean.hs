@@ -30,7 +30,7 @@ import Data.IntMap.Strict qualified as IntMap
 import Data.IntSet (IntSet)
 import Data.IntSet qualified as IntSet
 import Keelung.Data.UnionFind
-import Keelung.Data.UnionFind.Relation (Relation (..))
+import Keelung.Data.UnionFind.Relation (ExecRelation (..), IsRelation (..))
 import Prelude hiding (lookup)
 
 --------------------------------------------------------------------------------
@@ -57,11 +57,13 @@ instance Semigroup Rel where
 instance Monoid Rel where
   mempty = Rel True
 
-instance Relation Rel Bool where
+instance IsRelation Rel where
   invert (Rel x) = Rel (not x)
+  renderWithVarString child (Rel True) = "$" <> child
+  renderWithVarString child (Rel False) = "¬$" <> child
+
+instance ExecRelation Rel Bool where
   execute (Rel x) val = x == val -- NXOR
-  renderWithVar child (Rel False) = "¬$" <> show child
-  renderWithVar child (Rel True) = "$" <> show child
 
 --------------------------------------------------------------------------------
 

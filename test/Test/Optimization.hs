@@ -10,9 +10,10 @@ import Keelung hiding (compileO0)
 import Keelung.Compiler.ConstraintModule (ConstraintModule (..))
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Data.Reference
-import Test.Util
+import Keelung.Data.UnionFind.Field (LinRel (LinRel))
 import Test.Hspec
 import Test.Optimization.UInt qualified as Optimization.UInt
+import Test.Util
 
 run :: IO ()
 run = hspec tests
@@ -48,11 +49,11 @@ tests = do
         cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
 
         -- FO0 = 3FI0
-        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (3, 0)
+        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (LinRel 3 0)
         -- F0 (y) = FI0
-        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (1, 0)
+        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (LinRel 1 0)
         -- F1 (z) = F0 (y)
-        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm) `shouldBe` Just (1, 0)
+        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm) `shouldBe` Just (LinRel 1 0)
 
       it "Field 2" $ do
         let program = do
@@ -66,11 +67,11 @@ tests = do
 
         cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
         -- FO0 = 4FI0
-        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (4, 0)
+        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (LinRel 4 0)
         -- F0 (y) = FI0
-        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (1, 0)
+        Relations.relationBetween (F $ RefFX 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (LinRel 1 0)
         -- F1 (z) = 2F0 (y)
-        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm) `shouldBe` Just (2, 0)
+        Relations.relationBetween (F $ RefFX 1) (F $ RefFX 0) (cmRelations cm) `shouldBe` Just (LinRel 2 0)
 
       it "Field 3" $ do
         let program = do
@@ -83,7 +84,7 @@ tests = do
 
         cm <- compileAsConstraintModule gf181 program :: IO (ConstraintModule GF181)
         -- FO0 = 2FI0 + 1
-        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (2, 1)
+        Relations.relationBetween (F $ RefFO 0) (F $ RefFI 0) (cmRelations cm) `shouldBe` Just (LinRel 2 1)
 
       it "Field 4" $ do
         let program = do

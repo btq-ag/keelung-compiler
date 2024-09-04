@@ -8,6 +8,7 @@ import Keelung.Compiler.Options
 import Keelung.Compiler.Relations (Relations)
 import Keelung.Compiler.Relations qualified as Relations
 import Keelung.Data.Reference
+import Keelung.Data.UnionFind.Field (LinRel (LinRel))
 import Test.Hspec (SpecWith, describe, hspec, it)
 import Test.Hspec.Expectations.Lifted
 
@@ -85,7 +86,7 @@ relate var (slope, val, intercept) = do
 assertRelation :: RefF -> GF181 -> RefF -> GF181 -> M ()
 assertRelation var1 slope var2 intercept = do
   xs <- get
-  Relations.relationBetween (F var1) (F var2) xs `shouldBe` Just (slope, intercept)
+  Relations.relationBetween (F var1) (F var2) xs `shouldBe` Just (LinRel slope intercept)
 
 ------------------------------------------------------------------------
 
