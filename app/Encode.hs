@@ -31,10 +31,10 @@ import Data.Int (Int64)
 -- | IMPORTANT: Make sure major, minor and patch versions are updated
 --   accordingly for every release.
 compilerVersion :: (Int, Int)
-compilerVersion = (0, 25)
+compilerVersion = (0, 26)
 
 patchVersion :: Int
-patchVersion = 0
+patchVersion = 1
 
 versionString :: String
 versionString = intercalate "." [show (fst compilerVersion), show (snd compilerVersion), show patchVersion]

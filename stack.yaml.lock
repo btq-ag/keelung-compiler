@@ -16,15 +16,15 @@ packages:
     commit: d7d0da6b5df8045afdfb820ba8d08f34dc4c3e58
     git: https://github.com/btq-ag/galois-field.git
 - completed:
-    commit: 8ce77292278f5704359f29b4a0e7dbb1e3561455
+    commit: 94b2a01d7c0ed46ae543580cce87b30492ebbdbf
     git: https://github.com/btq-ag/keelung.git
     name: keelung
     pantry-tree:
-      sha256: e8993b03e1e269197d381504afa998f3ba15da6bc6c30cdc96ebd5cdcf0e8b10
+      sha256: 16027ff8e2fa2f1765108c5fbdf58a07c1329f5941afb8dc5d52df43c3d48770
       size: 2059
-    version: 0.25.0
+    version: 0.26.1
   original:
-    commit: 8ce77292278f5704359f29b4a0e7dbb1e3561455
+    commit: 94b2a01d7c0ed46ae543580cce87b30492ebbdbf
     git: https://github.com/btq-ag/keelung.git
 - completed:
     hackage: MonadRandom-0.5.3@sha256:bb553af2bac914362a54983e4ed2e0b6352c09b73a1e1e280ec4befe14c4270c,1456
