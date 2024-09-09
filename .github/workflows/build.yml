@@ -230,7 +230,7 @@ jobs:
 
     # artifacts:
     - name: Download report license
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4.1.7
       if: startsWith(github.ref, 'refs/tags/v')
       with:
         name: keelung-compiler-license-report
@@ -333,7 +333,7 @@ jobs:
         stack test
 
     - name: Download report license
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4.1.7
       if: startsWith(github.ref, 'refs/tags/v')
       with:
         name: keelung-compiler-license-report
