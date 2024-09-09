@@ -19,6 +19,23 @@ jobs:
 
     # things to be cached/restored:
 
+    - name: ⏬ Install Nodejs
+      uses: actions/setup-node@v4
+
+    - name: ⏬ Install Snarkjs
+      run: |
+        mkdir -p ~/.local/bin
+        mkdir -p ~/.npm-global
+        export PATH=~/.stack/bin:~/.cabal/bin:~/.ghcup/bin:~/.local/bin:~/.npm-global/bin:$PATH
+        npm config set prefix "~/.npm-global"
+        npm install -g snarkjs@latest
+        echo "In .npm-global:"
+        ls ~/.npm-global
+        echo "In .npm-global/bin:"
+        ls ~/.npm-global/bin
+        echo "file ~/.npm-global/bin/snarkjs"
+        file ~/.npm-global/bin/snarkjs
+
     - name: 💾 Cache GHCup
       id:   stack-global
       uses: actions/cache@v2
@@ -70,22 +87,12 @@ jobs:
 
     - name: ⏬ Install GHCup & GHC & stack & cabal
       run: |
-        mkdir -p ~/.local/bin
-        export PATH=~/.stack/bin:~/.cabal/bin:~/.ghcup/bin:~/.local/bin:~/.npm-global/bin:$PATH
         # curl -sL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'; chmod a+x ~/.local/bin/stack
         if [[ ! -x ~/.ghcup/bin/stack ]]; then curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh; ghcup install ghc; ghcup install stack; ghcup install cabal; fi
         stack --version
     - name: ⏬ Install dependencies
       run: |
         stack build --only-dependencies
-
-    - name: ⏬ Install Nodejs
-      uses: actions/setup-node@v4
-
-    - name: ⏬ Install Snarkjs
-      run: |
-        npm config set prefix "~/.npm-global"
-        npm install -g snarkjs@latest
 
     - name: 🔨 Build and run tests
       run: |
