@@ -86,6 +86,9 @@ jobs:
       run: |
         npm config set prefix "~/.npm-global"
         npm install -g snarkjs@latest
+        ls ~/.npm-global
+        ls ~/.npm-global/bin
+        which snarkjs
 
     - name: 🔨 Build and run tests
       run: |
