@@ -19,6 +19,20 @@ jobs:
 
     # things to be cached/restored:
 
+    - name: ⏬ Install Nodejs
+      uses: actions/setup-node@v4
+
+    - name: ⏬ Install Snarkjs
+      run: |
+        npm config set prefix "~/.npm-global"
+        npm install -g snarkjs@latest
+        echo "In .npm-global:"
+        ls ~/.npm-global
+        echo "In .npm-global/bin:"
+        ls ~/.npm-global/bin
+        echo "which snarkjs:"
+        which snarkjs
+
     - name: 💾 Cache GHCup
       id:   stack-global
       uses: actions/cache@v2
@@ -78,17 +92,6 @@ jobs:
     - name: ⏬ Install dependencies
       run: |
         stack build --only-dependencies
-
-    - name: ⏬ Install Nodejs
-      uses: actions/setup-node@v4
-
-    - name: ⏬ Install Snarkjs
-      run: |
-        npm config set prefix "~/.npm-global"
-        npm install -g snarkjs@latest
-        ls ~/.npm-global
-        ls ~/.npm-global/bin
-        which snarkjs
 
     - name: 🔨 Build and run tests
       run: |
