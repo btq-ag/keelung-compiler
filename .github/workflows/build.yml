@@ -30,8 +30,10 @@ jobs:
         ls ~/.npm-global
         echo "In .npm-global/bin:"
         ls ~/.npm-global/bin
-        echo "which snarkjs:"
-        which snarkjs
+        echo "file ~/.npm-global/bin/snarkjs"
+        file ~/.npm-global/bin/snarkjs
+        echo "snarkjs --help"
+        snarkjs --help
 
     - name: 💾 Cache GHCup
       id:   stack-global
